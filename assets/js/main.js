@@ -13,7 +13,7 @@ let countdownUntil; // when we are counting down to
 function getResultsData() {
     $.ajax({
         type: 'GET',
-        url: './assets/csv/results.csv',
+        url: `./assets/csv/results.csv?${new Date()}`,
         dataType: 'text',
         success: function(data) {
             loadScores(data);
