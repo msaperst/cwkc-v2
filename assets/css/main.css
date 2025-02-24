@@ -1,0 +1,76 @@
+@font-face {
+    font-family: chunk;
+    src: url(ChunkFive-Regular.ttf);
+}
+
+:root {
+    --hooBlue: #232D4B;
+    --hooOrange: #F84C1E;
+    --hokieMaroon: #630031;
+    --hokieOrange: #CF4420;
+}
+
+#header {
+    .title-image {
+        background-color: white;
+    }
+}
+
+.btn {
+    font-family: chunk, monospace;
+    font-size: 30px;
+    width: 250px;
+    padding: 15px;
+}
+
+.btn:hover {
+    color: white;
+}
+
+.btn.hoo, .hoo.winner {
+    background-color: var(--hooBlue);
+    color: white;
+}
+
+.btn.hoo:hover {
+    background-color: var(--hooOrange);
+}
+
+.btn.hokie, .hokie.winner {
+    background-color: var(--hokieMaroon);
+    color: white;
+}
+
+.btn.hokie:hover {
+    background-color: var(--hokieOrange);
+}
+
+#overall-results {
+    .rounded {
+        padding: 20px 0;
+    }
+}
+
+#score-areas .rounded {
+    padding: 15px 0;
+    max-width: 200px;
+    margin: auto;
+}
+
+.hoo-rules a {
+    color: var(--hooBlue);
+    font-weight: bolder;
+}
+
+.hoo-rules a:hover {
+    color: var(--hooOrange);
+}
+
+.hokie-rules a {
+    color: var(--hokieMaroon);
+    font-weight: bolder;
+}
+
+.hokie-rules a:hover {
+    color: var(--hokieOrange);
+}

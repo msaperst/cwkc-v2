@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang='en'>
+<head>
+    <meta charset='utf-8'>
+    <meta content='width=device-width, initial-scale=1' name='viewport'>
+    <meta content='https://cwkc.org/assets/img/cup-logo.png' property='og:image' />
+    <meta content='2025 Commonwealth Kiddush Cup' property='og:description' />
+    <meta content='https://cwkc.org' property='og:url' />
+    <meta content='2025 Commonwealth Kiddush Cup' property='og:title' />
+
+    <link crossorigin='anonymous' href='https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css'
+          integrity='sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65' rel='stylesheet' />
+    <link href='assets/css/main.css' rel='stylesheet' />
+    <link href='assets/img/cup-logo.png' rel='icon' type='images/png' />
+
+    <title>2024 Commonwealth Kiddush Cup</title>
+</head>
+<body>
+
+<section class='bg-primary text-center p-5' id='header'>
+    <div class='container'>
+        <div class='row align-items-center'>
+            <div class='col'>
+                <a class='btn hoo' href='https://secure.lglforms.com/form_engine/s/Zv1yw0cTxn3NdRQPaPqcDg?t=1731517260'
+                   rel='noreferrer' role='button' target='_blank'>
+                    DONATE TO THE HOOS
+                </a>
+            </div>
+            <div class='col'>
+                <img alt='Commonwealth Kiddush Cup' class='title-image rounded' src='assets/img/cup-logo.png'>
+            </div>
+            <div class='col'>
+                <a class='btn hokie'
+                   href='https://secure.lglforms.com/form_engine/s/yd5aIiowgs1SDzPz8ovXHw?t=1731517036'
+                   rel='noreferrer' role='button' target='_blank'>
+                    DONATE TO THE HOKIES
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id='cup-details'>
+    <div class='container'>
+        <div class='row mt-3 justify-content-center'>
+            <div class='col-8 text-center' style='font-size: small;'>
+                <h1 class='h3'>ONE TEAM. ONE COMMUNITY. ONE FAMILY. ONE COMMONWEALTH. ONE CUP.</h1>
+                <p>Welcome to the Commonwealth Kiddush Cup - an eleven-year tradition of competition between
+                    <a href='https://www.brodyjewishcenter.org/' rel='noreferrer' target='_blank'>Hillel at the
+                        University of Virginia</a> and
+                    <a href='https://www.hillelatvirginiatech.org/' rel='noreferrer' target='_blank'>Hillel at Virginia
+                        Tech</a>.
+                    This fundraising battle sees alumni from both schools face off to raise more money for their
+                    school's Hillel - providing
+                    essential support for the many programs each Hillel runs for students throughout the year.
+                </p>
+                <p>Thank you for giving generously to support our Hillels. Each donation makes a direct impact on how
+                    students at both schools are able to deepen their connections to Judaism.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class='mb-5' id='overall-results'>
+    <div class='container bg-secondary p-5 rounded'>
+        <div class='row align-items-center'>
+            <div class='col text-center'><img alt='hoo logo' src='assets/img/uva.png' /></div>
+            <div class='col text-center'>
+                <div class='winner rounded h4 p-4 bg-primary' id='countdown'>
+                    <span id='countdown-text'>The Cup Starts In</span>
+                    <div class='h2'>
+                        <span class='days'></span>d
+                        <span class='hours'></span>h
+                        <span class='minutes'></span>m
+                        <span class='seconds'></span>s
+                    </div>
+                </div>
+                <div class='fw-bold' id='timeframe'>
+                    The CWKC starts December 2nd and ends December 9th at 8:00pm EST!
+                </div>
+            </div>
+            <div class='col text-center'><img alt='hokie logo' src='assets/img/tech.png' /></div>
+        </div>
+        <div class='row align-items-center'>
+            <div class='h2 col text-center rounded hoo winner'>
+                <span id='hooTotal'>0</span> Points
+            </div>
+            <div class='h4 col text-center align-self-end'>
+                Thanks to our donors!
+            </div>
+            <div class='h2 col text-center rounded hokie winner'>
+                <span id='hokieTotal'>0</span> Points
+            </div>
+        </div>
+        <div class='row align-items-center justify-content-between'>
+            <div class='col-4 text-center'>
+                <marquee behavior='scroll' direction='left' id='donorsUVA' scrollamount='5'></marquee>
+            </div>
+            <div class='col-4 text-center'>
+                <marquee behavior='scroll' direction='left' id='donorsTech' scrollamount='5'></marquee>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id='score-total'>
+</section>
+
+<section id='score-areas'>
+    <div class='container'>
+        <div class='row align-items-center score-area' data-points='3' id='totalRaisedScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'>$<span id='totalRaisedUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Highest Total Amount of Money Raised
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'>$<span id='totalRaisedTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='2' id='individualDonorsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='individualDonorsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Individual Overall Donors
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='individualDonorsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='alumniGatheringsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='alumniGatheringsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                <!-- TODO - put in link to form for gathering information -->
+                Alumni Gatherings
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='alumniGatheringsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='2' id='undergraduateDonorsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='undergraduateDonorsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Undergraduates Who Donate
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='undergraduateDonorsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='firstTimeDonorsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='firstTimeDonorsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most First Time Donors
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='firstTimeDonorsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='2' id='graduationClassDonorsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='graduationClassDonorsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Donations from Alumni of the Class of <span id='year'></span>
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='graduationClassDonorsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='alumniParentDonorsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'>$<span id='alumniParentDonorsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Money Raised by Parents of Alum
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'>$<span id='alumniParentDonorsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='giftsOver1000Score'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='giftsOver1000UVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Number of Gifts at/over $1,000
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='giftsOver1000Tech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='monthlyDonationsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='monthlyDonationsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Alum Who Sign Up To Give $10+ Monthly
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='monthlyDonationsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='workMatchedDonationsScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='workMatchedDonationsUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Most Alum Who Get Their Donations Matched Through Work
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='workMatchedDonationsTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='alumniMemoriesScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='alumniMemoriesUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                <!-- TODO - put in link to form for gathering information -->
+                Most Alumni Memories Submitted
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='alumniMemoriesTech'>0</span></div>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class='row align-items-center score-area' data-points='1' id='footballGameScore'>
+            <div class='col text-center'>
+                <div class='rounded hoo'><span id='footballGameUVA'>0</span></div>
+            </div>
+            <div class='col text-center h5'>
+                Winner of 11-30 Tech/UVA Football Game
+                <br>
+                <span class='points'></span>
+            </div>
+            <div class='col text-center'>
+                <div class='rounded hokie'><span id='footballGameTech'>0</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class='bg-primary p-5 mt-5' id='contact'>
+    <div class='container'>
+        <div class='row align-items-center'>
+            <div class='h4 col-4 text-center hoo-rules'>
+                <p><a href='https://www.brodyjewishcenter.org/commonwealth-kiddush-cup.html' rel='noreferrer'
+                      target='_blank'>The Rules</a></p>
+                <p><a href='mailto:truman@brodyjewishcenter.org' rel='noreferrer' target='_blank'>Email Truman</a></p>
+            </div>
+            <div class='h4 col-4 text-center'>
+                Have questions? Read the rules, or email our team for help!
+            </div>
+            <div class='h4 col-4 text-center hokie-rules'>
+                <p><a href='https://www.hillelatvirginiatech.org/cwkc' rel='noreferrer' target='_blank'>The Rules</a>
+                </p>
+                <p><a href='mailto:beryl@hillelvt.org' rel='noreferrer' target='_blank'>Email Beryl</a></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script crossorigin='anonymous'
+        integrity='sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4'
+        src='https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js'></script>
+<script crossorigin='anonymous' integrity='sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo='
+        src='https://code.jquery.com/jquery-3.7.1.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js'></script>
+
+<script src='assets/js/main.js'></script>
+</body>
+</html>
