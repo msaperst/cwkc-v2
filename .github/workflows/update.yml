@@ -1,11 +1,13 @@
-# Simple workflow for updating our results file
+# Workflow for updating our results file
+# This job can be triggered manually, and will run, alternatively, it can be triggered by
+# changes to our Google Sheets, however it will only run if the time are between the
+# start/stop times of the cup (defined below)
 name: Update results from multiple locations
 
 on:
-  # TODO - need to set up times for cron to run based on start/stop times of the cup
-  # Runs every five minutes to grab updated data
-  schedule:
-    - cron: '*/5 * * * *'
+  # Triggers from our google sheets
+  repository_dispatch:
+    types: [ sheet-change ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -23,18 +25,38 @@ permissions:
   id-token: write
 
 jobs:
-  # Single deploy job since we're just updating
-  update:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
+  # this job is relatively simple, and just checks the current date with the provided
+  # dates, and outputs true if inside the cup range
+  check-date:
     runs-on: ubuntu-latest
+    steps:
+      - name: Check Date Range
+        id: check_date
+        # these dates need to coincide with our start and stop dates
+        run: |
+          current_date=$(date +%Y-%m-%d)
+          start_date="2025-01-01"
+          end_date="2025-01-31"
+          if [[ $current_date > $start_date && $current_date < $end_date ]]; then
+            echo "in_range=true" >> $GITHUB_OUTPUT
+          else
+            echo "in_range=false" >> $GITHUB_OUTPUT
+          fi
 
+  # this job updates the csv file based on the data from the Google Sheets files (through a
+  # Python script). This job only run if within the date range of the cup, or if it was
+  # triggered manually
+  update-data:
+    runs-on: ubuntu-latest
+    needs: check-date
+    if: ${{ needs.check-date.outputs.in_range == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # credentials for Google Sheets obtained from here
+      # https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
       - name: Setup credentials
         run: |
           cd scraper
@@ -52,10 +74,11 @@ jobs:
           echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
           echo "}" >> spreadsheet_credentials.json
 
+      #install the python needed
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.12 #install the python needed
+          python-version: 3.12
 
       - name: Install dependencies
         run: |
@@ -67,39 +90,46 @@ jobs:
           cd scraper
           python getData.py
 
+      # check to see if we actually have any changes to our file
       - name: Check changes
         id: check-changes
-        run: |
+        run: |  # for some reason, this always comes back as true
           if git diff public/assets/csv/results.csv &> /dev/null; then
             echo "difference=true" >> $GITHUB_OUTPUT
           else
             echo "difference=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: check
-        run: |
-          echo ${{ steps.check-changes.outputs.difference }}
-          echo git diff public/assets/csv/results.csv
-
+      # push our updates to GitHub to save them
       - name: Publish new results
-        if: steps.check-changes.outputs.difference == 'true'
+        if: ${{ steps.check-changes.outputs.difference == 'true' }}
         uses: test-room-7/action-update-file@v2
         with:
           file-path: public/assets/csv/results.csv
           commit-msg: Updating results
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  # this final job publishes our code back to GitHub pages. This only runs if there were
+  # changes detected in the above steps
+  deploy-site:
+    runs-on: ubuntu-latest
+    needs: update-data
+    if: ${{ needs.update-data.check-changes.outputs.difference == 'true' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Pages
-        if: steps.check-changes.outputs.difference == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
-        if: steps.check-changes.outputs.difference == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: './public'  # Upload public folder
 
       - name: Deploy to GitHub Pages
-        if: steps.check-changes.outputs.difference == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
