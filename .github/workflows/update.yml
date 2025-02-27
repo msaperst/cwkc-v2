@@ -76,6 +76,11 @@ jobs:
             echo "difference=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: check
+        run: |
+          echo ${{ steps.check-changes.outputs.difference }}
+          echo git diff public/assets/csv/results.csv
+
       - name: Publish new results
         if: steps.check-changes.outputs.difference == 'true'
         uses: test-room-7/action-update-file@v2
@@ -83,9 +88,6 @@ jobs:
           file-path: public/assets/csv/results.csv
           commit-msg: Updating results
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: check
-        run: echo ${{ steps.check-changes.outputs.difference }}
 
       - name: Setup Pages
         if: steps.check-changes.outputs.difference == 'true'
