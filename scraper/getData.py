@@ -1,7 +1,7 @@
 import gspread
 import pandas
 
-from scraper.SubmittedData import get_alumni_gatherings, get_alumni_memories
+from scraper.getSubmittedData import get_alumni_gatherings, get_alumni_memories
 
 # set up our connection to google spreadsheets
 gc = gspread.service_account(filename='spreadsheet_credentials.json')
@@ -19,4 +19,4 @@ df.loc[0, 'alumniMemoriesUVA'] = alumni_memories_score.hoos
 df.loc[0, 'alumniMemoriesTech'] = alumni_memories_score.hokies
 
 # write new details into our file
-df.to_csv('../public/assets/csv/results.csv')
+df.to_csv('../public/assets/csv/results.csv', index=False)
