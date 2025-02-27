@@ -23,7 +23,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: setup python
+      - name: Setup credentials
+        run: |
+          cd scraper
+          cat ${{ secrets.GSPREADCREDENTIALS }} > spreadsheet_credentials.json
+
+      - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: 3.12 #install the python needed
@@ -34,7 +39,9 @@ jobs:
           if [ -f scraper/requirements.txt ]; then pip install -r scraper/requirements.txt; fi
 
       - name: Update results
-        run: cd scraper; python getData.py
+        run: |
+          cd scraper
+          python getData.py
 
       - name: Publish new results
         uses: test-room-7/action-update-file@v2
