@@ -22,3 +22,6 @@ is scheduled to run every 5 minutes, but can be triggered
 manually for more frequent runs. In order to authenticate
 with the spreadsheets, credentials have been saved into GHA
 following [these instructions](https://docs.gspread.org/en/v6.1.3/oauth2.html#for-bots-using-service-account).
+
+We're using a service bot for scraping this data, which is
+`google-sheets-service-account@hillel-51aad.iam.gserviceaccount.com`

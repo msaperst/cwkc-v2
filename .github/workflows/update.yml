@@ -26,7 +26,7 @@ jobs:
       - name: Setup credentials
         run: |
           cd scraper
-          cat ${{ secrets.GSPREADCREDENTIALS }} > spreadsheet_credentials.json
+          echo ${{ secrets.GSPREADCREDENTIALS }} > spreadsheet_credentials.json
 
       - name: Setup Python
         uses: actions/setup-python@v2
