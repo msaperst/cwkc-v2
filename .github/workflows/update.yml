@@ -17,7 +17,7 @@ concurrency:
 
 # Sets permissions of the GITHUB_TOKEN to allow updating our results file and publishing updates to pages
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -70,9 +70,9 @@ jobs:
         id: check-changes
         run: |
           if git diff public/assets/csv/results.csv &> /dev/null; then
-            echo ::set-output name=difference::true
+            echo "difference=true" >> $GITHUB_OUTPUT
           else
-            echo ::set-output name=difference::false
+            echo "difference=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Publish new results
