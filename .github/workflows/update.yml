@@ -2,6 +2,7 @@
 name: Update results from multiple locations
 
 on:
+  # TODO - need to set up times for cron to run based on start/stop times of the cup
   # Runs every five minutes to grab updated data
   schedule:
     - cron: '*/5 * * * *'
@@ -82,6 +83,9 @@ jobs:
           file-path: public/assets/csv/results.csv
           commit-msg: Updating results
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: check
+        run: echo ${{ steps.check-changes.outputs.difference }}
 
       - name: Setup Pages
         if: steps.check-changes.outputs.difference == 'true'
