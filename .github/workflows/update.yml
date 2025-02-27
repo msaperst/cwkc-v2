@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 # Sets permissions of the GITHUB_TOKEN to allow updating our results file
-permission:
+permissions:
   contents: write
 
 jobs:
