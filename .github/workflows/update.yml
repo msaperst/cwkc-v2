@@ -15,14 +15,21 @@ concurrency:
   group: "updates"
   cancel-in-progress: false
 
-# Sets permissions of the GITHUB_TOKEN to allow updating our results file
+# Sets permissions of the GITHUB_TOKEN to allow updating our results file and publishing updates to pages
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   # Single deploy job since we're just updating
   update:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,9 +66,34 @@ jobs:
           cd scraper
           python getData.py
 
+      - name: Check changes
+        id: check-changes
+        run: |
+          if git diff public/assets/csv/results.csv &> /dev/null; then
+            echo ::set-output name=difference::true
+          else
+            echo ::set-output name=difference::false
+          fi
+
       - name: Publish new results
+        if: steps.check-changes.outputs.difference == 'true'
         uses: test-room-7/action-update-file@v2
         with:
           file-path: public/assets/csv/results.csv
           commit-msg: Updating results
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Pages
+        if: steps.check-changes.outputs.difference == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        if: steps.check-changes.outputs.difference == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './public'  # Upload public folder
+
+      - name: Deploy to GitHub Pages
+        if: steps.check-changes.outputs.difference == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
