@@ -39,6 +39,8 @@ jobs:
           echo "  \"client_x509_cert_url\": \"${{ secrets.CLIENT_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
           echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
           echo "}" >> spreadsheet_credentials.json
+          
+          cat spreadsheet_credentials.json
 
       - name: Setup Python
         uses: actions/setup-python@v2
