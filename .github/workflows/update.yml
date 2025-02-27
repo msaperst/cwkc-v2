@@ -15,6 +15,10 @@ concurrency:
   group: "updates"
   cancel-in-progress: false
 
+# Sets permissions of the GITHUB_TOKEN to allow updating our results file
+permission:
+  contents: write
+
 jobs:
   # Single deploy job since we're just updating
   update:
@@ -39,8 +43,6 @@ jobs:
           echo "  \"client_x509_cert_url\": \"${{ secrets.CLIENT_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
           echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
           echo "}" >> spreadsheet_credentials.json
-          
-          cat spreadsheet_credentials.json
 
       - name: Setup Python
         uses: actions/setup-python@v2
