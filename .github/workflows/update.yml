@@ -8,7 +8,7 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-    
+
 # Allow only one concurrent data check, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these updates to complete.
 concurrency:
@@ -34,7 +34,7 @@ jobs:
           if [ -f scraper/requirements.txt ]; then pip install -r scraper/requirements.txt; fi
 
       - name: Update results
-        run: python scraper/getData.py
+        run: cd scraper; python getData.py
 
       - name: Publish new results
         uses: test-room-7/action-update-file@v2
