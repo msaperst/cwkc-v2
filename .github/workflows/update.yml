@@ -36,8 +36,8 @@ jobs:
         # these dates need to coincide with our start and stop dates
         run: |
           current_date=$(date +%Y-%m-%d)
-          start_date="2025-01-01"
-          end_date="2025-01-31"
+          start_date="2025-02-01"
+          end_date="2025-02-28"
           if [[ $current_date > $start_date && $current_date < $end_date ]]; then
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
@@ -102,7 +102,6 @@ jobs:
 
       # push our updates to GitHub to save them
       - name: Publish new results
-        if: ${{ steps.check-changes.outputs.difference == 'true' }}
         uses: test-room-7/action-update-file@v2
         with:
           file-path: public/assets/csv/results.csv

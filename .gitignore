@@ -1,3 +1,4 @@
 .idea
 
 /scraper/spreadsheet_credentials.json
+/scraper/github-access-token
