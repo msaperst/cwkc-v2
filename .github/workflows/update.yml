@@ -28,6 +28,8 @@ jobs:
   # dates, and outputs true if inside the cup range
   check-date:
     runs-on: ubuntu-latest
+    outputs:
+      output1: ${{ steps.date.outputs.in_range }}
     steps:
       - name: Check Date Range
         id: date
@@ -38,12 +40,9 @@ jobs:
           current_date=$(date +%Y-%m-%d)
           start_date="2025-02-01"
           end_date="2025-03-28"
-          echo $current_date
           if [[ $current_date > $start_date && $current_date < $end_date ]]; then
-            echo "true"
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
-            echo "true"
             echo "in_range=false" >> $GITHUB_OUTPUT
           fi
 
@@ -53,7 +52,7 @@ jobs:
   update-data:
     runs-on: ubuntu-latest
     needs: check-date
-    if: ${{ needs.check-date.date.outputs.in_range == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.check-date.outputs.in_range == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
