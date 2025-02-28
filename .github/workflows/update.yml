@@ -39,8 +39,10 @@ jobs:
           start_date="2025-02-01"
           end_date="2025-02-28"
           if [[ $current_date > $start_date && $current_date < $end_date ]]; then
+            echo "in range"
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
+            echo "out of range"
             echo "in_range=false" >> $GITHUB_OUTPUT
           fi
 
