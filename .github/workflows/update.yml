@@ -34,11 +34,13 @@ jobs:
       - name: Check Date Range
         id: date
         # these dates need to coincide with our start and stop dates
+        # TODO - these dates need to be in UTC, and include a timestamp
+        # TODO - for GHA to use it properly
         run: |
           current_date=$(date +%Y-%m-%d)
           start_date="2025-02-01"
-          end_date="2025-02-28"
-          if [[ $current_date >= $start_date && $current_date <= $end_date ]]; then
+          end_date="2025-03-28"
+          if [[ $current_date > $start_date && $current_date < $end_date ]]; then
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
             echo "in_range=false" >> $GITHUB_OUTPUT
