@@ -103,7 +103,5 @@ function triggerGithubAction() {
 
 # TODO
 
-- Fix date check for trigger (then verify that values actually get updated)
-- Complete documentation
-- Tie in changes for other form
 - Figure out how to grab data from LGL Forms
+- Figure out dates in `updates.yml` and how times can work (and to make inclusive)

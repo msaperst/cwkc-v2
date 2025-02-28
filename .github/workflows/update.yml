@@ -23,7 +23,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
-  
+
 jobs:
 
   # this job is relatively simple, and just checks the current date with the provided
@@ -40,8 +40,8 @@ jobs:
         # TODO - for GHA to use it properly
         run: |
           current_date=$(date +%Y-%m-%d)
-          start_date="2025-02-01"
-          end_date="2025-03-28"
+          start_date="2025-12-03"
+          end_date="2025-12-10"
           if [[ $current_date > $start_date && $current_date < $end_date ]]; then
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
