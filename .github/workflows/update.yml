@@ -21,7 +21,9 @@ concurrency:
 # Sets permissions of the GITHUB_TOKEN to allow updating our results file and publishing updates to pages
 permissions:
   contents: write
-
+  pages: write
+  id-token: write
+  
 jobs:
 
   # this job is relatively simple, and just checks the current date with the provided
