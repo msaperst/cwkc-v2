@@ -21,8 +21,6 @@ concurrency:
 # Sets permissions of the GITHUB_TOKEN to allow updating our results file and publishing updates to pages
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
 
@@ -40,9 +38,12 @@ jobs:
           current_date=$(date +%Y-%m-%d)
           start_date="2025-02-01"
           end_date="2025-03-28"
+          echo $current_date
           if [[ $current_date > $start_date && $current_date < $end_date ]]; then
+            echo "true"
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
+            echo "true"
             echo "in_range=false" >> $GITHUB_OUTPUT
           fi
 
