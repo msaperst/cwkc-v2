@@ -50,7 +50,6 @@ def get_alumni_memories(gc):
 
     data = SubmittedData()
     for row in rows:
-        print(row)
         young_alumni = row[4] == 'Yes'
 
         if 'University' in row[3] and young_alumni:
