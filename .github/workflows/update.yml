@@ -124,6 +124,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+
+      #this job completes to quickly, and doesn't get the updated content from above
+      - name: Waiting
+        run: sleep 5
+        
       - name: Checkout
         uses: actions/checkout@v4
 
