@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Date Range
-        id: check_date
+        id: date
         # these dates need to coincide with our start and stop dates
         run: |
           current_date=$(date +%Y-%m-%d)
@@ -50,7 +50,7 @@ jobs:
   update-data:
     runs-on: ubuntu-latest
     needs: check-date
-    if: ${{ needs.check-date.outputs.in_range == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.check-date.date.outputs.in_range == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,7 +92,7 @@ jobs:
 
       # check to see if we actually have any changes to our file
       - name: Check changes
-        id: check-changes
+        id: changes
         run: |  # for some reason, this always comes back as true
           if git diff public/assets/csv/results.csv &> /dev/null; then
             echo "difference=true" >> $GITHUB_OUTPUT
@@ -113,7 +113,7 @@ jobs:
   deploy-site:
     runs-on: ubuntu-latest
     needs: update-data
-    if: ${{ needs.update-data.check-changes.outputs.difference == 'true' }}
+    if: ${{ needs.update-data.changes.outputs.difference == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
