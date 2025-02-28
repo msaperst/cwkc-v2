@@ -43,7 +43,7 @@ jobs:
             echo "in range"
             echo "in_range=true" >> $GITHUB_OUTPUT
           else
-            echo current_date
+            echo $current_date
             echo "out of range"
             echo "in_range=false" >> $GITHUB_OUTPUT
           fi
