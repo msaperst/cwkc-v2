@@ -105,3 +105,4 @@ function triggerGithubAction() {
 
 - Figure out how to grab data from LGL Forms
 - Figure out dates in `updates.yml` and how times can work (and to make inclusive)
+- Get rid of the stupid sleep, and make it a dynamic wait
