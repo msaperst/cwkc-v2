@@ -109,6 +109,7 @@ jobs:
       # if there were some changes, push our new file to use later
       - name: Save CSV
         uses: actions/upload-artifact@v4
+        if: ${{ steps.changes.outputs.difference == 'true' }}
         with:
           name: results.csv
           path: public/assets/csv/results.csv
@@ -116,6 +117,7 @@ jobs:
       # push our updates to GitHub to save them
       - name: Publish new results
         uses: test-room-7/action-update-file@v2
+        if: ${{ steps.changes.outputs.difference == 'true' }}
         with:
           file-path: public/assets/csv/results.csv
           commit-msg: Updating results
@@ -137,7 +139,7 @@ jobs:
 
       # get our updated csv file (instead of waiting for the push to sync)
       - name: Retrieve CSV
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: results.csv
           path: public/assets/csv/results.csv
