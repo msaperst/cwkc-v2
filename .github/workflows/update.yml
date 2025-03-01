@@ -127,8 +127,8 @@ jobs:
 
       #this job completes to quickly, and doesn't get the updated content from above
       - name: Waiting
-        run: sleep 5
-        
+        run: sleep 10
+
       - name: Checkout
         uses: actions/checkout@v4
 
