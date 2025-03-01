@@ -109,7 +109,7 @@ jobs:
       # if there were some changes, push our new file to use later
       - name: Save CSV
         uses: actions/upload-artifact@v4
-        if: ${{ steps.changes.outputs.difference == 'true' }}
+        if: ${{ steps.changes.outputs.difference == 'true' }} # TODO - this if isn't respected, unsure why
         with:
           name: results.csv
           path: public/assets/csv/results.csv
@@ -117,7 +117,7 @@ jobs:
       # push our updates to GitHub to save them
       - name: Publish new results
         uses: test-room-7/action-update-file@v2
-        if: ${{ steps.changes.outputs.difference == 'true' }}
+        if: ${{ steps.changes.outputs.difference == 'true' }} # TODO - this if isn't respected, unsure why
         with:
           file-path: public/assets/csv/results.csv
           commit-msg: Updating results
