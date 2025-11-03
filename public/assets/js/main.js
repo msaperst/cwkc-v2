@@ -1,5 +1,5 @@
-const deadline = new Date(Date.parse('March 9, 2026 8:00 PM GMT-0500'));
-const startTime = new Date(Date.parse('February 2, 2026 12:00 AM GMT-0500'));
+const deadline = new Date(Date.parse('December 7, 2025 8:00 PM GMT-0500'));
+const startTime = new Date(Date.parse('December 1, 2025 12:00 AM GMT-0500'));
 // const year = new Date().getFullYear();
 const year = 2024;
 
