@@ -10,13 +10,13 @@ df = pandas.read_csv('../public/assets/csv/results.csv')
 
 # update data from our alumni gatherings
 alumni_gatherings_score = get_alumni_gatherings(gc)
-df.loc[0, 'alumniGatheringsUVA'] = alumni_gatherings_score.hoos
-df.loc[0, 'alumniGatheringsTech'] = alumni_gatherings_score.hokies
+df.loc[0, 'alumniGatheringsUVA'] = int(alumni_gatherings_score.hoos)
+df.loc[0, 'alumniGatheringsTech'] = int(alumni_gatherings_score.hokies)
 
 # update data from our alumni memories
 mitzvah_memories_score = get_mitzvah_memories(gc)
-df.loc[0, 'mitzvahMemoriesUVA'] = mitzvah_memories_score.hoos
-df.loc[0, 'mitzvahMemoriesTech'] = mitzvah_memories_score.hokies
+df.loc[0, 'mitzvahMemoriesUVA'] = int(mitzvah_memories_score.hoos)
+df.loc[0, 'mitzvahMemoriesTech'] = int(mitzvah_memories_score.hokies)
 
 # write new details into our file
 df.to_csv('../public/assets/csv/results.csv', index=False)
