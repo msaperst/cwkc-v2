@@ -1,7 +1,7 @@
 const deadline = new Date(Date.parse('December 7, 2025 8:00 PM GMT-0500'));
 const startTime = new Date(Date.parse('December 1, 2025 12:00 AM GMT-0500'));
 // const year = new Date().getFullYear();
-const year = 2024;
+const year = 2025;
 
 let timerInterval;  // interval to track countdown
 let refreshInterval;    // interval to track page refresh
@@ -129,6 +129,46 @@ function updateClock(endTime) {
     $('.seconds').html(('0' + timeRemaining.seconds).slice(-2));
 }
 
+// Helper for ordinal suffix (st, nd, rd, th)
+function getOrdinal(n) {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+function getDate(date) {
+    const optionsDate = { month: 'long', day: 'numeric', timeZone: 'America/New_York' };
+    const dateFormatter = new Intl.DateTimeFormat('en-US', optionsDate);
+
+    // Get month and day with ordinal
+    const endParts = dateFormatter.formatToParts(date);
+    const endMonth = endParts.find(p => p.type === 'month').value;
+    const endDay = endParts.find(p => p.type === 'day').value;
+    return `${endMonth} ${endDay}${getOrdinal(Number(endDay))}`;
+}
+
+function setTimes() {
+    $('#start-date').html(getDate(startTime));
+    $('#end-date').html(getDate(deadline));
+
+    // Format date for Eastern Time
+    const optionsTime = {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/New_York',
+        timeZoneName: 'short',
+    };
+
+    // Extract formatted parts
+    const timeFormatter = new Intl.DateTimeFormat('en-US', optionsTime);
+
+    // Get time in EST/EDT
+    const time = timeFormatter.format(deadline);
+
+    $('#end-time').html(time);
+}
+
 $(document).ready(() => {
     if (startTime > new Date()) {    // if in the future, show how many days until it starts
         countdownUntil = startTime;
@@ -146,6 +186,9 @@ $(document).ready(() => {
     // set an interval to keep the timer ticker (what we tick down to is set above)
     timerInterval = setInterval(() => updateClock(countdownUntil), 1000);
 
+    // set our dates
+    setTimes();
+    
     // retrieve our results data (stored in the CSV)
     getResultsData();
     refreshInterval = setInterval(getResultsData, 5000);
