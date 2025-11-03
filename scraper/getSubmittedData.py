@@ -60,3 +60,29 @@ def get_alumni_memories(gc):
     # TODO - return the testimonial and do something with them
 
     return data
+
+def get_mitzvah_memories(gc):
+    """Gets the mitzvah memory information
+
+    All the data is in one spreadsheet, with the schools listed in Column D.
+    We need to determine the correct school based on that column. Additionally,
+    you need to be an 'alumni' which is indicated in corresponding Column E.
+    Finally, we retrieve the picture, which is stored in Column G
+    """
+
+    sh = gc.open_by_key('1odvHzGY6O6buqlKSuFWx5WMfh0M2PGPCCJOVvXD8pko')
+    rows = sh.sheet1.get_all_values()  # get all of our rows
+    rows.pop(0)  # remove our header row
+
+    data = SubmittedData()
+    for row in rows:
+        alumni = row[4] == 'Yes'
+
+        if 'University' in row[3] and alumni:
+            data.hoos += 1
+        if 'Tech' in row[3] and alumni:
+            data.hokies += 1
+
+    # TODO - return the picture and do something with them
+
+    return data

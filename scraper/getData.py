@@ -14,9 +14,9 @@ df.loc[0, 'alumniGatheringsUVA'] = alumni_gatherings_score.hoos
 df.loc[0, 'alumniGatheringsTech'] = alumni_gatherings_score.hokies
 
 # update data from our alumni memories
-alumni_memories_score = get_alumni_memories(gc)
-df.loc[0, 'alumniMemoriesUVA'] = alumni_memories_score.hoos
-df.loc[0, 'alumniMemoriesTech'] = alumni_memories_score.hokies
+mitzvah_memories_score = get_mitzvah_memories(gc)
+df.loc[0, 'alumniMemoriesUVA'] = mitzvah_memories_score.hoos
+df.loc[0, 'alumniMemoriesTech'] = mitzvah_memories_score.hokies
 
 # write new details into our file
 df.to_csv('../public/assets/csv/results.csv', index=False)
