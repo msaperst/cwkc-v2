@@ -109,6 +109,9 @@ priority order
 - Figure out how to grab data from LGL Forms
 - Figure out dates in `updates.yml` and how times can work (and to make inclusive)
 - Add in links (and deactive them for alumni forms)
+- Make prettier for mobile
+- Document how to add/replace forms (maybe not needed)
+- Document how other schools can use this
 - Replace marquee with something smarter
 - Get images from gatherings and display them
 - Get testimonials (both video and written) and display them
