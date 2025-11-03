@@ -1,7 +1,7 @@
 import gspread
 import pandas
 
-from getSubmittedData import get_alumni_gatherings, get_alumni_memories
+from getSubmittedData import get_alumni_gatherings, get_alumni_memories, get_mitzvah_memories
 
 # set up our connection to google spreadsheets
 gc = gspread.service_account(filename='spreadsheet_credentials.json')
