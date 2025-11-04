@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en" class="h-full">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta content="https://cwkc.org/assets/img/cup-logo.png" property="og:image" />
+    <meta content="2025 Commonwealth Kiddush Cup" property="og:description" />
+    <meta content="https://cwkc.org" property="og:url" />
+    <meta content="2025 Commonwealth Kiddush Cup" property="og:title" />
+    <link href="assets/img/cup-logo.png" rel="icon" type="images/png" />
+    <title>2025 Commonwealth Kiddush Cup — Dark/Glass Tailwind</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Open+Sans:wght@700;800&display=swap"
+        rel="stylesheet">
+
+    <script>
+        // Extend Tailwind with school palettes, glass, and font families
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        heading: ['Open Sans', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Inter', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                        body: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif']
+                    },
+                    colors: {
+                        // University of Virginia (UVA)
+                        hoo: {
+                            blue: '#232D4B', // primary
+                            orange: '#E57200',
+                        },
+                        // Virginia Tech (VT)
+                        hokie: {
+                            maroon: '#861F41',
+                            orange: '#E87722',
+                        },
+                        glass: {
+                            1: 'rgba(255,255,255,0.08)',
+                            2: 'rgba(255,255,255,0.12)'
+                        }
+                    },
+                    boxShadow: {
+                        glass: '0 1px 0 rgba(255,255,255,.12) inset, 0 10px 30px rgba(0,0,0,.35)'
+                    },
+                    backdropBlur: {
+                        xs: '2px',
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        /* Typography */
+        html {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: 'Open Sans', ui-sans-serif, system-ui, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+            letter-spacing: .02em;
+        }
+
+        h1 {
+            font-weight: 800;
+        }
+
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-weight: 700;
+        }
+
+        /* Subtle animated gradient for the page background */
+        .bg-animated {
+            background: radial-gradient(1200px 600px at 10% -10%, rgba(35, 45, 75, .22), transparent 60%),
+                radial-gradient(900px 500px at 110% 10%, rgba(134, 31, 65, .25), transparent 60%),
+                radial-gradient(800px 400px at 50% 120%, rgba(232, 119, 34, .18), transparent 60%),
+                linear-gradient(180deg, #0B0F17 0%, #090D14 50%, #070B12 100%);
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+
+        /* Glass card helper (works with Tailwind utilities) */
+        .glass {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .08);
+        }
+
+        .logo-glass {
+            background: rgba(255, 255, 255, 0.32);
+            border-radius: 1rem;
+            padding: 0.5rem;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1), 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Optional marquee fallback styles if <marquee> is replaced later */
+        .marquee {
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .marquee>span {
+            display: inline-block;
+            padding-left: 100%;
+            animation: marquee 18s linear infinite;
+        }
+
+        @keyframes marquee {
+            to {
+                transform: translateX(-100%);
+            }
+        }
+    </style>
+</head>
+
+<body class="h-full text-slate-100 antialiased bg-animated font-body">
+
+    <!-- Page container -->
+    <div class="min-h-screen flex flex-col">
+
+        <!-- HEADER / HERO -->
+        <section id="header" class="relative">
+            <div class="absolute inset-0 pointer-events-none">
+                <!-- soft vignettes -->
+                <div class="absolute -top-20 -left-24 w-[40rem] h-[40rem] rounded-full bg-hokie-maroon/20 blur-3xl">
+                </div>
+                <div class="absolute -bottom-40 right-0 w-[40rem] h-[40rem] rounded-full bg-hoo-blue/20 blur-3xl"></div>
+            </div>
+
+            <div class="container mx-auto px-4 py-10 max-w-[960px]">
+                <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-6">
+                    <div class="flex justify-center md:justify-start">
+                        <a class="group inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold tracking-wide glass transition focus:outline-none focus:ring-2 border border-hoo-blue/40 bg-hoo-blue/60 hover:bg-hoo-blue/80 focus:ring-hoo-orange/60 shadow-glass"
+                            href="https://secure.lglforms.com/form_engine/s/Zv1yw0cTxn3NdRQPaPqcDg?t=1731517260"
+                            target="_blank" rel="noreferrer">
+                            <!-- <span class="mr-2 inline-block h-2 w-2 rounded-full bg-hoo-orange"></span> -->
+                            DONATE TO THE HOOS
+                        </a>
+                    </div>
+
+                    <div class="flex justify-center">
+                        <img src="assets/img/cup-logo.png" alt="Commonwealth Kiddush Cup"
+                            class="h-48 w-48 md:h-48 md:w-48 rounded-2xl shadow-glass glass" />
+                    </div>
+
+                    <div class="flex justify-center md:justify-end">
+                        <a class="group inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold tracking-wide glass transition focus:outline-none focus:ring-2 border border-hokie-maroon/40 bg-hokie-maroon/60 hover:bg-hokie-maroon/80 focus:ring-hokie-orange/60 shadow-glass"
+                            href="https://secure.lglforms.com/form_engine/s/CGpy6mRNHqYZkJaFadD9hQ" target="_blank"
+                            rel="noreferrer">
+                            DONATE TO THE HOKIES
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CUP DETAILS -->
+        <section id="cup-details" class="container mx-auto px-4 max-w-[960px]">
+            <div class="max-w-4xl mx-auto text-center glass rounded-3xl p-8 md:p-10">
+                <h1 class="text-xl md:text-2xl font-heading tracking-tight mb-3">ONE TEAM. ONE COMMUNITY. ONE FAMILY.
+                    ONE COMMONWEALTH. ONE CUP.</h1>
+                <p class="text-slate-300">Welcome to the Commonwealth Kiddush Cup - a thirteen-year tradition of
+                    competition between
+                    <a href="https://www.brodyjewishcenter.org/" target="_blank" rel="noreferrer"
+                        class="underline decoration-hoo-orange/60 hover:text-white">Hillel at the University of
+                        Virginia</a>
+                    and
+                    <a href="https://www.hillelatvirginiatech.org/" target="_blank" rel="noreferrer"
+                        class="underline decoration-hokie-orange/60 hover:text-white">Hillel at Virginia Tech</a>.
+                    This fundraising battle sees alumni from both schools face off to raise more money for their
+                    school's Hillel - providing essential support for the many programs each Hillel runs for students
+                    throughout the year.
+                </p>
+                <p class="text-slate-300 mt-4">Thank you for giving generously to support our Hillels. Each donation
+                    makes a direct impact on how students at both schools are able to deepen their connections to
+                    Judaism.</p>
+            </div>
+        </section>
+
+        <!-- OVERALL RESULTS / COUNTDOWN -->
+        <section id="overall-results" class="container mx-auto px-4 mt-10 max-w-[960px]">
+            <div class="glass rounded-3xl p-6 md:p-8">
+                <div class="grid grid-cols-3 gap-4 items-center">
+                    <div class="flex justify-center logo-glass">
+                        <img alt="hoo logo" src="assets/img/uva.png" class="h-24 w-auto opacity-90" />
+                    </div>
+                    <div class="text-center">
+                        <div id="countdown" class="winner glass rounded-2xl p-5">
+                            <span id="countdown-text" class="block text-sm uppercase tracking-widest text-slate-300">The
+                                Cup Starts In</span>
+                            <div class="text-2xl md:text-3xl font-heading font-extrabold mt-1">
+                                <span class="days"></span>d
+                                <span class="hours"></span>h
+                                <span class="minutes"></span>m
+                                <span class="seconds"></span>s
+                            </div>
+                        </div>
+                        <div id="timeframe" class="fw-bold mt-3 text-slate-300">
+                            The CWKC starts <span id="start-date" class="text-white"></span> and ends <span
+                                id="end-date" class="text-white"></span> at <span id="end-time"
+                                class="text-white"></span>!
+                        </div>
+                    </div>
+                    <div class="flex justify-center logo-glass">
+                        <img alt="hokie logo" src="assets/img/tech.png" class="h-24 w-auto" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-4 mt-6">
+                    <div class="h2 text-center glass rounded-2xl p-5 border-l-4 border-hoo-orange bg-hoo-blue/15">
+                        <span id="hooTotal" class="text-3xl font-heading font-extrabold">0</span>
+                        <span class="ml-2">Points</span>
+                    </div>
+                    <div class="text-center text-slate-300">Thanks to our donors!</div>
+                    <div class="h2 text-center glass rounded-2xl p-5 border-l-4 border-hokie-orange bg-hokie-maroon/15">
+                        <span id="hokieTotal" class="text-3xl font-heading font-extrabold">0</span>
+                        <span class="ml-2">Points</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center mt-6">
+                    <div class="glass rounded-2xl p-3">
+                        <marquee behavior="scroll" direction="left" id="donorsUVA" scrollamount="5"
+                            class="[--accent:theme(colors.hoo.orange)]"></marquee>
+                    </div>
+                    <div class="glass rounded-2xl p-3">
+                        <marquee behavior="scroll" direction="left" id="donorsTech" scrollamount="5"
+                            class="[--accent:theme(colors.hokie.orange)]"></marquee>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCORE TOTAL (placeholder keeps id for JS) -->
+        <section id="score-total" class="container mx-auto px-4 mt-8 max-w-[960px]"></section>
+
+        <!-- SCORE AREAS -->
+        <section id="score-areas" class="container mx-auto px-4 mt-2 max-w-[960px]">
+            <div class="space-y-6">
+
+                <!-- Score row helper: keep IDs for your existing JS -->
+                <div id="totalRaisedScore" data-points="3"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">
+                            $<span id="totalRaisedUVA">0</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Highest Total Amount of Money
+                            Raised</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">
+                            $<span id="totalRaisedTech">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="individualDonorsScore" data-points="2"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">
+                            <span id="individualDonorsUVA">0</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Individual Overall Donors
+                        </div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">
+                            <span id="individualDonorsTech">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="alumniGatheringsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">
+                            <span id="alumniGatheringsUVA">0</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <a class="enable-during-contest underline decoration-hoo-orange/60 hover:text-white text-base md:text-lg font-heading font-semibold"
+                            href="https://forms.gle/V5GyERDyzdHp67D67" target="_blank" rel="noreferrer">
+                            Alumni Gatherings
+                            <br />
+                            <span class="points text-slate-300 text-sm"></span>
+                        </a>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">
+                            <span id="alumniGatheringsTech">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="undergraduateDonorsScore" data-points="2"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="undergraduateDonorsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Undergraduates Who Donate
+                        </div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="undergraduateDonorsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="firstTimeDonorsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="firstTimeDonorsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most First Time Donors</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="firstTimeDonorsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="graduationClassDonorsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="graduationClassDonorsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Donations from Alumni of the
+                            Class of <span id="year"></span></div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="graduationClassDonorsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="familyDonorsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">$<span
+                                id="familyDonorsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Money Raised by Families of
+                            Alumni &amp; Current Students</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">$<span
+                                id="familyDonorsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="grandparentDonorsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">$<span
+                                id="grandparentDonorsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Money Raised by Grandparents
+                            of Current Students</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block">$<span
+                                id="grandparentDonorsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="giftsOver1000Score" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="giftsOver1000UVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Number of Gifts at/over $1,000
+                        </div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="giftsOver1000Tech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="monthlyDonationsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="monthlyDonationsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Alum Who Sign Up To Give $10+
+                            Monthly</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="monthlyDonationsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="workMatchedDonationsScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="workMatchedDonationsUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Most Alum Who Get Their Donations
+                            Matched Through Work</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="workMatchedDonationsTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="mitzvahMemoriesScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="mitzvahMemoriesUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <a class="enable-during-contest underline decoration-hokie-orange/60 hover:text-white text-base md:text-lg font-heading font-semibold"
+                            href="https://forms.gle/GWBr9PPb2wqKTWsCA" target="_blank" rel="noreferrer">
+                            Bar/Bat Mitzvah Photo Memory Submissions
+                            <br />
+                            <span class="points text-slate-300 text-sm"></span>
+                        </a>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="mitzvahMemoriesTech">0</span></div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-white/10"></div>
+
+                <div id="footballGameScore" data-points="1"
+                    class="grid grid-cols-3 items-center gap-4 glass rounded-2xl p-5">
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="footballGameUVA">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-base md:text-lg font-heading font-semibold">Winner of 11-30 Tech/UVA Football
+                            Game</div>
+                        <span class="points text-slate-300 text-sm"></span>
+                    </div>
+                    <div class="text-center">
+                        <div class="rounded-xl px-4 py-3 border border-white/15 bg-white/5 inline-block"><span
+                                id="footballGameTech">0</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- CONTACT / FOOTER CTA -->
+        <section id="contact" class="container mx-auto px-4 mt-10 mb-16 max-w-[960px]">
+            <div class="glass rounded-3xl p-6 md:p-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-6 text-center">
+
+                    <!-- UVA Section -->
+                    <div class="space-y-3">
+                        <a href="https://www.brodyjewishcenter.org/commonwealth-kiddush-cup.html" target="_blank"
+                            rel="noreferrer"
+                            class="inline-flex items-center justify-center px-5 py-3 rounded-2xl font-semibold tracking-wide border border-hoo-blue/40 bg-hoo-blue/30 hover:bg-hoo-blue/50 transition shadow-glass focus:outline-none focus:ring-2 focus:ring-hoo-orange/60">
+                            View The UVA Rules
+                        </a>
+                        <a href="mailto:truman@brodyjewishcenter.org" target="_blank" rel="noreferrer"
+                            class="inline-flex items-center justify-center px-5 py-3 rounded-2xl font-semibold tracking-wide border border-hoo-orange/40 bg-hoo-orange/30 hover:bg-hoo-orange/50 transition shadow-glass focus:outline-none focus:ring-2 focus:ring-hoo-blue/60">
+                            Email Truman
+                        </a>
+                    </div>
+
+                    <!-- Center Message -->
+                    <div class="text-slate-300 text-lg">
+                        Have questions? Read the rules or email our team for help!
+                    </div>
+
+                    <!-- VT Section -->
+                    <div class="space-y-3">
+                        <a href="https://www.hillelatvirginiatech.org/cwkc" target="_blank" rel="noreferrer"
+                            class="inline-flex items-center justify-center px-5 py-3 rounded-2xl font-semibold tracking-wide border border-hokie-maroon/40 bg-hokie-maroon/30 hover:bg-hokie-maroon/50 transition shadow-glass focus:outline-none focus:ring-2 focus:ring-hokie-orange/60">
+                            View The VT Rules
+                        </a>
+                        <a href="mailto:beryl@hillelvt.org" target="_blank" rel="noreferrer"
+                            class="inline-flex items-center justify-center px-5 py-3 rounded-2xl font-semibold tracking-wide border border-hokie-orange/40 bg-hokie-orange/30 hover:bg-hokie-orange/50 transition shadow-glass focus:outline-none focus:ring-2 focus:ring-hokie-maroon/60">
+                            Email Beryl
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Dependencies retained for your existing data/logic -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+
+</html>
