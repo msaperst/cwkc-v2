@@ -94,7 +94,7 @@ jobs:
       - name: Update results
         run: |
           cd scraper
-          python getData.py
+          python getGoogleFormData.py
 
       # check to see if we actually have any changes to our file
       - name: Check changes
