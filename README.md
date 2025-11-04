@@ -27,7 +27,7 @@ Commonwealth Kiddish Cup
 
 As the workflow above shows, there are two main
 integration points for our application. The first is
-directly to the LGL Forms database to track donations,
+scraping emails from the LGL Forms to track donations,
 and the second is from our alumni submitted data which
 is stored in Google Sheets.
 
@@ -37,9 +37,34 @@ real time.
 
 ### Donations
 
-TODO - figure out how to tie into database and then
-implement this, and then document it (might need to
-change the wording in the above step)
+Unfortunately, not all fields in the donations forms are
+mapped to fields within LGL. This means that data can not
+be extracted directly from the LGL database. Instead, we
+are capturing data from the emails sent out, pulling that
+data into a spreadsheet, and then analyzing it.
+
+A script is running on a remote server that continuously
+checks to see if a new email is received from LGL. If it
+is, it triggers a GitHub Action to scrape the email data.
+If needed, it can be triggered manually for more frequent
+runs.
+
+#### Setup
+
+In order to poll for emails, simply run the
+`scripts/pollEmail.py` script. In order to run, an env
+file must be configured with a few values.
+
+```env
+EMAIL_ACCOUNT=servicecwkc@gmail.com
+EMAIL_APP_PASSWORD=[UNIQUE_EMAIL_APP_PASSWORD]
+GITHUB_TOKEN=[GHA_TOKEN]
+```
+
+This polling script can be run anywhere, so long as it
+runs the entire time of the cup (so that emails can be
+checked for); locally, on a small server somewhere, or
+even as an ongoing GHA job.
 
 ### Gathering and Memory Forms
 
@@ -106,9 +131,7 @@ function triggerGithubAction() {
 Open items to be addressed. These are more or less in
 priority order
 
-- Figure out how to grab data from LGL Forms
 - Figure out dates in `updates.yml` and how times can work (and to make inclusive)
-- Make prettier for mobile
 - Document how to add/replace forms (maybe not needed)
 - Document how other schools can use this
 - Replace marquee with something smarter
