@@ -201,17 +201,31 @@ jobs:
           commit-msg: Updating results
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  # this job waits for the previous two to complete, and then checks their status to determine if
+  # the next one should run
+  merge-results:
+    runs-on: ubuntu-latest
+    needs: [ update-google-form-data, update-lgl-form-data ]
+    if: always()
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    steps:
+      - id: check
+        run: |
+          google_diff=${{ needs.update-google-form-data.outputs.difference }}
+          lgl_diff=${{ needs.update-lgl-form-data.outputs.difference }}
+          if [[ "$google_diff" == "true" || "$lgl_diff" == "true" ]]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
+
   # this final job publishes our code back to GitHub pages. This only runs if there were
   # changes detected in the above steps
   deploy-site:
     runs-on: ubuntu-latest
-    needs: [ update-google-form-data, update-lgl-form-data ]
-    if: >
-      ${{ 
-        (needs.update-google-form-data.result == 'success' && needs.update-google-form-data.outputs.difference == 'true')
-      ||
-      (needs.update-lgl-form-data.result == 'success' && needs.update-lgl-form-data.outputs.difference == 'true')
-      }}
+    needs: merge-results
+    if: ${{ needs.merge-results.outputs.should_deploy == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
