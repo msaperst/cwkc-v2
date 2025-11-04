@@ -214,7 +214,7 @@ jobs:
         run: |
           google_diff="${{ needs.update-google-form-data.outputs.difference }}"
           lgl_diff="${{ needs.update-lgl-form-data.outputs.difference }}"
-            
+          
           echo "google_diff=$google_diff"
           echo "lgl_diff=$lgl_diff"
           
@@ -231,7 +231,7 @@ jobs:
   deploy-site:
     runs-on: ubuntu-latest
     needs: merge-results
-    if: ${{ needs.merge-results.outputs.should_deploy == 'true' }}
+    if: ${{ always() && needs.merge-results.outputs.should_deploy == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
