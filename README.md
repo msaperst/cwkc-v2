@@ -6,15 +6,16 @@ Commonwealth Kiddish Cup
 
 ## Workflow
 
-1. Alumni forms are filled out
-2. Results populate into Google Sheets
-3. When Google Sheets changes, a GHA is triggered to
-   scrape data into `results.csv` file
-4. Donation forms are filled out
-5. Results get uploaded to a database
-6. GHA triggered to pull data from database into
+1. Forms are filled out
+    1. Alumni forms
+        1. Alumni forms are filled out
+        2. Results populate into Google Sheets
+    2. Donation forms
+        1. Donation forms are filled out
+        2. Email is sent out
+2. GHA is triggered to scrape data into
    `results.csv` file
-7. `index.html` pulls data from `results.csv` file
+3. `index.html` pulls data from `results.csv` file
 
 ![img.png](highLevelWorkflow.png)
 [Link for modifying](https://www.canva.com/design/DAGgbkbv3WQ/oSKlD4TjEMOe_xGGQLPTSQ/edit?utm_content=DAGgbkbv3WQ&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
