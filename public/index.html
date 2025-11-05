@@ -97,10 +97,10 @@
         </div>
         <div class='row align-items-center justify-content-between'>
             <div class='col-4 text-center'>
-                <marquee behavior='scroll' direction='left' id='donorsUVA' scrollamount='5'></marquee>
+                <marquee behavior='scroll' direction='left' id='uva_donor_names' scrollamount='5'></marquee>
             </div>
             <div class='col-4 text-center'>
-                <marquee behavior='scroll' direction='left' id='donorsTech' scrollamount='5'></marquee>
+                <marquee behavior='scroll' direction='left' id='vt_donor_names' scrollamount='5'></marquee>
             </div>
         </div>
     </div>
@@ -111,9 +111,9 @@
 
 <section id='score-areas'>
     <div class='container'>
-        <div class='row align-items-center score-area' data-points='3' id='totalRaisedScore'>
+        <div class='row align-items-center score-area' data-points='3' id='total_amount'>
             <div class='col text-center'>
-                <div class='rounded hoo'>$<span id='totalRaisedUVA'>0</span></div>
+                <div class='rounded hoo'>$<span id='uva_total_amount'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Total Amount of Money Raised
@@ -121,15 +121,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'>$<span id='totalRaisedTech'>0</span></div>
+                <div class='rounded hokie'>$<span id='vt_total_amount'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='2' id='individualDonorsScore'>
+        <div class='row align-items-center score-area' data-points='2' id='most_individual_donors'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='individualDonorsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_individual_donors'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Individual Overall Donors
@@ -137,15 +137,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='individualDonorsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_individual_donors'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='alumniGatheringsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='alumni_gatherings'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='alumniGatheringsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_alumni_gatherings'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 <a class="enable-during-contest" href="https://forms.gle/V5GyERDyzdHp67D67" rel="noreferrer"
@@ -156,15 +156,15 @@
                 </a>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='alumniGatheringsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_alumni_gatherings'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='2' id='undergraduateDonorsScore'>
+        <div class='row align-items-center score-area' data-points='2' id='most_undergraduates'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='undergraduateDonorsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_undergraduates'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Undergraduates Who Donate
@@ -172,15 +172,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='undergraduateDonorsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_undergraduates'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='firstTimeDonorsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='most_first_time_donors'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='firstTimeDonorsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_first_time_donors'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most First Time Donors
@@ -188,15 +188,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='firstTimeDonorsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_first_time_donors'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='graduationClassDonorsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='most_donors_class_2025'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='graduationClassDonorsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_donors_class_2025'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Donations from Alumni of the Class of <span id='year'></span>
@@ -204,15 +204,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='graduationClassDonorsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_donors_class_2025'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='familyDonorsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='most_money_families'>
             <div class='col text-center'>
-                <div class='rounded hoo'>$<span id='familyDonorsUVA'>0</span></div>
+                <div class='rounded hoo'>$<span id='uva_most_money_families'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Money Raised by Families of Alumni & Current Students
@@ -220,15 +220,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'>$<span id='familyDonorsTech'>0</span></div>
+                <div class='rounded hokie'>$<span id='vt_most_money_families'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='grandparentDonorsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='most_money_grandparents_current_students'>
             <div class='col text-center'>
-                <div class='rounded hoo'>$<span id='grandparentDonorsUVA'>0</span></div>
+                <div class='rounded hoo'>$<span id='uva_most_money_grandparents_current_students'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Money Raised by Grandparents of Current Students
@@ -236,15 +236,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'>$<span id='grandparentDonorsTech'>0</span></div>
+                <div class='rounded hokie'>$<span id='vt_most_money_grandparents_current_students'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='giftsOver1000Score'>
+        <div class='row align-items-center score-area' data-points='1' id='most_gifts_over_1000'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='giftsOver1000UVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_gifts_over_1000'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Number of Gifts at/over $1,000
@@ -252,15 +252,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='giftsOver1000Tech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_gifts_over_1000'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='monthlyDonationsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='most_alum_monthly_10_plus'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='monthlyDonationsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_alum_monthly_10_plus'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Alum Who Sign Up To Give $10+ Monthly
@@ -268,15 +268,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='monthlyDonationsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_alum_monthly_10_plus'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='workMatchedDonationsScore'>
+        <div class='row align-items-center score-area' data-points='1' id='most_alum_work_matched'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='workMatchedDonationsUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_most_alum_work_matched'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 Most Alum Who Get Their Donations Matched Through Work
@@ -284,15 +284,15 @@
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='workMatchedDonationsTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_most_alum_work_matched'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='mitzvahMemoriesScore'>
+        <div class='row align-items-center score-area' data-points='1' id='mitzvah_memories'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='mitzvahMemoriesUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_mitzvah_memories'>0</span></div>
             </div>
             <div class='col text-center h5'>
                 <a class="enable-during-contest" href="https://forms.gle/GWBr9PPb2wqKTWsCA" rel="noreferrer"
@@ -303,23 +303,23 @@
                 </a>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='mitzvahMemoriesTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_mitzvah_memories'>0</span></div>
             </div>
         </div>
 
         <hr />
 
-        <div class='row align-items-center score-area' data-points='1' id='footballGameScore'>
+        <div class='row align-items-center score-area' data-points='1' id='football_score'>
             <div class='col text-center'>
-                <div class='rounded hoo'><span id='footballGameUVA'>0</span></div>
+                <div class='rounded hoo'><span id='uva_football_score'>0</span></div>
             </div>
             <div class='col text-center h5'>
-                Winner of 11-30 Tech/UVA Football Game
+                Winner of 11-29 Tech/UVA Football Game
                 <br>
                 <span class='points'></span>
             </div>
             <div class='col text-center'>
-                <div class='rounded hokie'><span id='footballGameTech'>0</span></div>
+                <div class='rounded hokie'><span id='vt_football_score'>0</span></div>
             </div>
         </div>
     </div>

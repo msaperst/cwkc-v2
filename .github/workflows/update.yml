@@ -157,6 +157,10 @@ jobs:
           echo "  \"client_x509_cert_url\": \"${{ secrets.CLIENT_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
           echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
           echo "}" >> spreadsheet_credentials.json
+          
+          echo "EMAIL_ACCOUNT=${{ secrets.EMAIL_ACCOUNT }}" > .env
+          echo "EMAIL_APP_PASSWORD=${{ secrets.EMAIL_APP_PASSWORD }}" >> .env
+          echo "SPREADSHEET_KEY=${{ secrets.SPREADSHEET_KEY }}" >> .env
 
       #install the python needed
       - name: Setup Python
@@ -172,7 +176,7 @@ jobs:
       - name: Update results
         run: |
           cd scraper
-          echo "NEED TO IMPLEMENT THIS"
+          python getLglFormData.py
 
       # check to see if we actually have any changes to our file
       - name: Check changes

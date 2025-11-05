@@ -34,7 +34,7 @@ function loadScores(data) {
         complete: function(results) {
             // loop through the results, and place each value in the appropriate location
             $.each(results.data[0], function(key, value) {
-                $(`#${key}`).html(value.replace(/(\d)(?=(\d\d\d)+(?!\d))/g, '$1,'));
+                $(`#${key}`).html(formatNumber(value.replace(/(\d)(?=(\d\d\d)+(?!\d))/g, '$1,')));
             });
 
             // clear out any winners
@@ -83,7 +83,21 @@ function loadScores(data) {
  * @returns {number} floating point number
  */
 function getNumber(element) {
-    return parseFloat($(element).html());
+    return parseFloat($(element).html().replace(/,/g, ''));
+}
+
+/**
+ * takes a number, and if it has a decimal place, rounds it to two
+ * places, otherwise leaves it with none
+ */
+function formatNumber(num) {
+    num = parseFloat(num.replace(/,/g, ''));
+    // Check if the number is an integer by comparing it to its integer part
+    if (Number.isInteger(num)) {
+        return num; // Return as-is if it's an integer
+    } else {
+        return parseFloat(num.toFixed(2)); // Format to 2 decimal places if float
+    }
 }
 
 /**
