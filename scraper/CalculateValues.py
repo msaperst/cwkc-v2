@@ -1,0 +1,107 @@
+from typing import Dict, Any
+
+import gspread
+import pandas as pd
+
+
+class CalculateValues:
+    """
+    Pulls normalized donation data from Google Sheets and calculates metrics per school.
+    """
+
+    FAMILY_STATUSES = ['Current Parent', 'Current Grandparent', 'Parent of Alumni', 'Grandparent of Alumni']
+    GRANDPARENT_STATUS = ['Current Grandparent']
+
+    def __init__(self, spreadsheet_key: str, worksheet_name: str = "entries",
+                 creds_file: str = "spreadsheet_credentials.json"):
+        self.spreadsheet_key = spreadsheet_key
+        self.worksheet_name = worksheet_name
+        self.creds_file = creds_file
+        self.df = self._load_data()
+
+    def _load_data(self) -> pd.DataFrame:
+        """Pull normalized data from Google Sheets into a DataFrame."""
+        gc = gspread.service_account(filename=self.creds_file)
+        sh = gc.open_by_key(self.spreadsheet_key)
+        ws = sh.worksheet(self.worksheet_name)
+        data = ws.get_all_records()
+        df = pd.DataFrame(data)
+
+        # Normalize columns
+        df['source'] = df['source'].str.lower()
+        df['total amount'] = pd.to_numeric(df['total amount'], errors='coerce').fillna(0)
+        df['recurring payment'] = df['recurring payment'].str.lower().map({'true': True, 'false': False})
+        return df
+
+    # =================== Public Interface ===================
+    def calculate_all(self) -> Dict[str, Dict[str, Any]]:
+        """Compute all metrics for UVA and VT."""
+        return {
+            'uva': self._calculate_school_metrics('uva'),
+            'vt': self._calculate_school_metrics('vt')
+        }
+
+    # =================== Internal Helpers ===================
+    def _calculate_school_metrics(self, school_prefix: str) -> Dict[str, Any]:
+        school_df = self.df[self.df['source'].str.startswith(school_prefix)]
+        if school_df.empty:
+            return {}
+
+        metrics = {
+            "total_amount": self._total_raised(school_df),
+            "most_individual_donors": self._unique_donors_count(school_df),
+            "donor_names": self._donor_names(school_df),
+            "most_first_time_donors": self._first_time_donors_count(school_df),
+            "most_donors_class_2025": self._class_year_donors(school_df, 2025),
+            "most_undergraduates": self._status_count(school_df, 'Current Student'),
+            "most_gifts_over_1000": self._gifts_over_1000_count(school_df),
+            "most_alum_monthly_10_plus": self._alumni_monthly_10_plus(school_df),
+            "most_alum_work_matched": self._alumni_work_matched(school_df),
+            "most_money_families": self._money_by_statuses(school_df, self.FAMILY_STATUSES),
+            "most_money_grandparents_current_students": self._money_by_statuses(school_df, self.GRANDPARENT_STATUS)
+        }
+
+        return metrics
+
+    # =================== Individual Metric Functions ===================
+    def _total_raised(self, df: pd.DataFrame) -> float:
+        return df.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'], axis=1).sum()
+
+    def _unique_donors_count(self, df: pd.DataFrame) -> int:
+        return df[['first name', 'last name']].drop_duplicates().shape[0]
+
+    def _donor_names(self, df: pd.DataFrame) -> str:
+        # Only include donors who are not anonymous
+        filtered = df[df['anonymous donation'].str.lower() != 'true']
+        unique = filtered[['first name', 'last name']].drop_duplicates()
+        return ", ".join(unique.apply(lambda x: f"{x['first name']} {x['last name']}".strip(), axis=1))
+
+    def _first_time_donors_count(self, df: pd.DataFrame) -> int:
+        # count unique donors who are first-time givers
+        ft_df = df[df['first time giver'].str.lower() == 'true']
+        return ft_df[['first name', 'last name']].drop_duplicates().shape[0]
+
+    def _class_year_donors(self, df: pd.DataFrame, year: int) -> int:
+        # count unique donors who are Current Student or Alumni of the given class
+        class_df = df[((df['status'].isin(['Current Student', 'Alumni'])) & (df['graduation year'] == year))]
+        return class_df[['first name', 'last name']].drop_duplicates().shape[0]
+
+    def _status_count(self, df: pd.DataFrame, status: str) -> int:
+        # count unique donors with a given status
+        status_df = df[df['status'] == status]
+        return status_df[['first name', 'last name']].drop_duplicates().shape[0]
+
+    def _gifts_over_1000_count(self, df: pd.DataFrame) -> int:
+        amounts = df.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'], axis=1)
+        return amounts[amounts >= 1000].count()
+
+    def _alumni_monthly_10_plus(self, df: pd.DataFrame) -> int:
+        return df[(df['status'] == 'Alumni') & (df['recurring payment']) & (df['total amount'] >= 10)].shape[0]
+
+    def _alumni_work_matched(self, df: pd.DataFrame) -> int:
+        return df[(df['status'] == 'Alumni') & (df['work referral'].str.lower() == 'true')].shape[0]
+
+    def _money_by_statuses(self, df: pd.DataFrame, statuses: list) -> float:
+        filtered = df[df['status'].isin(statuses)]
+        return filtered.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'],
+                              axis=1).sum()
