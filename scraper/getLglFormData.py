@@ -113,7 +113,7 @@ def main():
 
     # Update local CSV
     df = pd.read_csv(CSV_PATH)
-    # df = perform_calculations(df)
+    df = perform_calculations(df)
     # df.to_csv(CSV_PATH, index=False)
     # print("Updated results.csv")
 

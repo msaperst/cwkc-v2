@@ -98,8 +98,10 @@ class EmailParser:
 
         # Check-all-that-apply
         check_all_raw = parsed_email.get("Check all that apply", parsed_email.get("Check all that apply:", ""))
-        check_all_raw = check_all_raw.replace("  ", " ")  # hack because of double spacing
-        check_all_values = set([x.strip().replace('\xa0', ' ') for x in check_all_raw.split("||") if x.strip()])
+        check_all_values = set([
+            x.strip().replace('\xa0', ' ').replace("  ", " ")
+            for x in check_all_raw.split("||") if x.strip()
+        ])
 
         # First-time giver
         first_time_giver = "true" if check_all_values.intersection(self.FIRST_TIME_GIFTS) else "false"
