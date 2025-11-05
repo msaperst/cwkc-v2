@@ -112,7 +112,7 @@ def main():
                 print(f"Failed to process email UID {uid}: {e}")
 
     # Update local CSV
-    # df = pd.read_csv(CSV_PATH)
+    df = pd.read_csv(CSV_PATH)
     # df = perform_calculations(df)
     # df.to_csv(CSV_PATH, index=False)
     # print("Updated results.csv")

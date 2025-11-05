@@ -69,8 +69,12 @@ class EmailParser:
         """
         Convert parsed email key/value pairs into a normalized row for Google Sheets.
         """
+
         # Status
-        raw_status = parsed_email.get("I am a/an...", parsed_email.get("Donor is a/an...", "Community Member"))
+        raw_status = parsed_email.get("I am a/an...",
+                                      parsed_email.get("Donor is a/an...",
+                                                       parsed_email.get("Donor is a/n...", "Community Member"))
+                                      )
         status = self.STATUS_MAP.get(raw_status.strip(), "Community Member")
 
         # Name fields
@@ -87,15 +91,20 @@ class EmailParser:
         # Graduation year
         grad_year = parsed_email.get("Grad Year", "").strip()
 
-        # Recurring payment
-        recurring_raw = parsed_email.get("Is Recurring", parsed_email.get("Is this a monthly gift?", "false")).lower()
-        recurring_payment = "true" if recurring_raw in ("true", "yes") else "false"
+        # Recurring payment (check front-end 'Is Recurring' or back-end 'Is this a monthly gift?')
+        recurring_raw = parsed_email.get("Is Recurring", "").strip().lower()
+        monthly_raw = parsed_email.get("Is this a monthly gift?", "").strip().lower()
+        recurring_payment = "true" if recurring_raw in ("true", "yes") or monthly_raw in ("true", "yes") else "false"
 
         # Check-all-that-apply
-        check_all_raw = parsed_email.get("Check all that apply", "")
-        check_all_values = set([x.strip() for x in check_all_raw.split("||") if x.strip()])
+        check_all_raw = parsed_email.get("Check all that apply", parsed_email.get("Check all that apply:", ""))
+        check_all_raw = check_all_raw.replace("  ", " ")  # hack because of double spacing
+        check_all_values = set([x.strip().replace('\xa0', ' ') for x in check_all_raw.split("||") if x.strip()])
 
+        # First-time giver
         first_time_giver = "true" if check_all_values.intersection(self.FIRST_TIME_GIFTS) else "false"
+
+        # Anonymous donation
         anonymous_donation = "true" if check_all_values.intersection(self.ANONYMOUS_DONATIONS) else "false"
 
         # Work referral
