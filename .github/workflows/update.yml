@@ -212,8 +212,8 @@ jobs:
     steps:
       - id: check
         run: |
-          google_diff="${{ needs.update-google-form-data.outputs.difference }}"
-          lgl_diff="${{ needs.update-lgl-form-data.outputs.difference }}"
+          google_diff="${{ needs.update-google-form-data.outputs.difference || 'false' }}"
+          lgl_diff="${{ needs.update-lgl-form-data.outputs.difference || 'false' }}"
           
           echo "google_diff=$google_diff"
           echo "lgl_diff=$lgl_diff"
