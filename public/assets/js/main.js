@@ -34,7 +34,27 @@ function loadScores(data) {
         complete: function(results) {
             // loop through the results, and place each value in the appropriate location
             $.each(results.data[0], function(key, value) {
-                $(`#${key}`).html(formatNumber(value.replace(/(\d)(?=(\d\d\d)+(?!\d))/g, '$1,')));
+                const span = $(`#${key}`);
+                const parentHasDollar = span.parent().text().includes('$');
+
+                const numValue = parseFloat(String(value).replace(/,/g, ''));
+
+                if (!isNaN(numValue) && isFinite(numValue)) {
+                    // It's numeric
+                    let formatted = numValue;
+
+                    if (parentHasDollar) {
+                        formatted = numValue.toFixed(2); // 2 decimal places if money
+                    }
+
+                    // Add commas
+                    formatted = formatted.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+                    span.text(formatted);
+                } else {
+                    // Not numeric, print raw
+                    span.text(value);
+                }
             });
 
             // clear out any winners
