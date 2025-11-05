@@ -7,7 +7,7 @@ name: Update results from multiple locations
 on:
   # Triggers from our google sheets
   repository_dispatch:
-    types: [ sheet-change, lgl_form_submission ]
+    types: [ sheet-change, lgl-form-submission ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
