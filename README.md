@@ -47,7 +47,10 @@ data into a spreadsheet, and then analyzing it.
 A script is running on a remote server that continuously
 checks to see if a new email is received from LGL. If it
 is, it triggers a GitHub Action to scrape the email data.
-If needed, it can be triggered manually for more frequent
+This email data is stored in a google spreadsheet, and
+then an analysis of all of the data in the spreadsheet is
+performed, and those numbers are saved into the csv read
+by the front-end app. If needed, it can be triggered manually for more frequent
 runs.
 
 #### Setup
@@ -132,6 +135,7 @@ function triggerGithubAction() {
 Open items to be addressed. These are more or less in
 priority order
 
+- Allow graceful handling of empty calculations sheet, which will zero out values
 - Figure out dates in `updates.yml` and how times can work (and to make inclusive)
 - Document how to add/replace forms (maybe not needed)
 - Document how other schools can use this
@@ -139,3 +143,9 @@ priority order
 - Get images from gatherings and display them
 - Get testimonials (both video and written) and display them
 - Figure out why ifs are ignored in `update.yml`
+
+- Identify changes in forms and update parser
+    - List should send changes
+- Allow multiple selections for user types
+    - Will need to rework how things are calculated and recorded
+- Change site design to Lyle's new one

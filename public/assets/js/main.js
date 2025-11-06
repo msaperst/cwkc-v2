@@ -2,6 +2,7 @@ const deadline = new Date(Date.parse('December 7, 2025 8:00 PM GMT-0500'));
 const startTime = new Date(Date.parse('December 1, 2025 12:00 AM GMT-0500'));
 // const year = new Date().getFullYear();
 const year = 2025;
+const speedPxPerSec = 50;
 
 let timerInterval;  // interval to track countdown
 let refreshInterval;    // interval to track page refresh
@@ -52,34 +53,53 @@ function loadScores(data) {
 
                     span.text(formatted);
                 } else {
-                    // Not numeric, print raw
-                    span.text(value);
+                    // Not numeric, split up values, and place each one in a span
+                    // TODO - only empty/change these if there are different values - avoids flickering
+                    span.empty();
+
+                    const values = value.split(',').map(v => v.trim());
+                    $.each(values, function(_, value) {
+                        const container = $('<span>').text(value).css('margin-right', values.length > 1 ? '2rem' : '0');
+                        span.append(container);
+                    });
+                    if (values.length > 1) {
+                        const totalWidth = span[0].scrollWidth;
+                        const duration = totalWidth / speedPxPerSec;
+                        span.css({
+                            'padding-left': '100%',
+                            'display': 'inline-block',
+                            'white-space': 'nowrap',
+                            'animation': 'scroll-left ' + duration + 's linear infinite',
+                        });
+                    }
                 }
             });
 
             // clear out any winners
-            $('.score-area .winner').removeClass('winner');
+            $('[data-points] .bg-hoo-blue\\/100').removeClass('bg-hoo-blue/100').addClass('bg-white/5');
+            $('[data-points] .bg-hokie-maroon\\/50').removeClass('bg-hokie-maroon/50').addClass('bg-white/5');
 
             // track the scores as we go
             let uvaScore = 0;
             let techScore = 0;
 
             // loop through each of the scored areas
-            $('.score-area').each(function() {
+            $('[data-points]').each(function() {
                 // determine how many points for the area
                 const points = parseInt($(this).attr('data-points'));
                 $(this).find('span.points').html(`(${points} Point${points > 1 ? 's' : ''})`);
 
                 // determine who is winning in each area
-                const values = $(this).find('.rounded span');
+                const values = $(this).find('.rounded-xl span');
                 // if UVA (left column) has a higher number, mark it as a winner and add the points
                 if (getNumber(values[0]) > getNumber(values[1])) {
-                    $(values[0]).parent().addClass('winner');
+                    $(values[0]).parent().removeClass('bg-white/5').addClass('bg-hoo-blue/100');
                     uvaScore += points;
                 }
                 // if Tech (right column) has a higher number, mark it as a winner and add the points
                 if (getNumber(values[0]) < getNumber(values[1])) {
-                    $(values[1]).parent().addClass('winner');
+                    $(values[1]).parent().removeClass('bg-white/5').addClass('bg-hokie-maroon/50');
+
                     techScore += points;
                 }
             });
