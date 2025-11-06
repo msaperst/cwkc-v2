@@ -1,10 +1,7 @@
 .idea
 
 /scraper/.env
+/scraper/ignore
 /scraper/spreadsheet_credentials.json
-/scraper/email_credentials.json
-/scraper/github-access-token
-/scraper/token.pickle
-/scraper/token.json
 
 /Backup-codes-servicecwkc.txt
