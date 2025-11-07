@@ -27,10 +27,20 @@ class CalculateValues:
         data = ws.get_all_records()
         df = pd.DataFrame(data)
 
+        # If there are no rows, create an empty DataFrame with all expected columns
+        expected_columns = [
+            'source', 'total amount', 'recurring payment', 'first name', 'last name',
+            'phone number', 'anonymous donation', 'first time giver',
+            'graduation year', 'status', 'work referral'
+        ]
+        if df.empty:
+            df = pd.DataFrame(columns=expected_columns)
+
         # Normalize columns
         df['source'] = df['source'].str.lower()
         df['total amount'] = pd.to_numeric(df['total amount'], errors='coerce').fillna(0)
         df['recurring payment'] = df['recurring payment'].str.lower().map({'true': True, 'false': False})
+
         return df
 
     # =================== Public Interface ===================
@@ -43,11 +53,28 @@ class CalculateValues:
 
     # =================== Internal Helpers ===================
     def _calculate_school_metrics(self, school_prefix: str) -> Dict[str, Any]:
+        """Compute all metrics for a given school prefix ('uva' or 'vt')."""
         school_df = self.df[self.df['source'].str.startswith(school_prefix)]
-        if school_df.empty:
-            return {}
 
-        metrics = {
+        # If no rows, return zeros for all metrics
+        if school_df.empty:
+            zero_metrics = {
+                "total_amount": 0,
+                "most_individual_donors": 0,
+                "donor_names": "",
+                "most_first_time_donors": 0,
+                "most_donors_class_2025": 0,
+                "most_undergraduates": 0,
+                "most_gifts_over_1000": 0,
+                "most_alum_monthly_10_plus": 0,
+                "most_alum_work_matched": 0,
+                "most_money_families": 0,
+                "most_money_grandparents_current_students": 0
+            }
+            return zero_metrics
+
+        # Otherwise, calculate metrics normally
+        return {
             "total_amount": self._total_raised(school_df),
             "most_individual_donors": self._unique_donors_count(school_df),
             "donor_names": self._donor_names(school_df),
@@ -61,35 +88,33 @@ class CalculateValues:
             "most_money_grandparents_current_students": self._money_by_statuses(school_df, self.GRANDPARENT_STATUS)
         }
 
-        return metrics
-
     # =================== Individual Metric Functions ===================
     def _total_raised(self, df: pd.DataFrame) -> float:
         return df.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'], axis=1).sum()
 
     def _unique_donors_count(self, df: pd.DataFrame) -> int:
-        return df[['first name', 'last name']].drop_duplicates().shape[0]
+        return df[['phone number']].drop_duplicates().shape[0]
 
     def _donor_names(self, df: pd.DataFrame) -> str:
         # Only include donors who are not anonymous
         filtered = df[df['anonymous donation'].str.lower() != 'true']
-        unique = filtered[['first name', 'last name']].drop_duplicates()
+        unique = filtered[['phone number', 'first name', 'last name']].drop_duplicates()
         return ", ".join(unique.apply(lambda x: f"{x['first name']} {x['last name']}".strip(), axis=1))
 
     def _first_time_donors_count(self, df: pd.DataFrame) -> int:
         # count unique donors who are first-time givers
         ft_df = df[df['first time giver'].str.lower() == 'true']
-        return ft_df[['first name', 'last name']].drop_duplicates().shape[0]
+        return ft_df[['phone number']].drop_duplicates().shape[0]
 
     def _class_year_donors(self, df: pd.DataFrame, year: int) -> int:
         # count unique donors who are Current Student or Alumni of the given class
         class_df = df[((df['status'].isin(['Current Student', 'Alumni'])) & (df['graduation year'] == year))]
-        return class_df[['first name', 'last name']].drop_duplicates().shape[0]
+        return class_df[['phone number']].drop_duplicates().shape[0]
 
     def _status_count(self, df: pd.DataFrame, status: str) -> int:
         # count unique donors with a given status
         status_df = df[df['status'] == status]
-        return status_df[['first name', 'last name']].drop_duplicates().shape[0]
+        return status_df[['phone number']].drop_duplicates().shape[0]
 
     def _gifts_over_1000_count(self, df: pd.DataFrame) -> int:
         amounts = df.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'], axis=1)
