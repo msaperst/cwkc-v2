@@ -88,10 +88,11 @@ def update_local_csv():
 
             # If column exists in CSV, update; else optionally create
             if csv_col in df.columns:
+                df[csv_col] = df[csv_col].astype(object)
                 df.at[0, csv_col] = value
             else:
                 # Optionally create the column if it doesn't exist
-                df[csv_col] = value
+                df[csv_col] = pd.Series([value], dtype=object)
 
         # 5. Write CSV back
     df.to_csv(CSV_PATH, index=False)
