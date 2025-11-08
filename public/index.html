@@ -88,11 +88,25 @@
     <!-- OVERALL RESULTS / COUNTDOWN -->
     <section class="mx-auto px-4 mt-10 max-w-[960px]" id="overall-results">
         <div class="glass rounded-3xl p-6 md:p-8">
-            <div class="grid grid-cols-3 gap-4 items-center">
-                <div class="flex justify-center logo-glass">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                <div
+                    class="flex flex-col justify-center items-center gap-10 p-4 sm:p-6 logo-glass overflow-hidden order-2 md:order-1">
                     <img alt="hoo logo" class="h-24 w-auto opacity-90" src="assets/img/uva.png" />
+
+                    <div class="h2 text-center glass rounded-2xl p-5 border-l-4 border-hoo-orange bg-hoo-blue">
+                        <span class="text-3xl font-heading font-extrabold" id="hooTotal">0</span>
+                        <span class="ml-2">Points</span>
+                    </div>
+
+                    <div class="glass rounded-2xl p-3 w-full box-border overflow-hidden bg-black/60">
+                        <div class="scrolling-wrapper mt-2">
+                            <div class="scrolling-content [--accent:theme(colors.hoo.orange)]"
+                                 id="uva_donor_names"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="text-center">
+
+                <div class="text-center order-1 md:order-2">
                     <div class="winner glass rounded-2xl p-5" id="countdown">
                             <span class="block text-sm uppercase tracking-widest text-slate-300" id="countdown-text">The
                                 Cup Starts In</span>
@@ -108,33 +122,25 @@
                         class="text-white" id="end-date"></span> at <span class="text-white"
                                                                           id="end-time"></span>!
                     </div>
+
+                    <div class="text-center text-slate-300 mt-10">Thanks to our donors!</div>
                 </div>
-                <div class="flex justify-center logo-glass">
+
+                <div
+                    class="flex flex-col justify-center items-center gap-10 p-4 sm:p-6 logo-glass overflow-hidden order-3 md:order-3">
                     <img alt="hokie logo" class="h-24 w-auto" src="assets/img/tech.png" />
-                </div>
-            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-4 mt-6">
-                <div class="h2 text-center glass rounded-2xl p-5 border-l-4 border-hoo-orange bg-hoo-blue/50">
-                    <span class="text-3xl font-heading font-extrabold" id="hooTotal">0</span>
-                    <span class="ml-2">Points</span>
-                </div>
-                <div class="text-center text-slate-300">Thanks to our donors!</div>
-                <div class="h2 text-center glass rounded-2xl p-5 border-l-4 border-hokie-orange bg-hokie-maroon/50">
-                    <span class="text-3xl font-heading font-extrabold" id="hokieTotal">0</span>
-                    <span class="ml-2">Points</span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center mt-6">
-                <div class="glass rounded-2xl p-3">
-                    <div class="scrolling-wrapper">
-                        <div class="scrolling-content [--accent:theme(colors.hoo.orange)]" id="uva_donor_names"></div>
+                    <div
+                        class="h2 text-center glass rounded-2xl p-5 border-l-4 border-hokie-orange bg-hokie-maroon">
+                        <span class="text-3xl font-heading font-extrabold" id="hokieTotal">0</span>
+                        <span class="ml-2">Points</span>
                     </div>
-                </div>
-                <div class="glass rounded-2xl p-3">
-                    <div class="scrolling-wrapper">
-                        <div class="scrolling-content [--accent:theme(colors.hokie.orange)]" id="vt_donor_names"></div>
+
+                    <div class="glass rounded-2xl p-3 w-full box-border overflow-hidden bg-black/60">
+                        <div class="scrolling-wrapper mt-2">
+                            <div class="scrolling-content [--accent:theme(colors.hokie.orange)]"
+                                 id="vt_donor_names"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -420,7 +426,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 items-center gap-6 text-center">
 
                 <!-- UVA Section -->
-                <div class="space-y-3">
+                <div class="space-y-3 order-2 md:order-1">
                     <a class="inline-flex items-center justify-center px-5 py-3 rounded-2xl font-semibold tracking-wide border border-hoo-blue/40 bg-hoo-blue/30 hover:bg-hoo-blue/50 transition shadow-glass focus:outline-none focus:ring-2 focus:ring-hoo-orange/60"
                        href="https://www.brodyjewishcenter.org/commonwealth-kiddush-cup.html"
                        rel="noreferrer"
@@ -435,12 +441,12 @@
                 </div>
 
                 <!-- Center Message -->
-                <div class="text-slate-300 text-lg">
+                <div class="text-slate-300 text-lg order-1 md:order-2">
                     Have questions? Read the rules or email our team for help!
                 </div>
 
                 <!-- VT Section -->
-                <div class="space-y-3">
+                <div class="space-y-3 order-3 md:order-3">
                     <a class="inline-flex items-center justify-center px-5 py-3 rounded-2xl font-semibold tracking-wide border border-hokie-maroon/40 bg-hokie-maroon/30 hover:bg-hokie-maroon/50 transition shadow-glass focus:outline-none focus:ring-2 focus:ring-hokie-orange/60"
                        href="https://www.hillelatvirginiatech.org/cwkc" rel="noreferrer"
                        target="_blank">
