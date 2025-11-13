@@ -9,6 +9,7 @@ const {
     loadScores,
     updateClock,
     setTimes,
+    getResultsData,
 } = require('./main');
 
 describe('Utility functions', () => {
@@ -113,7 +114,7 @@ describe('Fetch functions', () => {
 
         loadScoresSpy.mockRestore();
     });
-    
+
     test('getResultsData updates DOM via loadScores', () => {
         document.body.innerHTML = `
         <span id="score1"></span>
