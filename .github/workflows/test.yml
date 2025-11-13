@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -32,7 +32,18 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --cov=scraper --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q
+          pytest --cov=scraper --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q | tee coverage.txt
+          
+          start_line=$(grep -n "^Name" coverage.txt | cut -d: -f1 | head -n 1)
+          if [ -n "$start_line" ]; then
+            tail -n +"$start_line" coverage.txt > coverage_summary.txt
+          else
+            echo "⚠️ Coverage summary header not found" > coverage_summary.txt
+          fi
+          
+          echo "COVERAGE_OUTPUT<<EOF" >> $GITHUB_ENV
+          cat coverage_summary.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Upload coverage summary to PR
         uses: actions/upload-artifact@v4
@@ -48,5 +59,8 @@ jobs:
           message: |
             ### 🧪 Code Coverage Summary
             ```
-            $(pytest --cov=scraper --cov-report=term | tail -n 10)
+            ${{ env.COVERAGE_OUTPUT }}
             ```
+            
+            ✅ [View full coverage report (artifact)](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          append: false
