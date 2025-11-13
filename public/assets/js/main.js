@@ -258,3 +258,18 @@ $(document).ready(() => {
         }
     }
 });
+
+// export for testing
+if (typeof module !== 'undefined') {
+    module.exports = {
+        getNumber,
+        formatNumber,
+        getTimeRemaining,
+        getOrdinal,
+        getDate,
+        loadScores,
+        updateClock,
+        setTimes,
+        getResultsData,
+    };
+}
