@@ -8,8 +8,8 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from imapclient import IMAPClient
 
-from CalculateValues import CalculateValues
-from EmailParser import EmailParser, determine_source
+from .CalculateValues import CalculateValues
+from .EmailParser import EmailParser, determine_source
 
 # ===== CONFIG =====
 load_dotenv()  # assumes .env in same dir
