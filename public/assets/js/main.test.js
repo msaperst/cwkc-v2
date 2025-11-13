@@ -103,8 +103,8 @@ describe('DOM functions', () => {
 describe('Fetch functions', () => {
     test('getResultsData fetches and updates DOM', () => {
         // Mock loadScores so we can spy on it
-        const { loadScores } = require('./cup');
-        const loadScoresSpy = jest.spyOn(require('./cup'), 'loadScores');
+        const { loadScores } = require('./main');
+        const loadScoresSpy = jest.spyOn(require('./main'), 'loadScores');
 
         // Call function
         getResultsData();
