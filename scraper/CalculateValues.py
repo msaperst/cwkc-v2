@@ -56,6 +56,12 @@ class CalculateValues:
         """Compute all metrics for a given school prefix ('uva' or 'vt')."""
         school_df = self.df[self.df['source'].str.startswith(school_prefix)]
 
+        # Normalize status field to be list-like
+        school_df = school_df.copy()
+        school_df['status_list'] = school_df['status'].fillna('').apply(
+            lambda x: [s.strip() for s in str(x).split(',') if s.strip()]
+        )
+
         # If no rows, return zeros for all metrics
         if school_df.empty:
             zero_metrics = {
@@ -108,12 +114,16 @@ class CalculateValues:
 
     def _class_year_donors(self, df: pd.DataFrame, year: int) -> int:
         # count unique donors who are Current Student or Alumni of the given class
-        class_df = df[((df['status'].isin(['Current Student', 'Alumni'])) & (df['graduation year'] == year))]
+        class_df = df[df.apply(
+            lambda r: any(s in r['status_list'] for s in ['Current Student', 'Alumni'])
+                      and r['graduation year'] == year,
+            axis=1
+        )]
         return class_df[['phone number']].drop_duplicates().shape[0]
 
     def _status_count(self, df: pd.DataFrame, status: str) -> int:
         # count unique donors with a given status
-        status_df = df[df['status'] == status]
+        status_df = df[df['status_list'].apply(lambda lst: status in lst)]
         return status_df[['phone number']].drop_duplicates().shape[0]
 
     def _gifts_over_1000_count(self, df: pd.DataFrame) -> int:
@@ -121,12 +131,15 @@ class CalculateValues:
         return amounts[amounts >= 1000].count()
 
     def _alumni_monthly_10_plus(self, df: pd.DataFrame) -> int:
-        return df[(df['status'] == 'Alumni') & (df['recurring payment']) & (df['total amount'] >= 10)].shape[0]
+        return df[df['status_list'].apply(lambda lst: 'Alumni' in lst) & (df['recurring payment']) & (
+                df['total amount'] >= 10)].shape[0]
 
     def _alumni_work_matched(self, df: pd.DataFrame) -> int:
-        return df[(df['status'] == 'Alumni') & (df['work referral'].str.lower() == 'true')].shape[0]
+        return \
+            df[df['status_list'].apply(lambda lst: 'Alumni' in lst) & (
+                    df['work referral'].str.lower() == 'true')].shape[0]
 
     def _money_by_statuses(self, df: pd.DataFrame, statuses: list) -> float:
-        filtered = df[df['status'].isin(statuses)]
+        filtered = df[df['status_list'].apply(lambda lst: any(s in lst for s in statuses))]
         return filtered.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'],
                               axis=1).sum()
