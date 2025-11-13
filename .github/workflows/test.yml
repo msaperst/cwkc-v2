@@ -30,11 +30,7 @@ jobs:
         run: |
           pytest --cov=scraper --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Show coverage summary in PR
+        uses: mikeal/code-coverage-summary@v2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
+          path-to-coverage-xml: coverage.xml
