@@ -50,6 +50,7 @@ jobs:
         with:
           name: coverage-html
           path: htmlcov/
+          retention-days: 7
 
       - name: Comment coverage summary on PR
         if: github.event_name == 'pull_request'
