@@ -5,3 +5,5 @@
 /scraper/spreadsheet_credentials.json
 
 /Backup-codes-servicecwkc.txt
+/.coverage
+/coverage.xml
