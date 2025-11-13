@@ -24,8 +24,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r scraper/requirements.txt
-          pip install pytest
+          pip install pytest pytest-cov codecov
 
       - name: Run tests
         run: |
-          pytest scraper/tests --maxfail=1 --disable-warnings -q
+          pytest --cov=scraper --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
