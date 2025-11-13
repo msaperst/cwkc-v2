@@ -61,8 +61,7 @@ class EmailParser:
 
     WORK_REFERRAL_YES_VALUES: Set[str] = {
         "Yes",  # "Is this gift being matched by workplace?"
-        "Yes! I'll go ahead and ask them",  # "Does your workplace match charitable giving?"
-        "I'm not sure, can you look into it for me?"
+        "Yes! I'll go ahead and ask them"  # "Does your workplace match charitable giving?"
     }
 
     def normalize(self, parsed_email: Dict[str, str], source: str) -> Dict[str, str]:
@@ -71,11 +70,19 @@ class EmailParser:
         """
 
         # Status
-        raw_status = parsed_email.get("I am a/an...",
-                                      parsed_email.get("Donor is a/an...",
-                                                       parsed_email.get("Donor is a/n...", "Community Member"))
-                                      )
-        status = self.STATUS_MAP.get(raw_status.strip(), "Community Member")
+        raw_status = parsed_email.get("I am a/an", parsed_email.get("I am a/an...",
+                                                                    parsed_email.get("Donor is a/an...",
+                                                                                     parsed_email.get("Donor is a/n...",
+                                                                                                      "Community Member"))
+                                                                    ))
+        # Split on '||', normalize, and map each to canonical form
+        statuses = [
+            self.STATUS_MAP.get(s.strip(), "Community Member")
+            for s in raw_status.split("||")
+            if s.strip()
+        ]
+        # Join multiple statuses with commas (e.g., "Alumni, Parent of Alumni")
+        status = ", ".join(sorted(set(statuses))) if statuses else "Community Member"
 
         # Name fields
         first_name = parsed_email.get("Name - First Name", "").strip()
