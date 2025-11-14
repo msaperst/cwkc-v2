@@ -56,7 +56,11 @@ describe('Main', () => {
     });
 
     describe('DOM functions', () => {
+        let originalDateNow;
+
         beforeEach(() => {
+            originalDateNow = Date;
+
             document.body.innerHTML = `
             <span id="score1"></span>
             <span id="score2"></span>
@@ -83,6 +87,7 @@ describe('Main', () => {
             <div id="hooTotal">3</div>
             <div id="hokieTotal">2</div>
             <div id="countdown" class="bg-primary">
+                <span id="countdown-text"></span>
                 <div class="days"></div>
                 <div class="hours"></div>
                 <div class="minutes"></div>
@@ -99,6 +104,14 @@ describe('Main', () => {
             }, 1000);
             global.refreshInterval = setInterval(() => {
             }, 1000);
+        });
+
+        afterEach(() => {
+            global.Date = originalDateNow;
+            jest.clearAllMocks();
+            jest.restoreAllMocks();
+            clearInterval(global.timerInterval);
+            clearInterval(global.refreshInterval);
         });
 
         test('loadScores parses CSV data and updates DOM', () => {
@@ -230,6 +243,53 @@ describe('Main', () => {
             expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(true);
 
             clearSpy.mockRestore();
+        });
+
+        test('Contest finished (countdown past deadline)', () => {
+            // Mock Date so that "now" is after the deadline, hitting the else branch
+            const mockNow = new Date('2025-12-08T12:00:00-05:00');
+            global.Date = class extends Date {
+                constructor(...args) {
+                    if (args.length === 0) return mockNow;
+                    return new originalDateNow(...args);
+                }
+
+                static now() {
+                    return mockNow.getTime();
+                }
+            };
+
+            // require main.js again to trigger $(document).ready()
+            jest.isolateModules(() => {
+                require('./main');
+            });
+
+            // Check that the countdown div was cleared
+            expect($('#countdown').html()).toBe('');
+            // Since the else branch clears the timer, the countdown-text should remain unchanged
+            expect($('#countdown-text').text()).toBe('');
+        });
+
+        test('Contest ongoing (still before deadline)', () => {
+            const mockNow = new Date('2025-12-05T12:00:00-05:00'); // before deadline
+            global.Date = class extends Date {
+                constructor(...args) {
+                    if (args.length === 0) return mockNow;
+                    return new originalDateNow(...args);
+                }
+
+                static now() {
+                    return mockNow.getTime();
+                }
+            };
+
+            jest.isolateModules(() => {
+                require('./main');
+            });
+
+            // Check that the countdown-text was updated for ongoing contest
+            expect($('#countdown-text').text()).toBe('The Cup Ends In');
+            expect($('#countdown').html()).not.toBe('');
         });
     });
 
