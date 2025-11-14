@@ -176,7 +176,7 @@ jobs:
       - name: Update results
         run: |
           cd scraper
-          python -m scraper.getLglFormData.py
+          python -m scraper.getLglFormData
 
       # check to see if we actually have any changes to our file
       - name: Check changes
