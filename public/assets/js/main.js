@@ -39,7 +39,6 @@ function loadScores(data) {
                 const parentHasDollar = span.parent().text().includes('$');
 
                 const numValue = parseFloat(String(value).replace(/,/g, ''));
-
                 if (!isNaN(numValue) && isFinite(numValue)) {
                     // It's numeric
                     let formatted = numValue;
@@ -99,7 +98,6 @@ function loadScores(data) {
                 // if Tech (right column) has a higher number, mark it as a winner and add the points
                 if (getNumber(values[0]) < getNumber(values[1])) {
                     $(values[1]).parent().removeClass('bg-white/5').addClass('bg-hokie-maroon/50');
-
                     techScore += points;
                 }
             });
