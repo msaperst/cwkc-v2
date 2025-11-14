@@ -84,7 +84,7 @@ describe('Fetch functions', () => {
         $.ajax = jest.fn((options) => {
             // Immediately call the success callback with some mock data
             if (options.success) {
-                const mockCSV = 'score1,score2\n1000,2000';
+                const mockCSV = 'score1,score2,names,points\n1000,2000,"Max Saperstone, Becca Goldberg",-';
                 options.success(mockCSV);
             }
         });
@@ -92,15 +92,19 @@ describe('Fetch functions', () => {
 
     test('getResultsData updates DOM via loadScores', () => {
         document.body.innerHTML = `
-        <span id="score1"></span>
-        <span id="score2"></span>
+        <span>$<span id="score1"></span></span>
+        <span><span id="score2"></span></span>
+        <span><span id="names"></span></span>
+        <span><span id="points"></span></span>
     `;
 
         // Call the function
         main.getResultsData();
 
         // Check that the DOM was updated
-        expect($('#score1').text()).toBe('1,000');
+        expect($('#score1').text()).toBe('1,000.00');
         expect($('#score2').text()).toBe('2,000');
+        expect($('#names').text()).toBe('Max SaperstoneBecca Goldberg');
+        expect($('#points').text()).toBe('-');
     });
 });
