@@ -22,7 +22,7 @@ FROM_FILTER = os.getenv("FROM_FILTER", "lglforms-submissions@littlegreenlight.co
 
 SPREADSHEET_KEY = os.getenv("SPREADSHEET_KEY")
 SPREADSHEET_SHEET = os.getenv("SPREADSHEET_SHEET", "entries")
-CSV_PATH = os.getenv("RESULTS_CSV", "../public/assets/csv/results.csv")
+CSV_PATH = os.getenv("RESULTS_CSV", "public/assets/csv/results.csv")
 
 
 # ===== FUNCTIONS =====

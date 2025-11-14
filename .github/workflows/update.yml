@@ -143,7 +143,6 @@ jobs:
       # https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
       - name: Setup credentials
         run: |
-          cd scraper
           echo "{" > spreadsheet_credentials.json
           echo "  \"type\": \"${{ secrets.TYPE }}\"," >> spreadsheet_credentials.json
           echo "  \"project_id\": \"${{ secrets.PROJECT_ID }}\"," >> spreadsheet_credentials.json
@@ -158,6 +157,7 @@ jobs:
           echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
           echo "}" >> spreadsheet_credentials.json
           
+          cd scraper
           echo "EMAIL_ACCOUNT=${{ secrets.EMAIL_ACCOUNT }}" > .env
           echo "EMAIL_APP_PASSWORD=${{ secrets.EMAIL_APP_PASSWORD }}" >> .env
           echo "SPREADSHEET_KEY=${{ secrets.SPREADSHEET_KEY }}" >> .env
@@ -176,7 +176,7 @@ jobs:
       - name: Update results
         run: |
           cd scraper
-          python getLglFormData.py
+          python -m scraper.getLglFormData.py
 
       # check to see if we actually have any changes to our file
       - name: Check changes
