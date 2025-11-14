@@ -169,10 +169,18 @@ function updateClock(endTime) {
     if (timeRemaining.total <= 0) {
         clearInterval(timerInterval);
         clearInterval(refreshInterval);
-        const winner = getNumber('#hooTotal') > getNumber('#hokieTotal') ? 'Hoos' : 'Hokies';
+        let winner = 'It\'s a tie for';
+        let bgClass = '';
+        if (getNumber('#hooTotal') > getNumber('#hokieTotal')) {
+            winner = 'Hoos win';
+            bgClass = 'bg-hoo-blue';
+        } else if (getNumber('#hokieTotal') > getNumber('#hooTotal')) {
+            winner = 'Hokies win';
+            bgClass = 'bg-hokie-maroon';
+        }
         const clock = $('#countdown');
-        clock.html(winner + ` win the ${year} Commonwealth Kiddush Cup!<br/><br/><small>and a big THANK YOU to everyone who gave!</small>`);
-        clock.addClass(winner.toLowerCase().slice(0, -1)).removeClass('bg-primary');
+        clock.html(winner + ` the ${year} Commonwealth Kiddush Cup!<br/><br/><small>and a big THANK YOU to everyone who gave!</small>`);
+        clock.addClass(bgClass);
     }
 
     $('.days').html(timeRemaining.days);

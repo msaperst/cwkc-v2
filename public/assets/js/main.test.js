@@ -80,17 +80,25 @@ describe('Main', () => {
                     <span>10</span>
                 </span>
             </div>
-            <div id="hooTotal"></div>
-            <div id="hokieTotal"></div>
-            <div class="days"></div>
-            <div class="hours"></div>
-            <div class="minutes"></div>
-            <div class="seconds"></div>
+            <div id="hooTotal">3</div>
+            <div id="hokieTotal">2</div>
+            <div id="countdown" class="bg-primary">
+                <div class="days"></div>
+                <div class="hours"></div>
+                <div class="minutes"></div>
+                <div class="seconds"></div>
+            </div>
         `;
             // Mock Papa.parse
             Papa.parse = jest.fn((data, { complete }) => {
                 complete({ data: [{ score1: '1000', score2: '2000' }] });
             });
+
+            // Mock intervals so clearInterval() doesn't complain
+            global.timerInterval = setInterval(() => {
+            }, 1000);
+            global.refreshInterval = setInterval(() => {
+            }, 1000);
         });
 
         test('loadScores parses CSV data and updates DOM', () => {
@@ -128,6 +136,101 @@ describe('Main', () => {
             main.updateClock(future);
             expect($('.seconds').text()).toBeDefined();
         });
+
+        test('updateClock handles expired countdown when it\'s it tie and updates DOM correctly', () => {
+            document.body.innerHTML = `
+            <div id="hooTotal">2</div>
+            <div id="hokieTotal">2</div>
+            <div id="countdown">
+                <div class="days"></div>
+                <div class="hours"></div>
+                <div class="minutes"></div>
+                <div class="seconds"></div>
+            </div>
+        `;
+
+            // Create an end time in the past
+            const past = new Date(Date.now() - 10000);
+
+            // Spy so we can assert clearInterval() was invoked
+            const clearSpy = jest.spyOn(global, 'clearInterval');
+
+            main.updateClock(past);
+
+            // Clear interval should be called twice
+            expect(clearSpy).toHaveBeenCalledTimes(2);
+
+            expect($('#countdown').html()).toContain('It\'s a tie for the 2025 Commonwealth Kiddush Cup!');
+            expect($('#countdown').hasClass('bg-hoo-blue')).toBe(false);
+            expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(false);
+
+            expect($('.days').length).toBe(0);
+            expect($('.hours').length).toBe(0);
+            expect($('.minutes').length).toBe(0);
+            expect($('.seconds').length).toBe(0);
+
+            clearSpy.mockRestore();
+        });
+
+        test('updateClock handles expired countdown when hoos win and updates DOM correctly', () => {
+            document.body.innerHTML = `
+            <div id="hooTotal">3</div>
+            <div id="hokieTotal">2</div>
+            <div id="countdown">
+                <div class="days"></div>
+                <div class="hours"></div>
+                <div class="minutes"></div>
+                <div class="seconds"></div>
+            </div>
+        `;
+
+            // Create an end time in the past
+            const past = new Date(Date.now() - 10000);
+
+            // Spy so we can assert clearInterval() was invoked
+            const clearSpy = jest.spyOn(global, 'clearInterval');
+
+            main.updateClock(past);
+
+            // Clear interval should be called twice
+            expect(clearSpy).toHaveBeenCalledTimes(2);
+
+            expect($('#countdown').html()).toContain('Hoos win the 2025 Commonwealth Kiddush Cup!');
+            expect($('#countdown').hasClass('bg-hoo-blue')).toBe(true);
+            expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(false);
+
+            clearSpy.mockRestore();
+        });
+
+        test('updateClock handles expired countdown when hokies win and updates DOM correctly', () => {
+            document.body.innerHTML = `
+            <div id="hooTotal">2</div>
+            <div id="hokieTotal">3</div>
+            <div id="countdown">
+                <div class="days"></div>
+                <div class="hours"></div>
+                <div class="minutes"></div>
+                <div class="seconds"></div>
+            </div>
+        `;
+
+            // Create an end time in the past
+            const past = new Date(Date.now() - 10000);
+
+            // Spy so we can assert clearInterval() was invoked
+            const clearSpy = jest.spyOn(global, 'clearInterval');
+
+            main.updateClock(past);
+
+            // Clear interval should be called twice
+            expect(clearSpy).toHaveBeenCalledTimes(2);
+
+            expect($('#countdown').html()).toContain('Hokies win the 2025 Commonwealth Kiddush Cup!');
+            expect($('#countdown').hasClass('bg-hoo-blue')).toBe(false);
+            expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(true);
+
+            clearSpy.mockRestore();
+        });
     });
 
     describe('Fetch functions', () => {
@@ -141,6 +244,8 @@ describe('Main', () => {
             });
 
             document.body.innerHTML = `
+        <span>$<span id="hooTotal"></span></span>
+        <span>$<span id="hokieTotal"></span></span>
         <span>$<span id="score1"></span></span>
         <span><span id="score2"></span></span>
         <span><span id="names"></span></span>
