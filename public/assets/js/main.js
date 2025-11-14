@@ -254,7 +254,7 @@ $(document).ready(() => {
     refreshInterval = setInterval(getResultsData, 5000);
 
     // set the year we're interested in
-    $('#year').html(year);
+    $('.year').html(year);
 
     // enable/disable our form links
     if (startTime > new Date() || deadline < new Date()) {
