@@ -1,4 +1,4 @@
-name: Python Tests
+name: Unit Tests
 
 on:
   pull_request:
@@ -8,21 +8,17 @@ permissions:
   pull-requests: write
 
 jobs:
-  test:
+  python-test:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: [ 3.12 ]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.12
 
       - name: Install dependencies
         run: |
@@ -32,6 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
+          set -o pipefail
           pytest --cov=scraper --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q | tee coverage.txt
           
           start_line=$(grep -n "^Name" coverage.txt | cut -d: -f1 | head -n 1)
@@ -48,7 +45,7 @@ jobs:
       - name: Upload coverage summary to PR
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html
+          name: python-coverage-html
           path: htmlcov/
           retention-days: 7
 
@@ -56,9 +53,62 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          header: code-coverage-report
+          header: python-code-coverage-report
           message: |
-            ### 🧪 Code Coverage Summary
+            ### 🧪 Python Code Coverage Summary
+            ```
+            ${{ env.COVERAGE_OUTPUT }}
+            ```
+            
+            ✅ [View full coverage report (artifact)](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          append: false
+
+  javascript-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          npm test | tee coverage.txt
+          
+          start_line=$(grep -n "^----------|" coverage.txt | cut -d: -f1 | head -n 1)
+          if [ -n "$start_line" ]; then
+            tail -n +"$start_line" coverage.txt > coverage_summary.txt
+          else
+            echo "⚠️ Coverage summary header not found" > coverage_summary.txt
+          fi
+          
+          echo "COVERAGE_OUTPUT<<EOF" >> $GITHUB_ENV
+          cat coverage_summary.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Upload coverage summary to PR
+        uses: actions/upload-artifact@v4
+        with:
+          name: javascript-coverage-html
+          path: coverage/
+          retention-days: 7
+
+      - name: Comment coverage summary on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: javascript-code-coverage-report
+          message: |
+            ### 🧪 Javascript Code Coverage Summary
             ```
             ${{ env.COVERAGE_OUTPUT }}
             ```

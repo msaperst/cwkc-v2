@@ -39,7 +39,6 @@ function loadScores(data) {
                 const parentHasDollar = span.parent().text().includes('$');
 
                 const numValue = parseFloat(String(value).replace(/,/g, ''));
-
                 if (!isNaN(numValue) && isFinite(numValue)) {
                     // It's numeric
                     let formatted = numValue;
@@ -99,7 +98,6 @@ function loadScores(data) {
                 // if Tech (right column) has a higher number, mark it as a winner and add the points
                 if (getNumber(values[0]) < getNumber(values[1])) {
                     $(values[1]).parent().removeClass('bg-white/5').addClass('bg-hokie-maroon/50');
-
                     techScore += points;
                 }
             });
@@ -171,10 +169,18 @@ function updateClock(endTime) {
     if (timeRemaining.total <= 0) {
         clearInterval(timerInterval);
         clearInterval(refreshInterval);
-        const winner = getNumber('#hooTotal') > getNumber('#hokieTotal') ? 'Hoos' : 'Hokies';
+        let winner = 'It\'s a tie for';
+        let bgClass = '';
+        if (getNumber('#hooTotal') > getNumber('#hokieTotal')) {
+            winner = 'Hoos win';
+            bgClass = 'bg-hoo-blue';
+        } else if (getNumber('#hokieTotal') > getNumber('#hooTotal')) {
+            winner = 'Hokies win';
+            bgClass = 'bg-hokie-maroon';
+        }
         const clock = $('#countdown');
-        clock.html(winner + ` win the ${year} Commonwealth Kiddush Cup!<br/><br/><small>and a big THANK YOU to everyone who gave!</small>`);
-        clock.addClass(winner.toLowerCase().slice(0, -1)).removeClass('bg-primary');
+        clock.html(winner + ` the ${year} Commonwealth Kiddush Cup!<br/><br/><small>and a big THANK YOU to everyone who gave!</small>`);
+        clock.addClass(bgClass);
     }
 
     $('.days').html(timeRemaining.days);
@@ -248,7 +254,7 @@ $(document).ready(() => {
     refreshInterval = setInterval(getResultsData, 5000);
 
     // set the year we're interested in
-    $('#year').html(year);
+    $('.year').html(year);
 
     // enable/disable our form links
     if (startTime > new Date() || deadline < new Date()) {
@@ -258,3 +264,18 @@ $(document).ready(() => {
         }
     }
 });
+
+// export for testing
+if (typeof module !== 'undefined') {
+    module.exports = {
+        getNumber,
+        formatNumber,
+        getTimeRemaining,
+        getOrdinal,
+        getDate,
+        loadScores,
+        updateClock,
+        setTimes,
+        getResultsData,
+    };
+}
