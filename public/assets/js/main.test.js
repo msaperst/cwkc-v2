@@ -227,7 +227,7 @@ describe('Main', () => {
 
             expect($('#countdown').html()).toContain('Hokies win the 2025 Commonwealth Kiddush Cup!');
             expect($('#countdown').hasClass('bg-hoo-blue')).toBe(false);
-            expect($('#countdown').hasClass('bg-hokie')).toBe(true);
+            expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(true);
 
             clearSpy.mockRestore();
         });
