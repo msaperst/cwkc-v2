@@ -118,7 +118,8 @@ def main():
             gc = gspread.service_account(filename='spreadsheet_credentials.json')
 
             for uid in uids:
-                raw_msg = server.fetch(uid, ['RFC822'])[uid][b'RFC822']
+                msg_data = server.fetch(uid, ['BODY.PEEK[]'])  # rather than using RFC822 we're using BODY.PEEK
+                raw_msg = msg_data[uid][b'BODY[]']  # because it's more supported and leaves the message as unread
                 try:
                     from_email, data = parse_lgl_email(raw_msg)
                     print(from_email, data)
@@ -129,6 +130,7 @@ def main():
                     print(f"Processed email UID {uid}")
                 except Exception as e:
                     print(f"Failed to process email UID {uid}: {e}")
+                    continue
 
     update_local_csv()
 
