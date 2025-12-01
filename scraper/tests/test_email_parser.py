@@ -124,3 +124,22 @@ def test_work_referral_via_yes_field(parser):
 
     assert result["work referral"] == "true"
     assert result["first time giver"] == "false"
+
+
+def test_phone_number_generated_when_blank(parser):
+    """Generates a valid 10-digit fallback phone number when phone is missing or blank."""
+    email_data = {
+        "I am a/an": "Alumni",
+        "Name - First Name": "Sam",
+        "Name - Last Name": "Smith",
+        "Phone": "",  # <-- blank on purpose
+        "Total Amount": "$10.00"
+    }
+
+    result = parser.normalize(email_data, source="vt-front")
+
+    phone = result["phone number"]
+
+    assert phone != ""  # Should not be empty
+    assert phone.isdigit()  # Should be digits only
+    assert len(phone) == 10  # Should be 10 digits

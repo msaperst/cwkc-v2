@@ -1,3 +1,4 @@
+import random
 from typing import Dict, Set
 
 
@@ -90,7 +91,9 @@ class EmailParser:
 
         # Phone
         phone = parsed_email.get("Phone", "").strip()
-
+        if not phone:
+            phone = self.generate_fallback_phone()
+            
         # Total amount
         total_amount = parsed_email.get("Total Amount", parsed_email.get("Gift amount", "0"))
         total_amount = str(float(total_amount.replace("$", "").strip()))
@@ -142,3 +145,11 @@ class EmailParser:
         }
 
         return normalized
+
+    @staticmethod
+    def generate_fallback_phone() -> str:
+        """
+        Generate a 10-digit fallback phone number if none was provided.
+        Ensures the first digit is non-zero.
+        """
+        return str(random.randint(10 ** 9, 10 ** 10 - 1))
