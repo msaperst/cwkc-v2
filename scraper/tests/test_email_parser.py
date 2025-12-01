@@ -143,3 +143,14 @@ def test_phone_number_generated_when_blank(parser):
     assert phone != ""  # Should not be empty
     assert phone.isdigit()  # Should be digits only
     assert len(phone) == 10  # Should be 10 digits
+
+
+def test_total_amount_with_commas(parser):
+    email_data = {
+        "Total Amount": "$1,030.00",
+        "I am a/an": "Alumni"
+    }
+
+    result = parser.normalize(email_data, source="vt-front")
+
+    assert result["total amount"] == "1030.0"

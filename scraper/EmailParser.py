@@ -93,10 +93,16 @@ class EmailParser:
         phone = parsed_email.get("Phone", "").strip()
         if not phone:
             phone = self.generate_fallback_phone()
-            
+
         # Total amount
-        total_amount = parsed_email.get("Total Amount", parsed_email.get("Gift amount", "0"))
-        total_amount = str(float(total_amount.replace("$", "").strip()))
+        raw_amount = parsed_email.get("Total Amount", parsed_email.get("Gift amount", "0"))
+        clean_amount = (
+            raw_amount
+            .replace("$", "")
+            .replace(",", "")
+            .strip()
+        )
+        total_amount = str(float(clean_amount))
 
         # Graduation year
         grad_year = parsed_email.get("Grad Year", "").strip()
