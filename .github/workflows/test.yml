@@ -172,7 +172,7 @@ jobs:
           projectBaseDir: .
 
       - name: SonarCloud Quality Gate
-        uses: sonarsource/sonarcloud-quality-gate-action@v1
+        uses: sonarsource/sonarqube-quality-gate-action@v1
         timeout-minutes: 15
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
