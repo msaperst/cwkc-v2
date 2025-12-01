@@ -33,7 +33,7 @@ jobs:
       - name: Run tests
         run: |
           set -o pipefail
-          pytest --cov=scraper --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q | tee coverage.txt
+          pytest --cov=scraper --cov-report=xml --cov-report=term-missing --cov-report=html scraper/tests --maxfail=1 --disable-warnings -q | tee coverage.txt
           
           start_line=$(grep -n "^Name" coverage.txt | cut -d: -f1 | head -n 1)
           if [ -n "$start_line" ]; then
