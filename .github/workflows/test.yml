@@ -53,6 +53,13 @@ jobs:
           path: htmlcov/
           retention-days: 7
 
+      - name: Upload Python coverage.xml
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage-xml
+          path: coverage.xml
+          retention-days: 7
+
       - name: Comment coverage summary on PR
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
@@ -108,6 +115,13 @@ jobs:
           path: coverage/
           retention-days: 7
 
+      - name: Upload JS lcov.info
+        uses: actions/upload-artifact@v4
+        with:
+          name: javascript-coverage-lcov
+          path: coverage/lcov.info
+          retention-days: 7
+
       - name: Comment coverage summary on PR
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
@@ -150,19 +164,17 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Download python coverage
+      - name: Download python coverage.xml
         uses: actions/download-artifact@v4
         with:
-          name: python-coverage-html
-          path: python_cov
-        continue-on-error: true
+          name: python-coverage-xml
+          path: .
 
-      - name: Download JS coverage
+      - name: Download JS lcov.info
         uses: actions/download-artifact@v4
         with:
-          name: javascript-coverage-html
-          path: js_cov
-        continue-on-error: true
+          name: javascript-coverage-lcov
+          path: coverage
 
       - name: Debug coverage files
         run: |
