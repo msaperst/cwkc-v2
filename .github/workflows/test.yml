@@ -176,17 +176,6 @@ jobs:
           name: javascript-coverage-lcov
           path: coverage
 
-      - name: Debug coverage files
-        run: |
-          echo "Listing coverage.xml:"
-          ls -l coverage.xml || echo "❌ coverage.xml not found"
-          
-          echo "Listing coverage/lcov.info:"
-          ls -l coverage/lcov.info || echo "❌ lcov.info not found"
-          
-          echo "Listing entire working directory:"
-          ls -R .
-
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
