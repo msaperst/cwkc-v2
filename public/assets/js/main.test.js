@@ -145,7 +145,7 @@ describe('Main', () => {
         });
 
         test('updateClock updates DOM countdown', () => {
-            const future = new Date(new Date().getTime() + 5000); // 5 seconds ahead
+            const future = new Date(Date.now() + 5000); // 5 seconds ahead
             main.updateClock(future);
             expect($('.seconds').text()).toBeDefined();
         });
