@@ -1,6 +1,6 @@
 const deadline = new Date(Date.parse('December 7, 2025 8:00 PM GMT-0500'));
 const startTime = new Date(Date.parse('December 1, 2025 12:00 AM GMT-0500'));
-// const year = new Date().getFullYear();
+
 const year = 2025;
 const speedPxPerSec = 50;
 
@@ -38,18 +38,22 @@ function loadScores(data) {
                 const span = $(`#${key}`);
                 const parentHasDollar = span.parent().text().includes('$');
 
-                const numValue = parseFloat(String(value).replace(/,/g, ''));
-                if (!isNaN(numValue) && isFinite(numValue)) {
+                const numValue = Number.parseFloat(String(value).replaceAll(',', ''));
+                if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
                     // It's numeric
-                    let formatted = numValue;
+                    let options = {};
 
+                    // set up decimal places
                     if (parentHasDollar) {
-                        formatted = numValue.toFixed(2); // 2 decimal places if money
+                        options = {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        };
                     }
 
-                    // Add commas
-                    formatted = formatted.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
+                    // set up commas if needed
+                    const formatted = new Intl.NumberFormat('en-US', options).format(numValue);
+                    
                     span.text(formatted);
                 } else {
                     // Not numeric, split up values, and place each one in a span
@@ -85,7 +89,7 @@ function loadScores(data) {
             // loop through each of the scored areas
             $('[data-points]').each(function() {
                 // determine how many points for the area
-                const points = parseInt($(this).attr('data-points'));
+                const points = Number.parseInt($(this).attr('data-points'));
                 $(this).find('span.points').html(`(${points} Point${points > 1 ? 's' : ''})`);
 
                 // determine who is winning in each area
@@ -121,7 +125,7 @@ function loadScores(data) {
  * @returns {number} floating point number
  */
 function getNumber(element) {
-    return parseFloat($(element).html().replace(/,/g, ''));
+    return Number.parseFloat($(element).html().replaceAll(',', ''));
 }
 
 /**
@@ -129,12 +133,12 @@ function getNumber(element) {
  * places, otherwise leaves it with none
  */
 function formatNumber(num) {
-    num = parseFloat(num.replace(/,/g, ''));
+    num = Number.parseFloat(num.replaceAll(',', ''));
     // Check if the number is an integer by comparing it to its integer part
     if (Number.isInteger(num)) {
         return num; // Return as-is if it's an integer
     } else {
-        return parseFloat(num.toFixed(2)); // Format to 2 decimal places if float
+        return Number.parseFloat(num.toFixed(2)); // Format to 2 decimal places if float
     }
 }
 
