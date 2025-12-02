@@ -3,6 +3,10 @@ from typing import Dict, Any
 import gspread
 import pandas as pd
 
+PHONE_NUMBER = 'phone number'
+TOTAL_AMOUNT = 'total amount'
+RECURRING_PAYMENT = 'recurring payment'
+
 
 class CalculateValues:
     """
@@ -29,8 +33,8 @@ class CalculateValues:
 
         # If there are no rows, create an empty DataFrame with all expected columns
         expected_columns = [
-            'source', 'total amount', 'recurring payment', 'first name', 'last name',
-            'phone number', 'anonymous donation', 'first time giver',
+            'source', TOTAL_AMOUNT, RECURRING_PAYMENT, 'first name', 'last name',
+            PHONE_NUMBER, 'anonymous donation', 'first time giver',
             'graduation year', 'status', 'work referral'
         ]
         if df.empty:
@@ -38,8 +42,8 @@ class CalculateValues:
 
         # Normalize columns
         df['source'] = df['source'].str.lower()
-        df['total amount'] = pd.to_numeric(df['total amount'], errors='coerce').fillna(0)
-        df['recurring payment'] = df['recurring payment'].str.lower().map({'true': True, 'false': False})
+        df[TOTAL_AMOUNT] = pd.to_numeric(df[TOTAL_AMOUNT], errors='coerce').fillna(0)
+        df[RECURRING_PAYMENT] = df[RECURRING_PAYMENT].str.lower().map({'true': True, 'false': False})
 
         return df
 
@@ -96,21 +100,21 @@ class CalculateValues:
 
     # =================== Individual Metric Functions ===================
     def _total_raised(self, df: pd.DataFrame) -> float:
-        return df.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'], axis=1).sum()
+        return df.apply(lambda r: r[TOTAL_AMOUNT] * 12 if r[RECURRING_PAYMENT] else r[TOTAL_AMOUNT], axis=1).sum()
 
     def _unique_donors_count(self, df: pd.DataFrame) -> int:
-        return df[['phone number']].drop_duplicates().shape[0]
+        return df[[PHONE_NUMBER]].drop_duplicates().shape[0]
 
     def _donor_names(self, df: pd.DataFrame) -> str:
         # Only include donors who are not anonymous
         filtered = df[df['anonymous donation'].str.lower() != 'true']
-        unique = filtered[['phone number', 'first name', 'last name']].drop_duplicates()
+        unique = filtered[[PHONE_NUMBER, 'first name', 'last name']].drop_duplicates()
         return ", ".join(unique.apply(lambda x: f"{x['first name']} {x['last name']}".strip(), axis=1))
 
     def _first_time_donors_count(self, df: pd.DataFrame) -> int:
         # count unique donors who are first-time givers
         ft_df = df[df['first time giver'].str.lower() == 'true']
-        return ft_df[['phone number']].drop_duplicates().shape[0]
+        return ft_df[[PHONE_NUMBER]].drop_duplicates().shape[0]
 
     def _class_year_donors(self, df: pd.DataFrame, year: int) -> int:
         # count unique donors who are Current Student or Alumni of the given class
@@ -119,20 +123,20 @@ class CalculateValues:
                       and r['graduation year'] == year,
             axis=1
         )]
-        return class_df[['phone number']].drop_duplicates().shape[0]
+        return class_df[[PHONE_NUMBER]].drop_duplicates().shape[0]
 
     def _status_count(self, df: pd.DataFrame, status: str) -> int:
         # count unique donors with a given status
         status_df = df[df['status_list'].apply(lambda lst: status in lst)]
-        return status_df[['phone number']].drop_duplicates().shape[0]
+        return status_df[[PHONE_NUMBER]].drop_duplicates().shape[0]
 
     def _gifts_over_1000_count(self, df: pd.DataFrame) -> int:
-        amounts = df.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'], axis=1)
+        amounts = df.apply(lambda r: r[TOTAL_AMOUNT] * 12 if r[RECURRING_PAYMENT] else r[TOTAL_AMOUNT], axis=1)
         return amounts[amounts >= 1000].count()
 
     def _alumni_monthly_10_plus(self, df: pd.DataFrame) -> int:
-        return df[df['status_list'].apply(lambda lst: 'Alumni' in lst) & (df['recurring payment']) & (
-                df['total amount'] >= 10)].shape[0]
+        return df[df['status_list'].apply(lambda lst: 'Alumni' in lst) & (df[RECURRING_PAYMENT]) & (
+                df[TOTAL_AMOUNT] >= 10)].shape[0]
 
     def _alumni_work_matched(self, df: pd.DataFrame) -> int:
         return \
@@ -141,5 +145,5 @@ class CalculateValues:
 
     def _money_by_statuses(self, df: pd.DataFrame, statuses: list) -> float:
         filtered = df[df['status_list'].apply(lambda lst: any(s in lst for s in statuses))]
-        return filtered.apply(lambda r: r['total amount'] * 12 if r['recurring payment'] else r['total amount'],
+        return filtered.apply(lambda r: r[TOTAL_AMOUNT] * 12 if r[RECURRING_PAYMENT] else r[TOTAL_AMOUNT],
                               axis=1).sum()

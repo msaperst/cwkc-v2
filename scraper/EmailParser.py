@@ -1,6 +1,10 @@
 import random
 from typing import Dict, Set
 
+COMMUNITY_MEMBER = 'Community Member'
+GRANDPARENT_OF_ALUMNI = 'Grandparent of Alumni'
+PARENT_OF_ALUMNI = 'Parent of Alumni'
+
 
 def determine_source(email_from: str, form_title: str) -> str:
     """
@@ -37,11 +41,11 @@ class EmailParser:
         'Current Grandparent': 'Current Grandparent',
         'Alumni': 'Alumni',
         'Alum': 'Alumni',
-        'Parent of Alumni': 'Parent of Alumni',
-        'Parent of an Alum': 'Parent of Alumni',
-        'Grandparent of Alumni': 'Grandparent of Alumni',
-        'Grandparent of an Alum': 'Grandparent of Alumni',
-        'Community Member': 'Community Member'
+        PARENT_OF_ALUMNI: PARENT_OF_ALUMNI,
+        'Parent of an Alum': PARENT_OF_ALUMNI,
+        GRANDPARENT_OF_ALUMNI: GRANDPARENT_OF_ALUMNI,
+        'Grandparent of an Alum': GRANDPARENT_OF_ALUMNI,
+        COMMUNITY_MEMBER: COMMUNITY_MEMBER
     }
 
     FIRST_TIME_GIFTS: Set[str] = {
@@ -74,16 +78,16 @@ class EmailParser:
         raw_status = parsed_email.get("I am a/an", parsed_email.get("I am a/an...",
                                                                     parsed_email.get("Donor is a/an...",
                                                                                      parsed_email.get("Donor is a/n...",
-                                                                                                      "Community Member"))
+                                                                                                      COMMUNITY_MEMBER))
                                                                     ))
         # Split on '||', normalize, and map each to canonical form
         statuses = [
-            self.STATUS_MAP.get(s.strip(), "Community Member")
+            self.STATUS_MAP.get(s.strip(), COMMUNITY_MEMBER)
             for s in raw_status.split("||")
             if s.strip()
         ]
         # Join multiple statuses with commas (e.g., "Alumni, Parent of Alumni")
-        status = ", ".join(sorted(set(statuses))) if statuses else "Community Member"
+        status = ", ".join(sorted(set(statuses))) if statuses else COMMUNITY_MEMBER
 
         # Name fields
         first_name = parsed_email.get("Name - First Name", "").strip()
@@ -114,10 +118,11 @@ class EmailParser:
 
         # Check-all-that-apply
         check_all_raw = parsed_email.get("Check all that apply", parsed_email.get("Check all that apply:", ""))
-        check_all_values = set([
+        check_all_values = {
             x.strip().replace('\xa0', ' ').replace("  ", " ")
-            for x in check_all_raw.split("||") if x.strip()
-        ])
+            for x in check_all_raw.split("||")
+            if x.strip()
+        }
 
         # First-time giver
         first_time_giver = "true" if check_all_values.intersection(self.FIRST_TIME_GIFTS) else "false"
