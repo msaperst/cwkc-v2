@@ -291,6 +291,72 @@ describe('Main', () => {
             expect($('#countdown-text').text()).toBe('The Cup Ends In');
             expect($('#countdown').html()).not.toBe('');
         });
+
+        test('document.ready shows "The Cup Starts In" when contest has not started', () => {
+            const originalDate = Date;
+
+            // mock date BEFORE startTime (startTime is Dec 1, 2025)
+            const mockNow = new Date('2025-11-20T12:00:00-05:00');
+
+            global.Date = class extends Date {
+                constructor(...args) {
+                    if (args.length === 0) return mockNow;
+                    return new originalDate(...args);
+                }
+
+                static now() {
+                    return mockNow.getTime();
+                }
+            };
+
+            document.body.innerHTML = `
+        <div id="countdown"></div>
+        <div id="countdown-text"></div>
+        <div class="days"></div>
+        <div class="hours"></div>
+        <div class="minutes"></div>
+        <div class="seconds"></div>
+    `;
+
+            jest.isolateModules(() => {
+                require('./main'); // triggers document.ready
+            });
+
+            expect($('#countdown-text').text()).toBe('The Cup Starts In');
+
+            global.Date = originalDate;
+        });
+
+        test('document.ready disables enable-during-contest links (line 267)', () => {
+            const originalDate = Date;
+
+            // mock date AFTER deadline (deadline is Dec 7, 2025)
+            const mockNow = new Date('2025-12-10T12:00:00-05:00');
+
+            global.Date = class extends Date {
+                constructor(...args) {
+                    if (args.length === 0) return mockNow;
+                    return new originalDate(...args);
+                }
+
+                static now() {
+                    return mockNow.getTime();
+                }
+            };
+
+            document.body.innerHTML = `
+        <a class="enable-during-contest" style="pointer-events: auto;">Test Link</a>
+    `;
+
+            jest.isolateModules(() => {
+                require('./main'); // triggers document.ready
+            });
+
+            const el = document.getElementsByClassName('enable-during-contest')[0];
+            expect(el.style.pointerEvents).toBe('none'); // covers line 267
+
+            global.Date = originalDate;
+        });
     });
 
     describe('Fetch functions', () => {
@@ -320,6 +386,21 @@ describe('Main', () => {
             expect($('#score2').text()).toBe('2,000');
             expect($('#names').text()).toBe('Max SaperstoneBecca Goldberg');
             expect($('#points').text()).toBe('-');
+        });
+
+        test('loadScores logs error when Papa.parse fails', () => {
+            document.body.innerHTML = `<span id="score1"></span>`;
+            const errorObj = new Error('CSV failed');
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {
+            });
+
+            Papa.parse = jest.fn((data, { error }) => {
+                error(errorObj); // trigger the error handler
+            });
+
+            main.loadScores('mock bad csv');
+            expect(consoleSpy).toHaveBeenCalledWith('Error parsing CSV:', errorObj);
+            consoleSpy.mockRestore();
         });
     });
 });

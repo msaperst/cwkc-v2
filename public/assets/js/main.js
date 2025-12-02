@@ -53,7 +53,7 @@ function loadScores(data) {
 
                     // set up commas if needed
                     const formatted = new Intl.NumberFormat('en-US', options).format(numValue);
-                    
+
                     span.text(formatted);
                 } else {
                     // Not numeric, split up values, and place each one in a span
@@ -270,6 +270,7 @@ $(document).ready(() => {
 });
 
 // export for testing
+/* istanbul ignore next */
 if (typeof module !== 'undefined') {
     module.exports = {
         getNumber,
