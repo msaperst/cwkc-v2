@@ -78,7 +78,7 @@ def calc(mock_gspread):
 def test_total_raised_includes_recurring(calc):
     """Recurring gifts should count as 12x the total amount."""
     total = calc._total_raised(calc.df)
-    # 100 + (20*12) + (50*12) = 100 + 240 + 600 = 940
+    # totals: 100 + (20*12) + (50*12) = 100 + 240 + 600 = 940
     assert total == 940
 
 

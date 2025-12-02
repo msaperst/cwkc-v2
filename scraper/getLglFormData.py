@@ -107,7 +107,7 @@ def main():
         server.select_folder(MAILBOX)
 
         # search for unread LGL emails
-        uids = server.search(['UNSEEN', f'FROM', FROM_FILTER])
+        uids = server.search(['UNSEEN', 'FROM', FROM_FILTER])
         if not uids:
             print("No unread LGL emails found.")
         else:
