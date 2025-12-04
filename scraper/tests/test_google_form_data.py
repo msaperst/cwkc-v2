@@ -43,15 +43,16 @@ def test_get_alumni_gatherings(monkeypatch, updater):
     sheet_mock = MagicMock()
     sheet_mock.sheet1.get_all_values.return_value = [
         ["Header1", "Header2", "Header3", "Header4", "Header5"],
-        ["", "", "Brody", "", "a,b,c,d"],  # enough people -> UVA
-        ["", "", "Tech", "", "a,b,c,d"],  # enough people -> VT
+        ["", "", "Tech", "", "a,b,c,d"],  # enough people with commas -> VT
+        ["", "", "Tech", "", "a\nb\nc\nd"],  # enough people with newlines -> VT
+        ["", "", "Brody", "", "a,b\nc\nd"],  # enough people with newlines and commas -> UVA
         ["", "", "Brody", "", "a,b"]  # not enough people
     ]
     updater.gc.open_by_key.return_value = sheet_mock
 
     result = updater.get_alumni_gatherings()
     assert result.hoos == 1
-    assert result.hokies == 1
+    assert result.hokies == 2
 
 
 def test_get_alumni_memories(monkeypatch, updater):
