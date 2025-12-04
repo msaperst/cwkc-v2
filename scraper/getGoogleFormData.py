@@ -40,8 +40,18 @@ class SubmissionUpdater:
 
         data = SubmittedData()
         for row in rows:
-            # check number of attendees (3 commas = 4 names)
-            enough_people = row[4].count(",") >= 3
+            raw_names = row[4]
+
+            # Normalize separators: treat commas and newlines as equivalent
+            # Replace newlines with commas, then split
+            normalized = raw_names.replace("\r\n", "\n").replace("\r", "\n")
+            normalized = normalized.replace("\n", ",")  # unify separators
+
+            # Split into individual names, strip whitespace, and remove empty entries
+            names = [n.strip() for n in normalized.split(",") if n.strip()]
+
+            # Check if we have at least 4 names
+            enough_people = len(names) >= 4
 
             if "Brody" in row[2] and enough_people:
                 data.hoos += 1
@@ -90,11 +100,13 @@ class SubmissionUpdater:
         """Fetches all data sources and updates the results CSV."""
         print("📊 Updating alumni gatherings...")
         alumni_gatherings_score = self.get_alumni_gatherings()
+        print("    ", alumni_gatherings_score)
         self.df.loc[0, "uva_alumni_gatherings"] = int(alumni_gatherings_score.hoos)
         self.df.loc[0, "vt_alumni_gatherings"] = int(alumni_gatherings_score.hokies)
 
         print("📸 Updating mitzvah memories...")
         mitzvah_memories_score = self.get_mitzvah_memories()
+        print("    ", mitzvah_memories_score)
         self.df.loc[0, "uva_mitzvah_memories"] = int(mitzvah_memories_score.hoos)
         self.df.loc[0, "vt_mitzvah_memories"] = int(mitzvah_memories_score.hokies)
 
