@@ -100,11 +100,13 @@ class SubmissionUpdater:
         """Fetches all data sources and updates the results CSV."""
         print("📊 Updating alumni gatherings...")
         alumni_gatherings_score = self.get_alumni_gatherings()
+        print("    ", alumni_gatherings_score)
         self.df.loc[0, "uva_alumni_gatherings"] = int(alumni_gatherings_score.hoos)
         self.df.loc[0, "vt_alumni_gatherings"] = int(alumni_gatherings_score.hokies)
 
         print("📸 Updating mitzvah memories...")
         mitzvah_memories_score = self.get_mitzvah_memories()
+        print("    ", mitzvah_memories_score)
         self.df.loc[0, "uva_mitzvah_memories"] = int(mitzvah_memories_score.hoos)
         self.df.loc[0, "vt_mitzvah_memories"] = int(mitzvah_memories_score.hokies)
 
