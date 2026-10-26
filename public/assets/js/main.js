@@ -1,9 +1,8 @@
-// The 2026 cup runs Nov 30, midnight Eastern, through Dec 7 at 8 PM Eastern.
-// Both dates are in EST (UTC-05:00). Use ISO-8601 to avoid browser-dependent parsing.
-const startTime = new Date('2026-11-30T00:00:00-05:00');
-const deadline = new Date('2026-12-07T20:00:00-05:00');
-
-const year = 2026;
+// season-config.js is generated from public/assets/config/season.json
+// and must be loaded before this file.
+const {start, end, year, timezone} = globalThis.CWKC_SEASON;
+const startTime = new Date(start);
+const deadline = new Date(end);
 const speedPxPerSec = 50;
 
 let timerInterval;  // interval to track countdown
@@ -251,7 +250,7 @@ function getOrdinal(n) {
 }
 
 function getDate(date) {
-    const optionsDate = { month: 'long', day: 'numeric', timeZone: 'America/New_York' };
+    const optionsDate = { month: 'long', day: 'numeric', timeZone: timezone };
     const dateFormatter = new Intl.DateTimeFormat('en-US', optionsDate);
 
     // Get month and day with ordinal
@@ -270,7 +269,7 @@ function setTimes() {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'America/New_York',
+        timeZone: timezone,
         timeZoneName: 'short',
     };
 
@@ -281,6 +280,10 @@ function setTimes() {
     const time = timeFormatter.format(deadline);
 
     $('#end-time').html(time);
+    const monthDay = new Intl.DateTimeFormat('en-US', {
+        month: 'long', day: 'numeric', timeZone: timezone,
+    });
+    $('#season-dates').text(`from ${monthDay.format(startTime)} through ${monthDay.format(deadline)}`);
 }
 
 $(document).ready(() => {

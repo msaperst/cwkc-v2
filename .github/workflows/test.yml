@@ -106,9 +106,9 @@ jobs:
       - name: Run tests
         run: |
           set -o pipefail
-          npm test | tee coverage.txt
+          npm test 2>&1 | tee coverage.txt
           
-          start_line=$(grep -n "^----------|" coverage.txt | cut -d: -f1 | head -n 1)
+          start_line=$(grep -n "^----------|" coverage.txt | cut -d: -f1 | head -n 1 || true)
           if [ -n "$start_line" ]; then
             tail -n +"$start_line" coverage.txt > coverage_summary.txt
           else
