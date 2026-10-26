@@ -1,15 +1,17 @@
-"""2026 CWKC collection window. Keep these instants synchronized with public/assets/js/main.js.
+"""CWKC collection window loaded from the shared season JSON configuration.
 
-The window is [start, end): kickoff is allowed; at exactly 8 PM Eastern,
-new runs must not begin. These November/December dates are both EST (UTC-05).
+Window is [start, end): allow kickoff, reject ingestion at the exact end.
 """
 from datetime import datetime, timezone
 import sys
 from pathlib import Path
 import os
 
-START = datetime.fromisoformat("2026-11-30T00:00:00-05:00")
-END = datetime.fromisoformat("2026-12-07T20:00:00-05:00")
+from .season_config import load_config
+
+_config = load_config()
+START = datetime.fromisoformat(_config["start"])
+END = datetime.fromisoformat(_config["end"])
 
 
 def is_active(now: datetime | None = None) -> bool:
