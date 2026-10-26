@@ -23,13 +23,14 @@ def allowed_sources(event_name: str, action: str = "", now: datetime | None = No
         raise ValueError("Contest gate needs a timezone-aware datetime")
     if not START <= instant < END:
         return False, False
+    # Recompute BOTH sources for every accepted event. GitHub concurrency can
+    # coalesce queued dispatches; one successful run must refresh all sources.
     if event_name == "workflow_dispatch":
         return True, True
-    if event_name == "repository_dispatch":
-        if action == "lgl-form-submission":
-            return True, False
-        if action == "sheet-change":
-            return False, True
+    if event_name == "repository_dispatch" and action in (
+        "lgl-form-submission", "sheet-change"
+    ):
+        return True, True
     return False, False
 
 
