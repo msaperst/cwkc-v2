@@ -41,13 +41,20 @@ def test_timezone_required():
         contest_window.is_active(datetime(2026, 12, 1))
 
 
-def test_frontend_and_backend_dates_are_identical():
+def test_frontend_and_backend_read_one_season_config():
+    from scraper import season_config
+
+    config = season_config.load_config()
+    assert START == datetime.fromisoformat(config["start"])
+    assert END == datetime.fromisoformat(config["end"])
+    generated = season_config.BROWSER_PATH.read_text(encoding="utf-8")
+    assert generated == season_config.render_browser_config(config)
     script = (ROOT / "public/assets/js/main.js").read_text(encoding="utf-8")
-    js_start = re.search(r"const startTime = new Date\('([^']+)'\)", script)
-    js_end = re.search(r"const deadline = new Date\('([^']+)'\)", script)
-    assert js_start is not None and js_end is not None
-    assert datetime.fromisoformat(js_start.group(1)) == START
-    assert datetime.fromisoformat(js_end.group(1)) == END
+    assert "globalThis.CWKC_SEASON" in script
+    assert "2026-11-30T00:00:00-05:00" not in script
+    assert "2026-12-07T20:00:00-05:00" not in script
+    html = (ROOT / "public/index.html").read_text(encoding="utf-8")
+    assert html.index('src="assets/js/season-config.js"') < html.index('src="assets/js/main.js"')
 
 
 @pytest.mark.parametrize("active", [True, False])
@@ -108,6 +115,7 @@ def test_update_workflow_guards_and_single_publisher():
     workflow = (ROOT / ".github/workflows/update.yml").read_text(encoding="utf-8")
     assert "if: github.ref == 'refs/heads/main'" in workflow
     assert workflow.count("CWKC_INGESTION_ENABLED:") == 2
+    assert workflow.count('python -m scraper.contest_window --require-active') == 2
     assert "if: needs.check-window.outputs.active == 'true'" in workflow
     assert "python -m scraper.contest_window --require-active" in workflow
     assert "git diff --quiet -- public/assets/csv/results.csv" in workflow
@@ -120,7 +128,11 @@ def test_update_workflow_guards_and_single_publisher():
     assert workflow.index("python -m scraper.getLglFormData") < workflow.index("python getGoogleFormData.py")
     assert workflow.index("python getGoogleFormData.py") < workflow.index("git diff --quiet")
     assert workflow.count("git push origin HEAD:main") == 1
-    assert "actions/upload-artifact" not in workflow
+    assert "actions/upload-artifact@" in workflow
+    assert "actions/download-artifact@" in workflow
+    assert "name: results-csv-" in workflow
+    assert workflow.index("Reject publication after cutoff") < workflow.index(
+        "Commit the single reconciled results file")
     assert "git diff public/assets/csv/results.csv &> /dev/null" not in workflow
     assert "|| github.event_name == 'workflow_dispatch'" not in workflow
     assert "2025-11-01" not in workflow
