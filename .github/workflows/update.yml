@@ -116,6 +116,10 @@ jobs:
         working-directory: scraper
         run: python getGoogleFormData.py
 
+      # The import can span the closing instant; never publish afterwards.
+      - name: Reject publication after cutoff
+        run: python -m scraper.contest_window --require-active
+
       - name: Detect actual CSV change
         id: changes
         shell: bash
@@ -127,6 +131,17 @@ jobs:
             if [ "$result" -ne 1 ]; then exit "$result"; fi
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Save a per-run copy before the commit, so an artifact failure cannot
+      # leave a data commit without a matching deployment artifact.
+      - name: Save reconciled CSV for Pages
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: results-csv-${{ github.run_id }}
+          path: public/assets/csv/results.csv
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Commit the single reconciled results file
         if: steps.changes.outputs.changed == 'true'
@@ -160,6 +175,11 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: main
+      - name: Retrieve this run's reconciled CSV
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: results-csv-${{ github.run_id }}
+          path: public/assets/csv
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Upload public website
