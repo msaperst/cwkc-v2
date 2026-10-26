@@ -30,7 +30,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --only-binary=:all: -r scraper/requirements-test.txt
+          # All direct and transitive dependencies are enumerated in requirements-test.txt
+          # (which includes the pinned runtime graph); never resolve extra packages.
+          python -m pip install --no-deps --only-binary=:all: -r scraper/requirements-test.txt
 
       - name: Run tests
         run: |
