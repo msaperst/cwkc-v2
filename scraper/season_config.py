@@ -5,6 +5,7 @@ and run: python -m scraper.season_config --write
 """
 import argparse
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13,6 +14,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "public/assets/config/season.json"
 BROWSER_PATH = ROOT / "public/assets/js/season-config.js"
+HTML_PATH = ROOT / "public/index.html"
 
 
 def load_config(path: Path = CONFIG_PATH) -> dict:
@@ -47,20 +49,49 @@ def render_browser_config(config: dict) -> str:
     )
 
 
+def render_html_metadata(html: str, config: dict) -> str:
+    """Keep static/social HTML metadata aligned with the season JSON.
+
+    Social link previews generally do not run JavaScript, so updating the
+    browser's document.title at runtime is not sufficient.
+    """
+    year = str(config["year"])
+    patterns = (
+        r'(<meta content=")\d{4}( Commonwealth Kiddush Cup" property="og:description" />)',
+        r'(<meta content=")\d{4}( Commonwealth Kiddush Cup" property="og:title" />)',
+        r'(<title>)\d{4}( Commonwealth Kiddush Cup \| UVA vs\. Virginia Tech</title>)',
+    )
+    for pattern in patterns:
+        html, count = re.subn(
+            pattern,
+            lambda match: f"{match.group(1)}{year}{match.group(2)}",
+            html,
+        )
+        if count != 1:
+            raise ValueError("Expected exactly one season metadata tag matching: " + pattern)
+    return html
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true", help="Regenerate browser configuration")
     parser.add_argument("--check", action="store_true", help="Check generated config is current")
     args = parser.parse_args()
-    expected = render_browser_config(load_config())
-    if args.write:
-        BROWSER_PATH.write_text(expected, encoding="utf-8")
-        print(f"Updated {BROWSER_PATH}")
-        return 0
-    if args.check:
-        if not BROWSER_PATH.exists() or BROWSER_PATH.read_text(encoding="utf-8") != expected:
+    if args.write or args.check:
+        config = load_config()
+        expected_browser = render_browser_config(config)
+        current_html = HTML_PATH.read_text(encoding="utf-8")
+        expected_html = render_html_metadata(current_html, config)
+        if args.write:
+            BROWSER_PATH.write_text(expected_browser, encoding="utf-8")
+            HTML_PATH.write_text(expected_html, encoding="utf-8")
+            print(f"Updated {BROWSER_PATH} and {HTML_PATH}")
+            return 0
+        if not BROWSER_PATH.exists() or BROWSER_PATH.read_text(encoding="utf-8") != expected_browser:
             raise SystemExit("Generated season-config.js is stale. Run python -m scraper.season_config --write")
-        print("Browser season config matches canonical JSON")
+        if current_html != expected_html:
+            raise SystemExit("Static page metadata is stale. Run python -m scraper.season_config --write")
+        print("Browser season config and HTML metadata match canonical JSON")
         return 0
     parser.print_help()
     return 0
