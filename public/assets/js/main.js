@@ -1,9 +1,8 @@
-// The 2026 cup runs Nov 30, midnight Eastern, through Dec 7 at 8 PM Eastern.
-// Both dates are in EST (UTC-05:00). Use ISO-8601 to avoid browser-dependent parsing.
-const startTime = new Date('2026-11-30T00:00:00-05:00');
-const deadline = new Date('2026-12-07T20:00:00-05:00');
-
-const year = 2026;
+// season-config.js is generated from public/assets/config/season.json
+// and must be loaded before this file.
+const {start, end, year} = globalThis.CWKC_SEASON;
+const startTime = new Date(start);
+const deadline = new Date(end);
 const speedPxPerSec = 50;
 
 let timerInterval;  // interval to track countdown
