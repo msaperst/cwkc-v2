@@ -55,7 +55,7 @@ def main() -> int:
     expected = render_browser_config(load_config())
     if args.write:
         BROWSER_PATH.write_text(expected, encoding="utf-8")
-        print(f"Updated {BROWSER_PATH.relative_to(ROOT)}")
+        print(f"Updated {BROWSER_PATH}")
         return 0
     if args.check:
         if not BROWSER_PATH.exists() or BROWSER_PATH.read_text(encoding="utf-8") != expected:
