@@ -93,7 +93,11 @@ def test_verification_rejects_closed_window(monkeypatch, tmp_path):
 def test_gate_is_used_by_workflow_before_and_after_processing():
     workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/update.yml").read_text()
     assert "python -m scraper.season" in workflow
-    assert "python -m scraper.season --verify-only" in workflow
+    assert workflow.count("python -m scraper.season --verify-only") == 2
+    assert workflow.index("Verify cutoff before ingestion") < workflow.index(
+        "Configure Google Sheets credentials")
+    assert workflow.index("Check cutoff again before publishing") > workflow.index(
+        "Update Google Forms participation scores")
     assert "needs.check_date.outputs.in_range == 'true'" in workflow
     assert "git diff --quiet -- public/assets/csv/results.csv" in workflow
     assert "needs.update_results.outputs.changed == 'true'" in workflow
