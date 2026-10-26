@@ -1,7 +1,7 @@
 {
   "name": "cwkc-v2",
   "version": "1.0.0",
-  "description": "Commonwealth Kiddish Cup",
+  "description": "Commonwealth Kiddush Cup",
   "main": "index.js",
   "scripts": {
     "test": "jest --coverage"
