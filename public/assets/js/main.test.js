@@ -428,8 +428,10 @@ describe('Main', () => {
 describe('2026 landing page content', () => {
     test('identifies the 14th cup and the new event dates', () => {
         const html = fs.readFileSync(require('path').join(__dirname, '../../index.html'), 'utf8');
-        expect(html).toContain('<title>2026 Commonwealth Kiddush Cup | UVA vs. Virginia Tech</title>');
-        expect(html).toContain('content="2026 Commonwealth Kiddush Cup" property="og:title"');
+        const {year} = globalThis.CWKC_SEASON;
+        expect(html).toContain(`<title>${year} Commonwealth Kiddush Cup | UVA vs. Virginia Tech</title>`);
+        expect(html).toContain(`content="${year} Commonwealth Kiddush Cup" property="og:title"`);
+        expect(html).toContain(`content="${year} Commonwealth Kiddush Cup" property="og:description"`);
         expect(html).toContain('14th annual Commonwealth Kiddush Cup, <span id="season-dates"></span>');
         expect(html).not.toContain('from December 1-7');
         expect(html).not.toContain('B’nai Mitzvah of The Commonwealth Kiddush Cup');
