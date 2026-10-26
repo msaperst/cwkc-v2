@@ -4,6 +4,7 @@ The window is [start, end): kickoff is allowed; at exactly 8 PM Eastern,
 new runs must not begin. These November/December dates are both EST (UTC-05).
 """
 from datetime import datetime, timezone
+import sys
 from pathlib import Path
 import os
 
@@ -28,6 +29,8 @@ def main() -> None:
         with Path(output_file).open("a", encoding="utf-8") as output:
             output.write(f"active={str(active).lower()}\n")
     print("CWKC 2026 data collection is " + ("enabled" if active else "disabled"))
+    if "--require-active" in sys.argv[1:] and not active:
+        raise SystemExit("Outside approved collection window; refusing to process data")
 
 
 if __name__ == "__main__":
