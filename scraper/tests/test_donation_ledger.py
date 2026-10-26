@@ -120,7 +120,7 @@ def test_existing_legacy_rows_block_unverified_replay():
     sheet = FakeSheet([[*NORMALIZED_FIELDS], ["123", "25"]])
     with pytest.raises(ValueError, match="unkeyed"):
         build_ledger(sheet)
-    assert sheet.rows[0][-1] == "submission id"
+    assert sheet.rows[0] == list(NORMALIZED_FIELDS)
     assert len(sheet.rows) == 2
 
 
