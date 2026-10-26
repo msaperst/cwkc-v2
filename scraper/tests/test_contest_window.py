@@ -81,7 +81,7 @@ def test_missing_enable_switch_blocks_collection_even_in_window(tmp_path, monkey
     monkeypatch.setattr("sys.argv", ["contest_window", "--require-active"])
     with pytest.raises(SystemExit, match="Outside approved collection window"):
         contest_window.main()
-    assert output.read_text(encoding="utf-8") == "active=false\\n".replace("\\n", "\n")
+    assert output.read_text(encoding="utf-8") == "active=false\n"
 
 
 def test_changed_vs_unchanged_csv_detected_by_git(tmp_path):
