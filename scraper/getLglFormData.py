@@ -122,7 +122,8 @@ def main():
                 raw_msg = msg_data[uid][b'BODY[]']  # because it's more supported and leaves the message as unread
                 try:
                     from_email, data = parse_lgl_email(raw_msg)
-                    print(from_email, data)
+                    # Never log donors' personal or gift information in Actions logs.
+                    print(f"Parsing LGL submission UID {uid}")
                     normalized_row = normalizer.normalize(
                         data, determine_source(from_email, data.get("Form title", "")))
                     update_google_sheet(gc, normalized_row)  # data is raw from parse_lgl_email
