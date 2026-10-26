@@ -183,8 +183,16 @@ jobs:
           name: javascript-coverage-lcov
           path: coverage
 
+      - name: Set up Java 21 for SonarQube scanner
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # The old sonarcloud-github-action@v2 uses an unsupported Java 17 image.
+      # Official SonarQube Cloud action executes with the supported Java runtime.
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2
+        uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
