@@ -72,6 +72,14 @@ def render_html_metadata(html: str, config: dict) -> str:
     return html
 
 
+def verified_html_path() -> Path:
+    """Require the ordinary repository HTML file, not a redirected path."""
+    expected = ROOT.resolve() / "public" / "index.html"
+    if HTML_PATH.is_symlink() or HTML_PATH.resolve(strict=True) != expected:
+        raise ValueError("HTML metadata target must be the repository public/index.html")
+    return expected
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true", help="Regenerate browser configuration")
@@ -80,12 +88,14 @@ def main() -> int:
     if args.write or args.check:
         config = load_config()
         expected_browser = render_browser_config(config)
-        current_html = HTML_PATH.read_text(encoding="utf-8")
+        html_path = verified_html_path()
+        current_html = html_path.read_text(encoding="utf-8")
         expected_html = render_html_metadata(current_html, config)
         if args.write:
             BROWSER_PATH.write_text(expected_browser, encoding="utf-8")
-            HTML_PATH.write_text(expected_html, encoding="utf-8")
-            print(f"Updated {BROWSER_PATH} and {HTML_PATH}")
+            with html_path.open("w", encoding="utf-8") as output:
+                output.write(expected_html)
+            print(f"Updated {BROWSER_PATH} and {html_path}")
             return 0
         if not BROWSER_PATH.exists() or BROWSER_PATH.read_text(encoding="utf-8") != expected_browser:
             raise SystemExit("Generated season-config.js is stale. Run python -m scraper.season_config --write")
