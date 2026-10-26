@@ -222,7 +222,7 @@ function updateClock(endTime) {
         timerInterval = undefined;
         refreshInterval = undefined;
         setContestLinksEnabled(false);
-        let winner = 'It\\'s a tie for';
+        let winner = "It\'s a tie for";
         let bgClass = '';
         if (getNumber('#hooTotal') > getNumber('#hokieTotal')) {
             winner = 'Hoos win';
