@@ -15,6 +15,11 @@ from requests.exceptions import RequestException
 
 
 SUBMISSION_ID = "submission id"
+NORMALIZED_FIELDS = (
+    "phone number", "total amount", "first name", "last name",
+    "anonymous donation", "first time giver", "graduation year", "status",
+    "work referral", "recurring payment", "source",
+)
 # Cumulative delay exceeds a per-minute Google Sheets quota window.
 RETRY_DELAYS = (15, 30, 60, 60)
 
@@ -85,11 +90,28 @@ class SubmissionLedger:
 
         self.id_col = self.headers.index(SUBMISSION_ID) + 1
         self.tracking_enabled = bool(headers and SUBMISSION_ID in headers) or not read_only
-        self.ids = self._read_ids() if self.tracking_enabled else set()
+        self.ids, self.legacy_rows = self._read_state()
+        # A previous import without IDs may have appended an unread donation.
+        # It cannot be replayed automatically without risking a double count.
+        if self.legacy_rows and not read_only:
+            raise ValueError("Existing unkeyed donations require reconciliation before ingestion")
 
-    def _read_ids(self):
-        values = retry(lambda: self.ws.col_values(self.id_col), sleeper=self.sleeper)
-        return set(values[1:])
+    def _read_state(self):
+        rows = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
+        index = self.id_col - 1
+        ids = set()
+        legacy = 0
+        for values in rows[1:]:
+            if not any(values):
+                continue
+            key = values[index].strip() if index < len(values) else ""
+            if key:
+                if key in ids:
+                    raise ValueError("Duplicate submission IDs in normalized Sheet")
+                ids.add(key)
+            else:
+                legacy += 1
+        return ids, legacy
 
     def known(self, submission_id: str) -> bool:
         return submission_id in self.ids
@@ -110,7 +132,7 @@ class SubmissionLedger:
             except Exception as error:
                 # If the server applied the append before losing its response,
                 # the persisted ID wins, even if the exception was a 429/timeout.
-                self.ids = self._read_ids()
+                self.ids, self.legacy_rows = self._read_state()
                 if submission_id in self.ids:
                     return False
                 if attempt == len(RETRY_DELAYS) or not _retryable(error):
