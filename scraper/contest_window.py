@@ -23,7 +23,8 @@ def is_active(now: datetime | None = None) -> bool:
 
 def main() -> None:
     """Write the GitHub Actions step output; no credentials or data read."""
-    active = is_active()
+    # A missing or non-true repo variable is a deliberate production kill switch.
+    active = is_active() and os.getenv("CWKC_INGESTION_ENABLED") == "true"
     output_file = os.getenv("GITHUB_OUTPUT")
     if output_file:
         with Path(output_file).open("a", encoding="utf-8") as output:
