@@ -55,6 +55,7 @@ def test_github_output_is_boolean(tmp_path, monkeypatch, capsys, active):
     output = tmp_path / "github-output"
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     monkeypatch.setattr(contest_window, "is_active", lambda: active)
+    monkeypatch.setenv("CWKC_INGESTION_ENABLED", "true")
     monkeypatch.setattr("sys.argv", ["contest_window"])
     contest_window.main()
     assert output.read_text(encoding="utf-8") == f"active={str(active).lower()}\n"
@@ -65,10 +66,22 @@ def test_require_active_fails_closed(tmp_path, monkeypatch):
     output = tmp_path / "github-output"
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     monkeypatch.setattr(contest_window, "is_active", lambda: False)
+    monkeypatch.setenv("CWKC_INGESTION_ENABLED", "true")
     monkeypatch.setattr("sys.argv", ["contest_window", "--require-active"])
     with pytest.raises(SystemExit, match="Outside approved collection window"):
         contest_window.main()
     assert output.read_text(encoding="utf-8") == "active=false\n"
+
+
+def test_missing_enable_switch_blocks_collection_even_in_window(tmp_path, monkeypatch):
+    output = tmp_path / "github-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.delenv("CWKC_INGESTION_ENABLED", raising=False)
+    monkeypatch.setattr(contest_window, "is_active", lambda: True)
+    monkeypatch.setattr("sys.argv", ["contest_window", "--require-active"])
+    with pytest.raises(SystemExit, match="Outside approved collection window"):
+        contest_window.main()
+    assert output.read_text(encoding="utf-8") == "active=false\\n".replace("\\n", "\n")
 
 
 def test_changed_vs_unchanged_csv_detected_by_git(tmp_path):
@@ -94,6 +107,7 @@ def test_changed_vs_unchanged_csv_detected_by_git(tmp_path):
 def test_update_workflow_guards_and_single_publisher():
     workflow = (ROOT / ".github/workflows/update.yml").read_text(encoding="utf-8")
     assert "if: github.ref == 'refs/heads/main'" in workflow
+    assert workflow.count("CWKC_INGESTION_ENABLED:") == 2
     assert "if: needs.check-window.outputs.active == 'true'" in workflow
     assert "python -m scraper.contest_window --require-active" in workflow
     assert "git diff --quiet -- public/assets/csv/results.csv" in workflow
