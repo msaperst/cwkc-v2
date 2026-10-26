@@ -39,6 +39,38 @@ jobs:
         run: |
           python -m pip install -r scraper/requirements-test.txt
 
+      # TEMPORARY: generate one hash per compatible Linux/Python 3.12 wheel
+      # from our already-version-pinned dependencies; remove after committing lock.
+      - name: Generate verified wheel hashes for CI lock
+        run: |
+          mkdir -p "${RUNNER_TEMP}/cwkc-wheels"
+          python -m pip download --no-deps --only-binary=:all: -r scraper/requirements-test.txt -d "${RUNNER_TEMP}/cwkc-wheels" -q
+          python - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          from packaging.utils import canonicalize_name, parse_wheel_filename
+          packages = {}
+          for req_file in ('scraper/requirements.txt', 'scraper/requirements-test.txt'):
+              for line in Path(req_file).read_text().splitlines():
+                  if '==' in line and not line.lstrip().startswith('#'):
+                      name, version = line.split('==', 1)
+                      packages[canonicalize_name(name.strip())] = version.strip()
+          hashes = {}
+          wheel_dir = Path(__import__('os').environ['RUNNER_TEMP']) / 'cwkc-wheels'
+          for wheel in wheel_dir.glob('*.whl'):
+              name, version, _, _ = parse_wheel_filename(wheel.name)
+              canon = canonicalize_name(name)
+              if canon not in packages or str(version) != packages[canon]:
+                  raise ValueError(f'Unexpected wheel: {wheel.name}')
+              hashes[canon] = sha256(wheel.read_bytes()).hexdigest()
+          missing = set(packages) - set(hashes)
+          if missing:
+              raise ValueError(f'Missing wheels: {sorted(missing)}')
+          for name, version in sorted(packages.items()):
+              print(f'CWKC_LOCK {name}=={version} --hash=sha256:{hashes[name]}', flush=True)
+          print(f'CWKC_LOCK_TOTAL={len(packages)}', flush=True)
+          PY
+
       - name: Run tests
         run: |
           set -o pipefail
