@@ -6,15 +6,16 @@ on:
     branches:
       - main
 
+# Default to least privilege; jobs that post PR coverage comments opt in to write.
 permissions:
   contents: read
-  pull-requests: write
-  checks: write
-  statuses: write
 
 jobs:
   python-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -29,9 +30,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r scraper/requirements.txt
-          pip install pytest pytest-cov coverage
+          python -m pip install --only-binary=:all: -r scraper/requirements-test.txt
 
       - name: Run tests
         run: |
@@ -79,6 +78,9 @@ jobs:
 
   javascript-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -147,9 +149,6 @@ jobs:
 
     permissions:
       contents: read
-      pull-requests: write
-      checks: write
-      statuses: write
 
     steps:
       - name: Checkout repository
