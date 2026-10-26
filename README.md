@@ -190,6 +190,22 @@ python -m scraper.getLglFormData
 
 That last command processes actual unread messages and marks successfully handled ones as read; use it only when production processing is intended, or with a fully isolated test mailbox and spreadsheet.
 
+### Safe backlog reconciliation and restart
+
+The LGL importer stores a SHA-256 fingerprint of each received MIME message in a private `submission id` column of the normalized donations Sheet. The ID and donation fields are written together. On replay, a stored ID prevents a duplicate donation. An email is marked read only after that row has been verified as stored.
+
+To check the unread backlog **without processing, marking emails read, or writing Google Sheets/CSV**, use a properly configured isolated environment, or coordinate a read-only production check with the authorized operator:
+
+~~~bash
+python -m scraper.getLglFormData --reconcile-only
+~~~
+
+The output contains aggregate counts of `pending`, `already_stored`, and `failed` unread notifications, plus a warning if the Sheet has historical rows without submission IDs. Donor names and amounts are not printed. This is a point-in-time check, not proof that the Hillels' totals reconcile; compare it against the authorized LGL reports separately.
+
+**One-time migration:** an older normalized Sheet may contain rows without IDs. The importer deliberately **refuses live writes** when any unkeyed rows exist: some might represent donations whose emails were never acknowledged, and blindly replaying those emails would count them twice. Before kickoff, make a **private** backup/export, reconcile the old rows against LGL and pending notifications, and agree on an archive/verified reset or explicit backfill. Do not erase live rows, fabricate identifiers, or mark messages read just to get past the safety check.
+
+**Restart or failure:** leave failed emails unread, inspect the Actions job failure and the last successful normalized-Sheet state, run the read-only check, then retry only after correcting the cause. A successful Sheet append followed by a failed IMAP acknowledgment will be recognized by its stored ID during the next run. Any processing failures produce a nonzero exit code so the update workflow cannot publish an incomplete CSV. An LGL duplicate *notification with a different MIME identity* still needs upstream LGL reconciliation; the fingerprint guarantees idempotent **email replay**, not deduplication of distinct form submissions.
+
 ## Deployment
 
 The site is a static GitHub Pages deployment with custom domain **cwkc.org**:
