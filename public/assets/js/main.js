@@ -1,12 +1,42 @@
-const deadline = new Date(Date.parse('December 7, 2025 8:00 PM GMT-0500'));
-const startTime = new Date(Date.parse('December 1, 2025 12:00 AM GMT-0500'));
+// The 2026 cup runs Nov 30, midnight Eastern, through Dec 7 at 8 PM Eastern.
+// Both dates are in EST (UTC-05:00). Use ISO-8601 to avoid browser-dependent parsing.
+const startTime = new Date('2026-11-30T00:00:00-05:00');
+const deadline = new Date('2026-12-07T20:00:00-05:00');
 
-const year = 2025;
+const year = 2026;
 const speedPxPerSec = 50;
 
 let timerInterval;  // interval to track countdown
 let refreshInterval;    // interval to track page refresh
 let countdownUntil; // when we are counting down to
+
+/**
+ * Contest phase is based on fixed Eastern-time instants, not the visitor's timezone.
+ */
+function getContestPhase(now = new Date()) {
+    if (now < startTime) return 'upcoming';
+    if (now < deadline) return 'active';
+    return 'ended';
+}
+
+/**
+ * Links for participation forms are only enabled during the competition.
+ * Donation links are intentionally NOT controlled by this function.
+ */
+function setContestLinksEnabled(enabled) {
+    $('.enable-during-contest').each(function() {
+        this.style.pointerEvents = enabled ? '' : 'none';
+    });
+}
+
+/**
+ * Never fetch last season's data or begin the five-second refresh before kickoff.
+ */
+function startScoreUpdates() {
+    if (getContestPhase() !== 'active' || refreshInterval !== undefined) return;
+    getResultsData();
+    refreshInterval = setInterval(getResultsData, 5000);
+}
 
 /**
  * retrieve our results data (stored in the CSV)
@@ -168,12 +198,31 @@ function getTimeRemaining(endTime) {
  * @param endTime the time to tick down to
  */
 function updateClock(endTime) {
-    const timeRemaining = getTimeRemaining(endTime);
+    // A tab left open before the cup must switch to the LIVE countdown at
+    // midnight Eastern, not declare a winner when the start timer reaches zero.
+    if (endTime.getTime() === startTime.getTime() && getContestPhase() !== 'upcoming') {
+        countdownUntil = deadline;
+        if (getContestPhase() === 'active') {
+            $('#countdown-text').text('The Cup Ends In');
+            setContestLinksEnabled(true);
+            startScoreUpdates();
+        } else {
+            // The tab could also have been suspended until after the cup ended.
+            // Fetch final scores once; do not start a recurring results poll.
+            getResultsData();
+        }
+        updateClock(deadline);
+        return;
+    }
 
+    const timeRemaining = getTimeRemaining(endTime);
     if (timeRemaining.total <= 0) {
         clearInterval(timerInterval);
         clearInterval(refreshInterval);
-        let winner = 'It\'s a tie for';
+        timerInterval = undefined;
+        refreshInterval = undefined;
+        setContestLinksEnabled(false);
+        let winner = "It's a tie for";
         let bgClass = '';
         if (getNumber('#hooTotal') > getNumber('#hokieTotal')) {
             winner = 'Hoos win';
@@ -185,6 +234,7 @@ function updateClock(endTime) {
         const clock = $('#countdown');
         clock.html(winner + ` the ${year} Commonwealth Kiddush Cup!<br/><br/><small>and a big THANK YOU to everyone who gave!</small>`);
         clock.addClass(bgClass);
+        return;
     }
 
     $('.days').html(timeRemaining.days);
@@ -234,45 +284,41 @@ function setTimes() {
 }
 
 $(document).ready(() => {
-    if (startTime > new Date()) {    // if in the future, show how many days until it starts
-        countdownUntil = startTime;
+    const phase = getContestPhase();
+    countdownUntil = phase === 'upcoming' ? startTime : deadline;
+
+    if (phase === 'upcoming') {
+        $('#countdown-text').text('The Cup Starts In');
         updateClock(countdownUntil);
-        $('#countdown-text').html('The Cup Starts In');
-    } else {    // if not, show how many days until it ends
-        countdownUntil = deadline;
-        if (deadline > new Date()) {    // if we're still in the window, start the timer
-            updateClock(countdownUntil);
-            $('#countdown-text').html('The Cup Ends In');
-        } else {    // otherwise, wipe out the timer, and wait for the results
-            $('#countdown').html('');
-        }
+    } else if (phase === 'active') {
+        $('#countdown-text').text('The Cup Ends In');
+        updateClock(countdownUntil);
+    } else {
+        // Final results will be loaded once, then the winner is calculated.
+        $('#countdown').html('');
     }
-    // set an interval to keep the timer ticker (what we tick down to is set above)
+
+    setContestLinksEnabled(phase === 'active');
     timerInterval = setInterval(() => updateClock(countdownUntil), 1000);
-
-    // set our dates
     setTimes();
+    $('.year').text(year);
 
-    // retrieve our results data (stored in the CSV)
-    getResultsData();
-    refreshInterval = setInterval(getResultsData, 5000);
-
-    // set the year we're interested in
-    $('.year').html(year);
-
-    // enable/disable our form links
-    if (startTime > new Date() || deadline < new Date()) {
-        const collection = document.getElementsByClassName('enable-during-contest');
-        for (let i = 0, len = collection.length; i < len; i++) {
-            collection[i].style['pointerEvents'] = 'none';
-        }
+    if (phase === 'active') {
+        startScoreUpdates();
+    } else if (phase === 'ended') {
+        // Refresh just once to render the final scoreboard.
+        getResultsData();
     }
+    // No CSV requests or refresh timer before the cup starts.
 });
 
 // export for testing
 /* istanbul ignore next */
 if (typeof module !== 'undefined') {
     module.exports = {
+        getContestPhase,
+        setContestLinksEnabled,
+        startScoreUpdates,
         getNumber,
         formatNumber,
         getTimeRemaining,

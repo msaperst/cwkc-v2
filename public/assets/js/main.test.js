@@ -49,9 +49,27 @@ describe('Main', () => {
         });
 
         test('getDate formats date correctly', () => {
-            const testDate = new Date('2025-12-07T20:00:00-05:00');
+            const testDate = new Date('2026-12-07T20:00:00-05:00');
             const result = main.getDate(testDate);
             expect(result).toMatch(/December 7/);
+        });
+
+        test('setTimes shows the official 2026 Eastern dates', () => {
+            document.body.innerHTML = `<span id="start-date"></span><span id="end-date"></span><span id="end-time"></span>`;
+            main.setTimes();
+            expect($('#start-date').text()).toBe('November 30th');
+            expect($('#end-date').text()).toBe('December 7th');
+            expect($('#end-time').text()).toBe('8:00 PM EST');
+        });
+
+        test('2026 countdown dates correspond to Eastern midnight and 8 PM EST', () => {
+            // Browser timezone must not change the instant represented by event dates.
+            const start = new Date('2026-11-30T00:00:00-05:00');
+            const end = new Date('2026-12-07T20:00:00-05:00');
+            expect(start.toISOString()).toBe('2026-11-30T05:00:00.000Z');
+            expect(end.toISOString()).toBe('2026-12-08T01:00:00.000Z');
+            expect(main.getDate(start)).toBe('November 30th');
+            expect(main.getDate(end)).toBe('December 7th');
         });
     });
 
@@ -173,7 +191,7 @@ describe('Main', () => {
             // Clear interval should be called twice
             expect(clearSpy).toHaveBeenCalledTimes(2);
 
-            expect($('#countdown').html()).toContain('It\'s a tie for the 2025 Commonwealth Kiddush Cup!');
+            expect($('#countdown').html()).toContain('It\'s a tie for the 2026 Commonwealth Kiddush Cup!');
             expect($('#countdown').hasClass('bg-hoo-blue')).toBe(false);
             expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(false);
 
@@ -208,7 +226,7 @@ describe('Main', () => {
             // Clear interval should be called twice
             expect(clearSpy).toHaveBeenCalledTimes(2);
 
-            expect($('#countdown').html()).toContain('Hoos win the 2025 Commonwealth Kiddush Cup!');
+            expect($('#countdown').html()).toContain('Hoos win the 2026 Commonwealth Kiddush Cup!');
             expect($('#countdown').hasClass('bg-hoo-blue')).toBe(true);
             expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(false);
 
@@ -238,7 +256,7 @@ describe('Main', () => {
             // Clear interval should be called twice
             expect(clearSpy).toHaveBeenCalledTimes(2);
 
-            expect($('#countdown').html()).toContain('Hokies win the 2025 Commonwealth Kiddush Cup!');
+            expect($('#countdown').html()).toContain('Hokies win the 2026 Commonwealth Kiddush Cup!');
             expect($('#countdown').hasClass('bg-hoo-blue')).toBe(false);
             expect($('#countdown').hasClass('bg-hokie-maroon')).toBe(true);
 
@@ -247,7 +265,7 @@ describe('Main', () => {
 
         test('Contest finished (countdown past deadline)', () => {
             // Mock Date so that "now" is after the deadline, hitting the else branch
-            const mockNow = new Date('2025-12-08T12:00:00-05:00');
+            const mockNow = new Date('2026-12-08T12:00:00-05:00');
             global.Date = class extends Date {
                 constructor(...args) {
                     if (args.length === 0) return mockNow;
@@ -271,7 +289,7 @@ describe('Main', () => {
         });
 
         test('Contest ongoing (still before deadline)', () => {
-            const mockNow = new Date('2025-12-05T12:00:00-05:00'); // before deadline
+            const mockNow = new Date('2026-12-05T12:00:00-05:00'); // before deadline
             global.Date = class extends Date {
                 constructor(...args) {
                     if (args.length === 0) return mockNow;
@@ -295,8 +313,8 @@ describe('Main', () => {
         test('document.ready shows "The Cup Starts In" when contest has not started', () => {
             const originalDate = Date;
 
-            // mock date BEFORE startTime (startTime is Dec 1, 2025)
-            const mockNow = new Date('2025-11-20T12:00:00-05:00');
+            // mock date BEFORE startTime (startTime is Nov 30, 2026)
+            const mockNow = new Date('2026-11-20T12:00:00-05:00');
 
             global.Date = class extends Date {
                 constructor(...args) {
@@ -330,8 +348,8 @@ describe('Main', () => {
         test('document.ready disables enable-during-contest links (line 267)', () => {
             const originalDate = Date;
 
-            // mock date AFTER deadline (deadline is Dec 7, 2025)
-            const mockNow = new Date('2025-12-10T12:00:00-05:00');
+            // mock date AFTER deadline (deadline is Dec 7, 2026)
+            const mockNow = new Date('2026-12-10T12:00:00-05:00');
 
             global.Date = class extends Date {
                 constructor(...args) {
@@ -402,5 +420,19 @@ describe('Main', () => {
             expect(consoleSpy).toHaveBeenCalledWith('Error parsing CSV:', errorObj);
             consoleSpy.mockRestore();
         });
+    });
+});
+
+// The website contains HTML and social metadata that do not go through main.js.
+describe('2026 landing page content', () => {
+    test('identifies the 14th cup and the new event dates', () => {
+        const html = fs.readFileSync(require('path').join(__dirname, '../../index.html'), 'utf8');
+        expect(html).toContain('<title>2026 Commonwealth Kiddush Cup | UVA vs. Virginia Tech</title>');
+        expect(html).toContain('content="2026 Commonwealth Kiddush Cup" property="og:title"');
+        expect(html).toContain('14th annual Commonwealth Kiddush Cup, from November 30 through December 7');
+        expect(html).not.toContain('from December 1-7');
+        expect(html).not.toContain('B’nai Mitzvah of The Commonwealth Kiddush Cup');
+        expect(html).toContain('Winner of 11/28 Virginia Tech/UVA');
+        expect(html).not.toContain('Winner of 11/29 Virginia Tech/UVA');
     });
 });

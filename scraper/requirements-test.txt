@@ -1,0 +1,9 @@
+# Test dependencies for CI; includes the pinned runtime graph.
+-r requirements.txt
+coverage==7.17.0
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+pygments==2.21.0
+pytest-cov==7.1.0
+pytest==9.1.1
