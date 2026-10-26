@@ -83,6 +83,13 @@ class SubmissionLedger:
         elif not set(normalized_fields).issubset(headers):
             raise ValueError("Normalized sheet columns do not match expected contract")
         elif SUBMISSION_ID not in headers:
+            # Preflight legacy rows BEFORE changing the live Sheet schema.
+            if not read_only:
+                rows = retry(lambda: self.ws.get_all_values(), sleeper=sleeper)
+                if any(any(cell for cell in row) for row in rows[1:]):
+                    raise ValueError(
+                        "Existing unkeyed donations require reconciliation before ingestion"
+                    )
             self.headers.append(SUBMISSION_ID)
             if not read_only:
                 retry(lambda: self.ws.update_cell(1, len(self.headers), SUBMISSION_ID),
