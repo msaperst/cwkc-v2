@@ -432,5 +432,7 @@ describe('2026 landing page content', () => {
         expect(html).toContain('14th annual Commonwealth Kiddush Cup, from November 30 through December 7');
         expect(html).not.toContain('from December 1-7');
         expect(html).not.toContain('B’nai Mitzvah of The Commonwealth Kiddush Cup');
+        expect(html).toContain('Winner of 11/28 Virginia Tech/UVA');
+        expect(html).not.toContain('Winner of 11/29 Virginia Tech/UVA');
     });
 });
