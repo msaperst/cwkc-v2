@@ -20,6 +20,8 @@ jobs:
     # workflow_dispatch on another branch must never change production.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      CWKC_INGESTION_ENABLED: ${{ vars.CWKC_INGESTION_ENABLED }}
     outputs:
       active: ${{ steps.season.outputs.active }}
     steps:
@@ -35,6 +37,8 @@ jobs:
 
   recompute:
     needs: check-window
+    env:
+      CWKC_INGESTION_ENABLED: ${{ vars.CWKC_INGESTION_ENABLED }}
     if: needs.check-window.outputs.active == 'true'
     runs-on: ubuntu-latest
     permissions:
