@@ -1,106 +1,206 @@
 # Commonwealth Kiddush Cup (CWKC)
 
-The **Commonwealth Kiddush Cup** is an annual UVA (Hoos) vs. Virginia Tech (Hokies) fundraising competition. This repository hosts the public scoreboard and its data ingestion/score-calculation scripts. The Hillels own the fundraising forms and donation processing; CWKC reads approved submission data and publishes the competition totals.
+The Commonwealth Kiddush Cup is an annual fundraising competition between UVA and Virginia Tech. This repository contains the public scoreboard and the scripts that turn donation and participation submissions into scores. Donations are collected by the Hillels' forms, not by this website.
 
-**Public production website:** https://cwkc.org  
-**Static hosting:** GitHub Pages at https://msaperst.github.io/cwkc-v2/ (underlying Pages host; `cwkc.org` is the public address).  
-**Source:** https://github.com/msaperst/cwkc-v2  
-**2026 launch tracker:** [#41](https://github.com/msaperst/cwkc-v2/issues/41)
+**Website:** https://cwkc.org · **Hosting:** GitHub Pages · **Repository:** https://github.com/msaperst/cwkc-v2
 
-## 2026 season: implementation versus launch readiness
+## How it works
 
-- Expected competition: **Nov 30 through Dec 7, 2026, ending at 8:00 PM America/New_York**. The frontend currently assumes **midnight Eastern** on Nov 30 as the start, but the exact hour still needs Hillel confirmation ([#32](https://github.com/msaperst/cwkc-v2/issues/32)).
-- **Early giving** can happen before Nov 30 through the Hillels' forms, but CWKC is **not to poll/collect/process submissions until kickoff**. Accumulated LGL notification emails should be processed only after activation and reconciliation.
-- [PR #42](https://github.com/msaperst/cwkc-v2/pull/42) merged the 2026 frontend dates, year, pre-start scoreboard suppression, start-time countdown transition, and a **zeroed** public `results.csv`.
-- **Do not interpret that frontend readiness as launch approval.** `.github/workflows/update.yml` still uses **2025 dates**, and `workflow_dispatch` can bypass its date gate. **Do not manually run production data updates** until [#5](https://github.com/msaperst/cwkc-v2/issues/5) is fixed and tested.
-- The existing CSV/HTML/scoring categories still have **2025-era field names** until the approved 2026 rubric and Forms are implemented ([#35](https://github.com/msaperst/cwkc-v2/issues/35), [#36](https://github.com/msaperst/cwkc-v2/issues/36)). Donation and submission URLs and the official 2026 logo also require verification ([#37](https://github.com/msaperst/cwkc-v2/issues/37)).
+![CWKC data flow](highLevelWorkflow.png)
 
-## Architecture
+[Edit the architecture diagram in Canva](https://www.canva.com/design/DAGgbkbv3WQ/oSKlD4TjEMOe_xGGQLPTSQ/edit)
 
-There are two input paths. Both ultimately update the published `public/assets/csv/results.csv` file.
+There are two data sources:
 
-1. **Little Green Light (LGL) donation forms:** The Hillels configure **every submission** to send a notification email to `servicecwkc@gmail.com`. An IMAP poller (`scraper/pollEmail.py`) checks for unread LGL emails and triggers a GitHub `repository_dispatch` event. The `lgl-form-submission` workflow invokes `scraper.getLglFormData`, which reads/parses mail, writes normalized donations to a Google Sheet, and calculates CSV results.
-2. **Google Forms (gatherings and photo entries):** Form responses populate linked Google Sheets. An installable Google Apps Script trigger sends `sheet-change` to GitHub, which runs `scraper/getGoogleFormData.py` to update the applicable CSV columns.
+- **LGL donations:** Little Green Light (LGL) form submissions send notification emails to `servicecwkc@gmail.com`. `scraper/pollEmail.py` looks for unread messages and sends a GitHub `lgl-form-submission` dispatch. `scraper/getLglFormData.py` parses the emails, writes normalized donations to Google Sheets, and calculates scoreboard metrics.
+- **Participation forms:** Google Forms store gathering/photo responses in linked Google Sheets. An Apps Script trigger sends a GitHub `sheet-change` dispatch. `scraper/getGoogleFormData.py` reads the sheets and updates the participation metrics.
 
-The frontend (`public/index.html` and `public/assets/js/main.js`) reads the CSV to display competition standings. It is a static page; no payment data is captured by the site. The live frontend refreshes its CSV view during the official contest window. GitHub Actions handles static Pages deployments (`.github/workflows/deploy.yml`) and data updates (`.github/workflows/update.yml`).
+The resulting scoreboard is stored in `public/assets/csv/results.csv`. The static site (`public/index.html` plus `public/assets/js/main.js`) reads that CSV and awards points according to the HTML `data-points` attributes. GitHub Actions handles data updates and deployment.
 
-The 2025 IMAP poller **ran locally on a volunteer's PC**; no always-on production runner is currently configured. A decision about a supervised local poller versus a free scheduled alternative, plus monitoring and a backup operator, is tracked in [#40](https://github.com/msaperst/cwkc-v2/issues/40).
+## Project layout
 
-![CWKC data flow diagram](highLevelWorkflow.png)
+| Path | Purpose |
+| --- | --- |
+| `public/index.html` | Website content, links, scoring categories and layout |
+| `public/assets/js/main.js` | CSV rendering, points, countdown and results refresh |
+| `public/assets/csv/results.csv` | Generated scoreboard data consumed by the browser |
+| `scraper/EmailParser.py` | Normalize LGL email fields |
+| `scraper/CalculateValues.py` | Calculate donation metrics |
+| `scraper/getLglFormData.py` | Process unread LGL emails and update donation results |
+| `scraper/getGoogleFormData.py` | Read gathering/photo response sheets |
+| `scraper/pollEmail.py` | Poll mailbox and trigger GitHub data updates |
+| `scraper/tests/` and `public/assets/js/*.test.js` | Python and JavaScript tests |
+| `.github/workflows/test.yml` | PR test/coverage/SonarCloud checks |
+| `.github/workflows/update.yml` | Google Sheet/LGL ingestion and results publishing |
+| `.github/workflows/deploy.yml` | Static website deployment to GitHub Pages |
 
-[Editable source for the diagram](https://www.canva.com/design/DAGgbkbv3WQ/oSKlD4TjEMOe_xGGQLPTSQ/edit)
+## Local development
 
-## Development and testing
+**Requirements:** Git, Node.js 24 with npm, and Python 3.12.
 
-Use **feature branches and pull requests**. Do not push directly to `main`. PRs must pass automated checks and be reviewed before merging. Changes to external Forms or scoring must include fixture-based regression tests; don't point PR CI at live donor data.
+~~~bash
+git clone https://github.com/msaperst/cwkc-v2.git
+cd cwkc-v2
 
-### JavaScript (Jest)
-
-```bash
 npm ci
-npm test
-```
 
-### Python (pytest)
-
-From the repository root, with Python 3.12 and a virtual environment:
-
-```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r scraper/requirements-test.txt
+~~~
+
+On Windows, activate the virtual environment using the appropriate `.venv/Scripts/activate` script instead.
+
+### Run the website
+
+No donation mailbox or Google credentials are needed to work on the **frontend**.
+
+~~~bash
+python -m http.server 8000 --directory public
+~~~
+
+Open http://localhost:8000. The site uses CDN-delivered frontend libraries; there is no frontend build step. Edits to files in `public/` are reflected after refreshing the browser.
+
+The real countdown uses fixed competition dates. Outside the active period, the live scoreboard may not load its CSV; test score rendering and timer boundaries with Jest rather than changing production dates just for a local preview. For manual layout work, use local, non-sensitive sample data.
+
+### Run tests
+
+Run both suites from the **repository root**:
+
+~~~bash
+npm test
 python -m pytest scraper/tests --maxfail=1 -q
-```
+~~~
 
-CI additionally uploads coverage for SonarCloud. The CI-only file `scraper/requirements-ci.lock` pins **all 42 resolved packages**, including transitive dependencies, to exact versions and SHA-256 hashes. It was verified for **CPython 3.12 on Linux x86_64**. CI enforces hash checking, wheel-only installs and no implicit dependency resolution. **Do not reuse this platform-specific wheel lock for a different Python/OS/CPU without regenerating and validating the hashes via PR.** Local development normally installs the exact-version `requirements-test.txt` graph instead.
+For Python coverage locally:
 
-[CI/test quality work](https://github.com/msaperst/cwkc-v2/issues/39) is still open for browser-level Playwright/smoke and end-to-end contract tests, even though [PR #42](https://github.com/msaperst/cwkc-v2/pull/42) had green pytest, Jest, and SonarCloud checks.
+~~~bash
+python -m pytest scraper/tests --cov=scraper --cov-report=term-missing --cov-report=html
+~~~
 
-## Integrations and access
+The GitHub Actions test workflow also collects JavaScript coverage and runs SonarCloud. CI installs from `scraper/requirements-ci.lock` using exact versions and SHA-256 wheel hashes for **Python 3.12 on Linux x86_64**. This lock is platform-specific: regenerate and verify wheel hashes when changing dependencies, Python, or the CI platform. For ordinary development use `scraper/requirements-test.txt`.
 
-### Account roles
+Work on a feature branch, add or update tests with behavior changes, and open a pull request against `main`. Do not push directly to `main`.
 
-- **`servicecwkc@gmail.com`:** Shared CWKC Gmail mailbox receiving LGL submission notifications. Request Google **Form Editor** and separate linked **Sheet Editor** permissions for this account to manage the Apps Script/Form integrations.
-- **Google Cloud service account (`client_email` in the private credentials JSON):** Separate non-Gmail identity used by `gspread` to read the linked Sheets. The exact service-account email should be obtained from private configuration and granted appropriate Sheet access. Never post its private key.
-- `cwkcmanager@gmail.com` is a different historical account; do **not** request access for it by default unless a verified integration depends on it.
+## Credentials and configuration
 
-These identities are not interchangeable. The form owner must check both the Form and its linked Sheet's sharing settings; a public responder link does **not** grant edit or API access.
+Live integration scripts access Gmail and Google Sheets. **Do not use production accounts or real donor data for automated tests or local experiments.**
 
-### Before connecting or replacing any 2026 Form
+### Mailbox settings
 
-1. Obtain organizer-approved final **public form URL**, any backend submission form URL, response Sheet link, and full questions/answer-option contract. Establish a **field freeze** with the Hillels before early giving.
-2. Grant `servicecwkc@gmail.com` **Editor** access on the Google Form **and** its linked response Google Sheet. Grant the separate GCP service account only the Sheet permissions its API actions require.
-3. Obtain the expected school mapping, participant eligibility, thresholds, duplicate handling, and a **sanitized fixture** for each Form. Use authorized test submissions without charging a real donor.
-4. For Google Forms, configure the associated Sheet's **installable Apps Script trigger** under the shared CWKC account. It should send the `sheet-change` `repository_dispatch` request to the GitHub repository. Store the GitHub credential in **Apps Script Properties**, never in a public script or repository. Review existing triggers to avoid duplicates, and give the token only the permissions needed for dispatch.
-5. For LGL donation forms, verify that **every submission** sends an email notification to `servicecwkc@gmail.com`, and that `scraper/EmailParser.py` can parse every exact label and option. Failed processing must be recoverable without losing/duplicating submissions.
-6. Test the **Form → email/Sheet → parser → result CSV → displayed points** chain with sanitized data in a nonproduction rehearsal; clear fixtures before activation. Never enable event ingestion just to test a provisional form.
+Create `scraper/.env` (ignored by Git) when configuring the email poller or LGL ingestion:
 
-Detailed 2026 form contracts and changes are tracked in [#32](https://github.com/msaperst/cwkc-v2/issues/32), [#33](https://github.com/msaperst/cwkc-v2/issues/33), and [#36](https://github.com/msaperst/cwkc-v2/issues/36).
-
-### IMAP poller (for the approved event window only)
-
-The poller lives at **`scraper/pollEmail.py`**. Its private environment configuration includes:
-
-```dotenv
+~~~dotenv
 EMAIL_ACCOUNT=servicecwkc@gmail.com
-EMAIL_APP_PASSWORD=your-private-Gmail-app-password
-GITHUB_TOKEN=your-private-GitHub-dispatch-token
-```
+EMAIL_APP_PASSWORD=replace-with-Gmail-app-password
+SPREADSHEET_KEY=replace-with-normalized-donations-spreadsheet-id
+GITHUB_TOKEN=replace-with-GitHub-dispatch-token
+~~~
 
-Once the **official kickoff is confirmed, the backend date gate is fixed, and the launch checklist is approved**, a supervised operator can run the local poller using:
+Other supported options include `IMAP_SERVER` (default `imap.gmail.com`), `MAILBOX` (default `INBOX`), `FROM_FILTER`, `SPREADSHEET_SHEET` (default `entries`), `GITHUB_REPO`, and `IDLE_TIMEOUT_SECONDS`. Check the corresponding Python script for the variables it actually uses; the poller needs `GITHUB_TOKEN`, while the LGL processor needs `SPREADSHEET_KEY`.
 
-```bash
+Use `servicecwkc@gmail.com` for LGL submission notifications. The **Google Cloud service account** used by `gspread` is a separate identity: its `client_email` must have access to the Google Sheets being read or written.
+
+### Google Sheets credentials
+
+Follow the [gspread service-account setup guide](https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account/) to create a credentials JSON file. Keep its private key outside Git.
+
+The current scripts use **working-directory-relative paths**:
+
+- For `getGoogleFormData.py`, run from `scraper/` and place the private credentials file at `scraper/spreadsheet_credentials.json`.
+- For `python -m scraper.getLglFormData`, run from the repository root and provide `spreadsheet_credentials.json` in the repository root. This root-level credentials file is also gitignored.
+
+Share the response Sheets with the service account's `client_email`. For editing a Google Form, its associated Sheet and Apps Script, grant the CWKC Google user (`servicecwkc@gmail.com`) **Editor** access to the Form **and** its linked response Sheet. Form-editor access alone is not the same as API access for the service account.
+
+The `update.yml` workflow reconstructs the credentials JSON from GitHub Actions secrets and reads the mailbox and destination-sheet secrets. Refer to that workflow for the expected secret names (including `EMAIL_ACCOUNT`, `EMAIL_APP_PASSWORD` and `SPREADSHEET_KEY`); the test workflow separately uses `SONAR_TOKEN`. Set secrets in the repository's GitHub Actions settings, never in source files.
+
+## Connecting a new or replacement form
+
+### LGL donation forms
+
+1. Configure each Hillel's public and backend LGL form to email **every submission** to `servicecwkc@gmail.com`.
+2. Compare the exact notification field labels and form titles against `scraper/EmailParser.py` and its tests. The parser depends on those fields to identify the school, donation type and values.
+3. Confirm the destination normalized-donations spreadsheet, its ID (`SPREADSHEET_KEY`), and the service account's Sheet access.
+4. Validate with authorized, non-financial test messages and sanitized test fixtures before accepting real donations. Freeze field names/options once verified.
+
+### Google Forms and linked response Sheets
+
+1. Have the owner share both the Form and its linked response Sheet with `servicecwkc@gmail.com` as **Editor**. Share the Sheet with the GCP service account for API access too.
+2. Update the spreadsheet IDs and expected response columns in `scraper/getGoogleFormData.py`, with tests for the actual response schema. A new Form or reordered questions can change column positions.
+3. In the **linked response Sheet**, open **Extensions → Apps Script**. Create a script like this:
+
+~~~javascript
+function triggerGithubAction() {
+  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) throw new Error('GITHUB_TOKEN script property is missing');
+
+  const response = UrlFetchApp.fetch(
+    'https://api.github.com/repos/msaperst/cwkc-v2/dispatches',
+    {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        Accept: 'application/vnd.github+json'
+      },
+      payload: JSON.stringify({
+        event_type: 'sheet-change',
+        client_payload: { message: 'Participation response sheet updated' }
+      }),
+      muteHttpExceptions: true
+    }
+  );
+
+  if (response.getResponseCode() !== 204) {
+    throw new Error('GitHub dispatch failed: HTTP ' + response.getResponseCode());
+  }
+}
+~~~
+
+4. Under **Apps Script → Project Settings → Script properties**, set `GITHUB_TOKEN` to a GitHub token authorized to create repository dispatches. Create an installable **On form submit** trigger for `triggerGithubAction`, authorizing it with the CWKC account. Add an **On change** trigger only if manual Sheet changes also need to trigger updates; avoid duplicate triggers.
+5. Verify the trigger with a safe test response and check the resulting GitHub Actions run, parsed totals and CSV contents. Remove test data before production use.
+
+Installable triggers run as the account that created them; keep their ownership under the shared CWKC account, not a departing volunteer's personal account.
+
+## Running integrations
+
+**These commands can change Google Sheets, mark emails as read, publish results, or trigger production Actions. They are not smoke tests.** Confirm credentials, inputs, the approved event window and backup/recovery procedure before using them.
+
+**LGL poller:** from the repository root (with `scraper/.env` configured):
+
+~~~bash
 python scraper/pollEmail.py
-```
+~~~
 
-The poller is **not currently running**; running it continuously or triggering an update early could initiate production data processing. Never commit `.env`, service-account JSON, app passwords, donor emails or secrets. An operator must have a tested restart/stop procedure and check that early-donation emails are ingested without duplication. Refer to [#34](https://github.com/msaperst/cwkc-v2/issues/34) and [#40](https://github.com/msaperst/cwkc-v2/issues/40).
+The poller looks for unread LGL messages and sends a `lgl-form-submission` dispatch. It does **not** parse or acknowledge donations itself. Leave it running only while collection is authorized, and monitor its output and the corresponding workflow runs.
 
-## Annual launch/rollback checklist
+**Read participation Sheets and update the local CSV:**
 
-Use [#41](https://github.com/msaperst/cwkc-v2/issues/41) as the live go/no-go tracker, not this README alone. At minimum: confirm the Hillels' full scoring rules, signup links, editor/API permissions, logo/contacts, field freeze, exact Eastern start/end times, zero production test data, validated ingestion/retry behavior, `cwkc.org` URLs, green CI/Sonar and production rollback plan. During event week, verify last successful ingestion, reconciliation against submitted gifts, and the final-score stop procedure.
+~~~bash
+cd scraper
+python getGoogleFormData.py
+cd ..
+~~~
 
-**Never waive a failing quality gate or make a direct `main` change to meet the event deadline.**
+**Process unread donation mail into the normalized Sheet and local CSV:**
 
-## Future reuse
+~~~bash
+python -m scraper.getLglFormData
+~~~
 
-[Documentation issue #6](https://github.com/msaperst/cwkc-v2/issues/6) tracks a configurable, school-independent deployment guide. This repository currently has CWKC-specific sheet IDs, score fields, and event assumptions; changing the school pair is **not** just a logo swap.
+That last command processes actual unread messages and marks successfully handled ones as read; use it only when production processing is intended, or with a fully isolated test mailbox and spreadsheet.
+
+## Deployment
+
+The site is a static GitHub Pages deployment with custom domain **cwkc.org**:
+
+1. Make changes on a branch, run both test suites and open a PR.
+2. Confirm the PR's **Unit Tests** and **SonarCloud quality gate** pass; review site changes and generated CSV data.
+3. Merge the PR into `main`. A push to `main` triggers `.github/workflows/deploy.yml`, which deploys the `public/` directory to GitHub Pages.
+4. Check https://cwkc.org after deployment for correct content, links, HTTPS, browser console errors, and the expected countdown/score display.
+
+**Data refresh is a separate workflow.** `.github/workflows/update.yml` handles `sheet-change` and `lgl-form-submission` events, updates `results.csv` and publishes updated scores. It also supports manual `workflow_dispatch`, but **manual execution can bypass the current date gate and write production data**. Do not treat a manual dispatch as a harmless dry run.
+
+For each new competition season, update and test **both** frontend start/end instants (`public/assets/js/main.js`) and backend collection dates (`.github/workflows/update.yml`), the scoring contract (`CalculateValues.py` / HTML / CSV), form IDs, links and branding. Test the precise timezone boundaries and manual dispatch behavior before enabling ingestion.
+
+If a release must be rolled back, revert the relevant PR on a new branch and merge the corrective PR through the normal checks. A static rollback does not automatically undo emails already processed or data written to Google Sheets; reconcile those separately before republishing scores.
