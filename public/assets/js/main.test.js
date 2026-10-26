@@ -55,7 +55,7 @@ describe('Main', () => {
         });
 
         test('setTimes shows the official 2026 Eastern dates', () => {
-            document.body.innerHTML = \`<span id="start-date"></span><span id="end-date"></span><span id="end-time"></span>\`;
+            document.body.innerHTML = `<span id="start-date"></span><span id="end-date"></span><span id="end-time"></span>`;
             main.setTimes();
             expect($('#start-date').text()).toBe('November 30th');
             expect($('#end-date').text()).toBe('December 7th');
