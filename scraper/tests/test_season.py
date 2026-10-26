@@ -1,6 +1,9 @@
 """Production season cutoff tests. Never connects to external services."""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import os
+import subprocess
+import textwrap
 
 import pytest
 
@@ -100,3 +103,64 @@ def test_gate_is_used_by_workflow_before_and_after_processing():
     assert "action-update-file" not in workflow
     assert "always()" not in workflow
     assert "name: results-csv-" in workflow
+
+
+def _change_step_shell() -> str:
+    """Execute the real workflow shell instead of a reimplementation."""
+    yaml = (Path(__file__).resolve().parents[2] / ".github/workflows/update.yml").read_text()
+    section = yaml.split("      - name: Detect changed scoreboard\n", 1)[1]
+    body = section.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0]
+    return textwrap.dedent(body)
+
+
+def _git(tmp_path, *args):
+    return subprocess.run(["git", *args], cwd=tmp_path, check=True,
+                          text=True, capture_output=True)
+
+
+@pytest.mark.parametrize("new_data,expected", [
+    (None, "false"),
+    ("updated scoring data\n", "true"),
+])
+def test_actual_workflow_diff_command(tmp_path, new_data, expected):
+    _git(tmp_path, "init", "-q")
+    path = tmp_path / "public/assets/csv/results.csv"
+    path.parent.mkdir(parents=True)
+    path.write_text("original scoring data\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "-c", "user.email=ci@example.invalid",
+         "-c", "user.name=CI", "commit", "-qm", "baseline")
+    if new_data is not None:
+        path.write_text(new_data)
+    output = tmp_path / "outputs"
+    env = {**os.environ, "GITHUB_OUTPUT": str(output)}
+    result = subprocess.run(["bash", "-c", _change_step_shell()],
+                            cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert output.read_text() == f"changed={expected}\n"
+
+
+def test_diff_step_fails_closed_outside_git_repository(tmp_path):
+    path = tmp_path / "public/assets/csv/results.csv"
+    path.parent.mkdir(parents=True)
+    path.write_text("untracked\n")
+    env = {**os.environ, "GITHUB_OUTPUT": str(tmp_path / "outputs")}
+    result = subprocess.run(["bash", "-c", _change_step_shell()],
+                            cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_workflow_cannot_publish_when_import_fails():
+    yaml = (Path(__file__).resolve().parents[2] / ".github/workflows/update.yml").read_text()
+    # Every successful event refreshes BOTH sources in a single ordered job.
+    assert yaml.count("      - name: Process unread LGL emails") == 1
+    assert yaml.count("      - name: Update Google Forms participation scores") == 1
+    assert yaml.index("Process unread LGL emails") < yaml.index(
+        "Update Google Forms participation scores") < yaml.index(
+        "Check cutoff again before publishing") < yaml.index(
+        "Detect changed scoreboard") < yaml.index("Commit and publish changed results")
+    assert "needs.update_results.result == 'success'" in yaml
+    assert "contents: write" in yaml
+    assert "id-token: write" in yaml
+    assert yaml.count("      - name: Commit and publish changed results") == 1
