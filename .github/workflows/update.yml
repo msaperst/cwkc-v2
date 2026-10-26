@@ -1,263 +1,167 @@
-# Workflow for updating our results file
-# This job can be triggered manually, and will run, alternatively, it can be triggered by
-# changes to our Google Sheets, however it will only run if the time are between the
-# start/stop times of the cup (defined below)
+# Recompute BOTH sources in a single run. Concurrent dispatches are coalesced,
+# so every run must be able to reconstruct the complete latest scoreboard.
 name: Update results from multiple locations
 
 on:
-  # Triggers from our google sheets
   repository_dispatch:
-    types: [ sheet-change, lgl-form-submission ]
-
-  # Allows you to run this workflow manually from the Actions tab
+    types: [sheet-change, lgl-form-submission]
   workflow_dispatch:
 
-# Allow only one concurrent data check, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these updates to complete.
+# Allow an in-flight run to finish, never cancel while it can acknowledge email.
 concurrency:
-  group: "updates"
+  group: updates
   cancel-in-progress: false
 
-# Sets permissions of the GITHUB_TOKEN to allow updating our results file and publishing updates to pages
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
-
-  # this job is relatively simple, and just checks the current date with the provided
-  # dates, and outputs true if inside the cup range
-  check-date:
+  check-window:
+    # workflow_dispatch on another branch must never change production.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
-      in_range: ${{ steps.date.outputs.in_range }}
-    steps:
-      - name: Check Date Range
-        id: date
-        # these dates need to coincide with our start and stop dates
-        # TODO - these dates need to be in UTC, and include a timestamp
-        # TODO - for GHA to use it properly
-        run: |
-          echo "Triggered by: ${{ github.event.client_payload.message }}"
-          current_date=$(date +%Y-%m-%d)
-          start_date="2025-11-01"
-          end_date="2025-12-10"
-          if [[ $current_date > $start_date && $current_date < $end_date ]]; then
-            echo "in_range=true" >> $GITHUB_OUTPUT
-          else
-            echo "in_range=false" >> $GITHUB_OUTPUT
-          fi
-
-  # this job updates the csv file based on the data from the Google Sheets files (through a
-  # Python script). This job only run if within the date range of the cup, or if it was
-  # triggered manually
-  update-google-form-data:
-    runs-on: ubuntu-latest
-    needs: check-date
-    if: ${{ ( needs.check-date.outputs.in_range == 'true' && github.event.action == 'sheet-change' )
-      || github.event_name == 'workflow_dispatch' }}
-    outputs:
-      difference: ${{ steps.changes.outputs.difference }}
+      active: ${{ steps.season.outputs.active }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      # credentials for Google Sheets obtained from here
-      # https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
-      - name: Setup credentials
-        run: |
-          cd scraper
-          echo "{" > spreadsheet_credentials.json
-          echo "  \"type\": \"${{ secrets.TYPE }}\"," >> spreadsheet_credentials.json
-          echo "  \"project_id\": \"${{ secrets.PROJECT_ID }}\"," >> spreadsheet_credentials.json
-          echo "  \"private_key_id\": \"${{ secrets.PRIVATE_KEY_ID }}\"," >> spreadsheet_credentials.json
-          echo "  \"private_key\": \"${{ secrets.PRIVATE_KEY }}\"," >> spreadsheet_credentials.json
-          echo "  \"client_email\": \"${{ secrets.CLIENT_EMAIL }}\"," >> spreadsheet_credentials.json
-          echo "  \"client_id\": \"${{ secrets.CLIENT_ID }}\"," >> spreadsheet_credentials.json
-          echo "  \"auth_uri\": \"${{ secrets.AUTH_URI }}\"," >> spreadsheet_credentials.json
-          echo "  \"token_uri\": \"${{ secrets.TOKEN_URI }}\"," >> spreadsheet_credentials.json
-          echo "  \"auth_provider_x509_cert_url\": \"${{ secrets.AUTH_PROVIDER_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
-          echo "  \"client_x509_cert_url\": \"${{ secrets.CLIENT_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
-          echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
-          echo "}" >> spreadsheet_credentials.json
-
-      #install the python needed
-      - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: 3.12
+          python-version: '3.12'
+      - name: Check exact 2026 Eastern-time window
+        id: season
+        run: python -m scraper.contest_window
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f scraper/requirements.txt ]; then pip install -r scraper/requirements.txt; fi
-
-      - name: Update results
-        run: |
-          cd scraper
-          python getGoogleFormData.py
-
-      # check to see if we actually have any changes to our file
-      - name: Check changes
-        id: changes
-        run: |  # for some reason, this always comes back as true
-          if git diff public/assets/csv/results.csv &> /dev/null; then
-            echo "difference=true" >> $GITHUB_OUTPUT
-          else
-            echo "difference=false" >> $GITHUB_OUTPUT
-          fi
-
-      # if there were some changes, push our new file to use later
-      - name: Save CSV
-        uses: actions/upload-artifact@v4
-        if: ${{ steps.changes.outputs.difference == 'true' }} # TODO - this if isn't respected, unsure why
-        with:
-          name: results.csv
-          path: public/assets/csv/results.csv
-
-      # push our updates to GitHub to save them
-      - name: Publish new results
-        uses: test-room-7/action-update-file@v2
-        if: ${{ steps.changes.outputs.difference == 'true' }} # TODO - this if isn't respected, unsure why
-        with:
-          file-path: public/assets/csv/results.csv
-          commit-msg: Updating results
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  # this job updates the csv file based on the data from the Google Sheets files (through a
-  # Python script). This job only run if within the date range of the cup, or if it was
-  # triggered manually
-  update-lgl-form-data:
+  recompute:
+    needs: check-window
+    if: needs.check-window.outputs.active == 'true'
     runs-on: ubuntu-latest
-    needs: check-date
-    if: ${{ ( needs.check-date.outputs.in_range == 'true' && github.event.action == 'lgl-form-submission' )
-      || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: write
     outputs:
-      difference: ${{ steps.changes.outputs.difference }}
+      changed: ${{ steps.changes.outputs.changed }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # credentials for Google Sheets obtained from here
-      # https://docs.gspread.org/en/latest/oauth2.html#for-bots-using-service-account
-      - name: Setup credentials
-        run: |
-          echo "{" > spreadsheet_credentials.json
-          echo "  \"type\": \"${{ secrets.TYPE }}\"," >> spreadsheet_credentials.json
-          echo "  \"project_id\": \"${{ secrets.PROJECT_ID }}\"," >> spreadsheet_credentials.json
-          echo "  \"private_key_id\": \"${{ secrets.PRIVATE_KEY_ID }}\"," >> spreadsheet_credentials.json
-          echo "  \"private_key\": \"${{ secrets.PRIVATE_KEY }}\"," >> spreadsheet_credentials.json
-          echo "  \"client_email\": \"${{ secrets.CLIENT_EMAIL }}\"," >> spreadsheet_credentials.json
-          echo "  \"client_id\": \"${{ secrets.CLIENT_ID }}\"," >> spreadsheet_credentials.json
-          echo "  \"auth_uri\": \"${{ secrets.AUTH_URI }}\"," >> spreadsheet_credentials.json
-          echo "  \"token_uri\": \"${{ secrets.TOKEN_URI }}\"," >> spreadsheet_credentials.json
-          echo "  \"auth_provider_x509_cert_url\": \"${{ secrets.AUTH_PROVIDER_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
-          echo "  \"client_x509_cert_url\": \"${{ secrets.CLIENT_X509_CERT_URL }}\"," >> spreadsheet_credentials.json
-          echo "  \"universe_domain\": \"${{ secrets.UNIVERSE_DOMAIN }}\"" >> spreadsheet_credentials.json
-          echo "}" >> spreadsheet_credentials.json
-          
-          cd scraper
-          echo "EMAIL_ACCOUNT=${{ secrets.EMAIL_ACCOUNT }}" > .env
-          echo "EMAIL_APP_PASSWORD=${{ secrets.EMAIL_APP_PASSWORD }}" >> .env
-          echo "SPREADSHEET_KEY=${{ secrets.SPREADSHEET_KEY }}" >> .env
-
-      #install the python needed
-      - name: Setup Python
-        uses: actions/setup-python@v2
+      - name: Checkout main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          python-version: 3.12
+          ref: main
 
-      - name: Install dependencies
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install hash-verified Python dependencies
+        env:
+          PIP_NO_DEPS: 'true'
+          PIP_ONLY_BINARY: ':all:'
+        run: python -m pip install --require-hashes -r scraper/requirements-ci.lock
+
+      # Re-check after any time spent queued or installing. This runs before
+      # any credentials are read, emails acknowledged or Sheets updated.
+      - name: Reject ingestion after cutoff
+        run: python -m scraper.contest_window --require-active
+
+      - name: Write private Google service account files
+        env:
+          GOOGLE_TYPE: ${{ secrets.TYPE }}
+          GOOGLE_PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          GOOGLE_PRIVATE_KEY_ID: ${{ secrets.PRIVATE_KEY_ID }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          GOOGLE_CLIENT_EMAIL: ${{ secrets.CLIENT_EMAIL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GOOGLE_AUTH_URI: ${{ secrets.AUTH_URI }}
+          GOOGLE_TOKEN_URI: ${{ secrets.TOKEN_URI }}
+          GOOGLE_AUTH_PROVIDER_X509_CERT_URL: ${{ secrets.AUTH_PROVIDER_X509_CERT_URL }}
+          GOOGLE_CLIENT_X509_CERT_URL: ${{ secrets.CLIENT_X509_CERT_URL }}
+          GOOGLE_UNIVERSE_DOMAIN: ${{ secrets.UNIVERSE_DOMAIN }}
         run: |
-          python -m pip install --upgrade pip
-          if [ -f scraper/requirements.txt ]; then pip install -r scraper/requirements.txt; fi
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-      - name: Update results
-        run: |
-          python -m scraper.getLglFormData
+          fields = ("type", "project_id", "private_key_id", "private_key",
+                    "client_email", "client_id", "auth_uri", "token_uri",
+                    "auth_provider_x509_cert_url", "client_x509_cert_url")
+          missing = [key for key in fields if not os.environ.get("GOOGLE_" + key.upper())]
+          if missing:
+              raise SystemExit("Missing configured Google service-account secret fields")
+          credentials = {key: os.environ["GOOGLE_" + key.upper()] for key in fields}
+          credentials["private_key"] = credentials["private_key"].replace("\\n", "\n")
+          if os.environ.get("GOOGLE_UNIVERSE_DOMAIN"):
+              credentials["universe_domain"] = os.environ["GOOGLE_UNIVERSE_DOMAIN"]
+          for filename in (Path("spreadsheet_credentials.json"),
+                           Path("scraper/spreadsheet_credentials.json")):
+              filename.write_text(json.dumps(credentials), encoding="utf-8")
+              filename.chmod(0o600)
+          PY
 
-      # check to see if we actually have any changes to our file
-      - name: Check changes
+      # Both producers are executed every time: a queued dispatch can be
+      # superseded by GitHub's concurrency scheduler without missing its source.
+      # Do not publish if either source fails.
+      - name: Update donation totals from unread LGL email
+        env:
+          EMAIL_ACCOUNT: ${{ secrets.EMAIL_ACCOUNT }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          SPREADSHEET_KEY: ${{ secrets.SPREADSHEET_KEY }}
+        run: python -m scraper.getLglFormData
+
+      - name: Update gathering and participation totals
+        working-directory: scraper
+        run: python getGoogleFormData.py
+
+      - name: Detect actual CSV change
         id: changes
-        run: |  # for some reason, this always comes back as true
-          if git diff public/assets/csv/results.csv &> /dev/null; then
-            echo "difference=true" >> $GITHUB_OUTPUT
-          else
-            echo "difference=false" >> $GITHUB_OUTPUT
-          fi
-
-      # if there were some changes, push our new file to use later
-      - name: Save CSV
-        uses: actions/upload-artifact@v4
-        if: ${{ steps.changes.outputs.difference == 'true' }} # TODO - this if isn't respected, unsure why
-        with:
-          name: results.csv
-          path: public/assets/csv/results.csv
-
-      # push our updates to GitHub to save them
-      - name: Publish new results
-        uses: test-room-7/action-update-file@v2
-        if: ${{ steps.changes.outputs.difference == 'true' }} # TODO - this if isn't respected, unsure why
-        with:
-          file-path: public/assets/csv/results.csv
-          commit-msg: Updating results
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  # this job waits for the previous two to complete, and then checks their status to determine if
-  # the next one should run
-  merge-results:
-    runs-on: ubuntu-latest
-    needs: [ update-google-form-data, update-lgl-form-data ]
-    if: always()
-    outputs:
-      should_deploy: ${{ steps.check.outputs.should_deploy }}
-    steps:
-      - id: check
+        shell: bash
         run: |
-          google_diff="${{ needs.update-google-form-data.outputs.difference || 'false' }}"
-          lgl_diff="${{ needs.update-lgl-form-data.outputs.difference || 'false' }}"
-          
-          echo "google_diff=$google_diff"
-          echo "lgl_diff=$lgl_diff"
-          
-          if [[ "$google_diff" == "true" || "$lgl_diff" == "true" ]]; then
-            echo "✅ At least one difference found — deploying"
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          if git diff --quiet -- public/assets/csv/results.csv; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "🟡 No differences found"
-            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            result=$?
+            if [ "$result" -ne 1 ]; then exit "$result"; fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-  # this final job publishes our code back to GitHub pages. This only runs if there were
-  # changes detected in the above steps
-  deploy-site:
+      - name: Commit the single reconciled results file
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- public/assets/csv/results.csv
+          git diff --cached --check
+          git commit -m "Update CWKC results"
+          git push origin HEAD:main
+
+  deploy-results:
+    needs: recompute
+    if: needs.recompute.result == 'success' && needs.recompute.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    needs: merge-results
-    if: ${{ always() && needs.merge-results.outputs.should_deploy == 'true' }}
+    # Share deployment concurrency with deploy.yml so manual PR merges and
+    # results publishing cannot deploy Pages at the same time.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # get our updated csv file (instead of waiting for the push to sync)
-      - name: Retrieve CSV
-        uses: actions/download-artifact@v4
+      # GITHUB_TOKEN pushes do NOT trigger deploy.yml; deploy here explicitly.
+      - name: Checkout published main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          name: results.csv
-          path: public/assets/csv
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+          ref: main
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Upload public website
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
-          path: './public'  # Upload public folder
-
-      - name: Deploy to GitHub Pages
+          path: public
+      - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
