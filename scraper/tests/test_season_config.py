@@ -59,7 +59,8 @@ def test_config_rejects_missing_or_extra_fields(valid_config, tmp_path):
 
 def test_generation_cli_write_and_check(tmp_path, valid_config, monkeypatch, capsys):
     generated = tmp_path / "season-config.js"
-    html = tmp_path / "index.html"
+    html = tmp_path / "public" / "index.html"
+    html.parent.mkdir()
     html.write_text(
         '<meta content="2025 Commonwealth Kiddush Cup" property="og:description" />\n'
         '<meta content="2025 Commonwealth Kiddush Cup" property="og:title" />\n'
@@ -67,6 +68,7 @@ def test_generation_cli_write_and_check(tmp_path, valid_config, monkeypatch, cap
         encoding="utf-8",
     )
     monkeypatch.setattr(season_config, "BROWSER_PATH", generated)
+    monkeypatch.setattr(season_config, "ROOT", tmp_path)
     monkeypatch.setattr(season_config, "HTML_PATH", html)
     monkeypatch.setattr(season_config, "load_config", lambda: valid_config)
     monkeypatch.setattr("sys.argv", ["season_config", "--write"])
@@ -117,3 +119,24 @@ def test_html_metadata_updates_when_the_year_changes(valid_config):
 def test_generator_fails_if_expected_seo_metadata_is_missing(valid_config):
     with pytest.raises(ValueError, match="Expected exactly one"):
         season_config.render_html_metadata("<title>Other page</title>", valid_config)
+
+
+def test_generator_rejects_html_path_outside_repository(tmp_path, monkeypatch):
+    outside = tmp_path / "outside.html"
+    outside.write_text("outside file", encoding="utf-8")
+    monkeypatch.setattr(season_config, "ROOT", tmp_path)
+    monkeypatch.setattr(season_config, "HTML_PATH", outside)
+    with pytest.raises(ValueError, match="must be the repository"):
+        season_config.verified_html_path()
+
+
+def test_generator_rejects_symlinked_html_target(tmp_path, monkeypatch):
+    html = tmp_path / "public" / "index.html"
+    html.parent.mkdir()
+    outside = tmp_path / "outside.html"
+    outside.write_text("outside file", encoding="utf-8")
+    html.symlink_to(outside)
+    monkeypatch.setattr(season_config, "ROOT", tmp_path)
+    monkeypatch.setattr(season_config, "HTML_PATH", html)
+    with pytest.raises(ValueError, match="must be the repository"):
+        season_config.verified_html_path()
