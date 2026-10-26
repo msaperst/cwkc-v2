@@ -37,8 +37,9 @@ def test_utc_and_local_time_represent_same_boundary():
 
 
 def test_timezone_required():
+    naive_datetime = datetime(2026, 12, 1)
     with pytest.raises(ValueError, match="timezone-aware"):
-        contest_window.is_active(datetime(2026, 12, 1))
+        contest_window.is_active(naive_datetime)
 
 
 def test_frontend_and_backend_read_one_season_config():
@@ -122,7 +123,8 @@ def test_update_workflow_guards_and_single_publisher():
     assert 'if: steps.changes.outputs.changed == \'true\'' in workflow
     assert "if: needs.recompute.result == 'success' && needs.recompute.outputs.changed == 'true'" in workflow
     assert "cancel-in-progress: false" in workflow
-    assert "group: updates" in workflow and "group: pages" in workflow
+    assert "group: updates" in workflow
+    assert "group: pages" in workflow
     assert "python -m scraper.getLglFormData" in workflow
     assert "python getGoogleFormData.py" in workflow
     assert workflow.index("python -m scraper.getLglFormData") < workflow.index("python getGoogleFormData.py")
