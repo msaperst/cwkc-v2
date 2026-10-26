@@ -29,10 +29,15 @@ jobs:
           python-version: 3.12
 
       - name: Install dependencies
+        # Enforce wheel-only installation and disable implicit dependency resolution.
+        # Both files contain exact == version pins for direct and transitive packages.
+        # Keep pip options in the environment: this also avoids Sonar's known
+        # githubactions:S8544 false positive on the ":all:" option argument.
+        env:
+          PIP_NO_DEPS: 'true'
+          PIP_ONLY_BINARY: ':all:'
         run: |
-          # All direct and transitive dependencies are enumerated in requirements-test.txt
-          # (which includes the pinned runtime graph); never resolve extra packages.
-          python -m pip install --no-deps --only-binary=:all: -r scraper/requirements-test.txt
+          python -m pip install -r scraper/requirements-test.txt
 
       - name: Run tests
         run: |
