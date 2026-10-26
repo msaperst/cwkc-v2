@@ -28,48 +28,15 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Install dependencies
-        # Enforce wheel-only installation and disable implicit dependency resolution.
-        # Both files contain exact == version pins for direct and transitive packages.
-        # Keep pip options in the environment: this also avoids Sonar's known
-        # githubactions:S8544 false positive on the ":all:" option argument.
+      - name: Install dependencies from verified wheel hashes
+        # All 42 direct/transitive dependencies have exact versions AND SHA-256
+        # hashes for CI's Python 3.12 / Linux x86_64 wheels.
+        # Never allow unverified files or install-time source builds.
         env:
           PIP_NO_DEPS: 'true'
           PIP_ONLY_BINARY: ':all:'
         run: |
-          python -m pip install -r scraper/requirements-test.txt
-
-      # TEMPORARY: generate one hash per compatible Linux/Python 3.12 wheel
-      # from our already-version-pinned dependencies; remove after committing lock.
-      - name: Generate verified wheel hashes for CI lock
-        run: |
-          mkdir -p "${RUNNER_TEMP}/cwkc-wheels"
-          python -m pip download --no-deps --only-binary=:all: -r scraper/requirements-test.txt -d "${RUNNER_TEMP}/cwkc-wheels" -q
-          python - <<'PY'
-          from pathlib import Path
-          from hashlib import sha256
-          from packaging.utils import canonicalize_name, parse_wheel_filename
-          packages = {}
-          for req_file in ('scraper/requirements.txt', 'scraper/requirements-test.txt'):
-              for line in Path(req_file).read_text().splitlines():
-                  if '==' in line and not line.lstrip().startswith('#'):
-                      name, version = line.split('==', 1)
-                      packages[canonicalize_name(name.strip())] = version.strip()
-          hashes = {}
-          wheel_dir = Path(__import__('os').environ['RUNNER_TEMP']) / 'cwkc-wheels'
-          for wheel in wheel_dir.glob('*.whl'):
-              name, version, _, _ = parse_wheel_filename(wheel.name)
-              canon = canonicalize_name(name)
-              if canon not in packages or str(version) != packages[canon]:
-                  raise ValueError(f'Unexpected wheel: {wheel.name}')
-              hashes[canon] = sha256(wheel.read_bytes()).hexdigest()
-          missing = set(packages) - set(hashes)
-          if missing:
-              raise ValueError(f'Missing wheels: {sorted(missing)}')
-          for name, version in sorted(packages.items()):
-              print(f'CWKC_LOCK {name}=={version} --hash=sha256:{hashes[name]}', flush=True)
-          print(f'CWKC_LOCK_TOTAL={len(packages)}', flush=True)
-          PY
+          python -m pip install --require-hashes -r scraper/requirements-ci.lock
 
       - name: Run tests
         run: |
