@@ -23,6 +23,8 @@ def test_repository_generated_browser_script_is_fresh(valid_config):
     assert season_config.BROWSER_PATH.read_text(encoding="utf-8") == (
         season_config.render_browser_config(valid_config)
     )
+    html = season_config.HTML_PATH.read_text(encoding="utf-8")
+    assert season_config.render_html_metadata(html, valid_config) == html
 
 
 @pytest.mark.parametrize(
@@ -57,16 +59,28 @@ def test_config_rejects_missing_or_extra_fields(valid_config, tmp_path):
 
 def test_generation_cli_write_and_check(tmp_path, valid_config, monkeypatch, capsys):
     generated = tmp_path / "season-config.js"
+    html = tmp_path / "public" / "index.html"
+    html.parent.mkdir()
+    html.write_text(
+        '<meta content="2025 Commonwealth Kiddush Cup" property="og:description" />\n'
+        '<meta content="2025 Commonwealth Kiddush Cup" property="og:title" />\n'
+        '<title>2025 Commonwealth Kiddush Cup | UVA vs. Virginia Tech</title>\n',
+        encoding="utf-8",
+    )
     monkeypatch.setattr(season_config, "BROWSER_PATH", generated)
+    monkeypatch.setattr(season_config, "ROOT", tmp_path)
+    monkeypatch.setattr(season_config, "HTML_PATH", html)
     monkeypatch.setattr(season_config, "load_config", lambda: valid_config)
     monkeypatch.setattr("sys.argv", ["season_config", "--write"])
     assert season_config.main() == 0
     assert generated.read_text(encoding="utf-8") == (
         season_config.render_browser_config(valid_config)
     )
+    assert '2026 Commonwealth Kiddush Cup' in html.read_text(encoding="utf-8")
+    assert '2025 Commonwealth Kiddush Cup' not in html.read_text(encoding="utf-8")
     monkeypatch.setattr("sys.argv", ["season_config", "--check"])
     assert season_config.main() == 0
-    assert "matches" in capsys.readouterr().out
+    assert "match canonical JSON" in capsys.readouterr().out
     generated.write_text("// stale config", encoding="utf-8")
     with pytest.raises(SystemExit, match="stale"):
         season_config.main()
@@ -74,8 +88,55 @@ def test_generation_cli_write_and_check(tmp_path, valid_config, monkeypatch, cap
     with pytest.raises(SystemExit, match="stale"):
         season_config.main()
 
+    monkeypatch.setattr("sys.argv", ["season_config", "--write"])
+    assert season_config.main() == 0
+    html.write_text(
+        html.read_text(encoding="utf-8").replace("2026 Commonwealth Kiddush Cup",
+                                                 "2027 Commonwealth Kiddush Cup", 1),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("sys.argv", ["season_config", "--check"])
+    with pytest.raises(SystemExit, match="Static page metadata is stale"):
+        season_config.main()
+
 
 def test_cli_without_mode_shows_help(monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["season_config"])
     assert season_config.main() == 0
     assert "--write" in capsys.readouterr().out
+
+
+def test_html_metadata_updates_when_the_year_changes(valid_config):
+    original = season_config.HTML_PATH.read_text(encoding="utf-8")
+    next_season = {**valid_config, "year": 2027}
+    rendered = season_config.render_html_metadata(original, next_season)
+    assert '<title>2027 Commonwealth Kiddush Cup | UVA vs. Virginia Tech</title>' in rendered
+    assert 'content="2027 Commonwealth Kiddush Cup" property="og:title"' in rendered
+    assert 'content="2027 Commonwealth Kiddush Cup" property="og:description"' in rendered
+    assert 'content="2026 Commonwealth Kiddush Cup" property="og:title"' not in rendered
+
+
+def test_generator_fails_if_expected_seo_metadata_is_missing(valid_config):
+    with pytest.raises(ValueError, match="Expected exactly one"):
+        season_config.render_html_metadata("<title>Other page</title>", valid_config)
+
+
+def test_generator_rejects_html_path_outside_repository(tmp_path, monkeypatch):
+    outside = tmp_path / "outside.html"
+    outside.write_text("outside file", encoding="utf-8")
+    monkeypatch.setattr(season_config, "ROOT", tmp_path)
+    monkeypatch.setattr(season_config, "HTML_PATH", outside)
+    with pytest.raises(ValueError, match="must be the repository"):
+        season_config.verified_html_path()
+
+
+def test_generator_rejects_symlinked_html_target(tmp_path, monkeypatch):
+    html = tmp_path / "public" / "index.html"
+    html.parent.mkdir()
+    outside = tmp_path / "outside.html"
+    outside.write_text("outside file", encoding="utf-8")
+    html.symlink_to(outside)
+    monkeypatch.setattr(season_config, "ROOT", tmp_path)
+    monkeypatch.setattr(season_config, "HTML_PATH", html)
+    with pytest.raises(ValueError, match="must be the repository"):
+        season_config.verified_html_path()

@@ -31,7 +31,7 @@ def main() -> None:
     if output_file:
         with Path(output_file).open("a", encoding="utf-8") as output:
             output.write(f"active={str(active).lower()}\n")
-    print("CWKC 2026 data collection is " + ("enabled" if active else "disabled"))
+    print(f"CWKC {_config['year']} data collection is " + ("enabled" if active else "disabled"))
     if "--require-active" in sys.argv[1:] and not active:
         raise SystemExit("Outside approved collection window; refusing to process data")
 
