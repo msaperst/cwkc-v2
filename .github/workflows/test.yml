@@ -211,3 +211,39 @@ jobs:
         timeout-minutes: 15
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Temporary diagnostic: show exact issue/rule after a failed quality gate.
+      # Remove this step after the reported reliability issue is repaired.
+      - name: Explain SonarCloud findings
+        if: failure()
+        env:
+          SONAR_TOKEN: ${{  secrets.SONAR_TOKEN }
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          query = urlencode({
+              "componentKeys": "msaperst_cwkc-v2",
+              "pullRequest": "47",
+              "resolved": "false",
+              "ps": 100,
+          })
+          url = "https://sonarcloud.io/api/issues/search?" + query
+          token = os.environ["SONAR_TOKEN"]
+          authorization = base64.b64encode((token + ":").encode()).decode()
+          req = Request(url, headers={"Authorization": "Basic " + authorization})
+          try:
+              with urlopen(req, timeout=25) as response:
+                  data = json.load(response)
+              print("Unresolved Sonar issues:", data.get("total"))
+              for issue in data.get("issues", []):
+                  print("ISSUE", issue.get("rule"), issue.get("type"),
+                        issue.get("severity"), issue.get("component"),
+                        issue.get("line"), issue.get("message", "")[:250])
+          except Exception as error:
+              print("Sonar issue lookup unavailable:", type(error).__name__)
+          PY
