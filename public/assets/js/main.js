@@ -1,6 +1,6 @@
 // season-config.js is generated from public/assets/config/season.json
 // and must be loaded before this file.
-const {start, end, year} = globalThis.CWKC_SEASON;
+const {start, end, year, timezone} = globalThis.CWKC_SEASON;
 const startTime = new Date(start);
 const deadline = new Date(end);
 const speedPxPerSec = 50;
@@ -250,7 +250,7 @@ function getOrdinal(n) {
 }
 
 function getDate(date) {
-    const optionsDate = { month: 'long', day: 'numeric', timeZone: 'America/New_York' };
+    const optionsDate = { month: 'long', day: 'numeric', timeZone: timezone };
     const dateFormatter = new Intl.DateTimeFormat('en-US', optionsDate);
 
     // Get month and day with ordinal
@@ -269,7 +269,7 @@ function setTimes() {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-        timeZone: 'America/New_York',
+        timeZone: timezone,
         timeZoneName: 'short',
     };
 
@@ -280,6 +280,10 @@ function setTimes() {
     const time = timeFormatter.format(deadline);
 
     $('#end-time').html(time);
+    const monthDay = new Intl.DateTimeFormat('en-US', {
+        month: 'long', day: 'numeric', timeZone: timezone,
+    });
+    $('#season-dates').text(`from ${monthDay.format(startTime)} through ${monthDay.format(deadline)}`);
 }
 
 $(document).ready(() => {
