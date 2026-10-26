@@ -33,7 +33,7 @@ function setContestLinksEnabled(enabled) {
  * Never fetch last season's data or begin the five-second refresh before kickoff.
  */
 function startScoreUpdates() {
-    if (refreshInterval !== undefined) return;
+    if (getContestPhase() !== 'active' || refreshInterval !== undefined) return;
     getResultsData();
     refreshInterval = setInterval(getResultsData, 5000);
 }
