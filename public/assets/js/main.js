@@ -1,7 +1,9 @@
-const deadline = new Date(Date.parse('December 7, 2025 8:00 PM GMT-0500'));
-const startTime = new Date(Date.parse('December 1, 2025 12:00 AM GMT-0500'));
+// The 2026 cup runs Nov 30, midnight Eastern, through Dec 7 at 8 PM Eastern.
+// Both dates are in EST (UTC-05:00). Use ISO-8601 to avoid browser-dependent parsing.
+const startTime = new Date('2026-11-30T00:00:00-05:00');
+const deadline = new Date('2026-12-07T20:00:00-05:00');
 
-const year = 2025;
+const year = 2026;
 const speedPxPerSec = 50;
 
 let timerInterval;  // interval to track countdown
