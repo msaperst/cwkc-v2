@@ -78,7 +78,7 @@ def test_generation_cli_write_and_check(tmp_path, valid_config, monkeypatch, cap
     assert '2025 Commonwealth Kiddush Cup' not in html.read_text(encoding="utf-8")
     monkeypatch.setattr("sys.argv", ["season_config", "--check"])
     assert season_config.main() == 0
-    assert "matches" in capsys.readouterr().out
+    assert "match canonical JSON" in capsys.readouterr().out
     generated.write_text("// stale config", encoding="utf-8")
     with pytest.raises(SystemExit, match="stale"):
         season_config.main()
