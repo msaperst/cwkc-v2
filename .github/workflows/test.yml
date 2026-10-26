@@ -195,6 +195,9 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # Use the Java 21 runtime configured above rather than the scanner's
+          # extra JRE metadata/download endpoint.
+          SONAR_SCANNER_SKIP_JRE_PROVISIONING: 'true'
         with:
           projectBaseDir: .
 
