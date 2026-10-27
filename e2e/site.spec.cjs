@@ -19,8 +19,7 @@ function syntheticCsv(overrides = {}) {
     numbers[key] = '';
   }
   return csvHeader.join(',') + '\n' +
-    csvHeader.map(key => numbers[key] = overrides[key] ?? numbers[key])
-      .map(value => JSON.stringify(value)).join(',') + '\n';
+    csvHeader.map(key => JSON.stringify(overrides[key] ?? numbers[key])).join(',') + '\n';
 }
 
 async function mockCsv(page, overrides = {}) {
@@ -74,10 +73,16 @@ test('active phase displays synthetic scores, winners and donor text', async ({ 
   await expect(page.locator('#countdown-text')).toHaveText('The Cup Ends In');
   await expect(page.locator('#uva_total_amount')).toHaveText('1,234.50');
   await expect(page.locator('#vt_total_amount')).toHaveText('1,000.00');
-  // The current HTML gives total raised 3 points and donors 2 points.
-  // These expected points come from the fixture, not a financial transaction.
-  await expect(page.locator('#hooTotal')).toHaveText('3');
-  await expect(page.locator('#hokieTotal')).toHaveText('2');
+  // Derive point weights from the rendered HTML, never from an
+  // unapproved future scoring rubric.
+  const totalPoints = await page.locator('[data-points]').filter({
+    has: page.locator('#uva_total_amount'),
+  }).getAttribute('data-points');
+  const donorPoints = await page.locator('[data-points]').filter({
+    has: page.locator('#vt_most_individual_donors'),
+  }).getAttribute('data-points');
+  await expect(page.locator('#hooTotal')).toHaveText(totalPoints);
+  await expect(page.locator('#hokieTotal')).toHaveText(donorPoints);
   await expect(page.locator('#uva_donor_names')).toContainText('Synthetic Hoo');
   await expect(page.locator('#vt_donor_names')).toContainText('Synthetic Hokie');
   await expect(page.locator('.enable-during-contest').first()).not.toHaveCSS('pointer-events', 'none');
@@ -92,7 +97,10 @@ test('existing tab switches from prelaunch to live at kickoff', async ({ page })
 
   await page.clock.runFor(2_000);
   await expect(page.locator('#countdown-text')).toHaveText('The Cup Ends In');
-  await expect(page.locator('#hooTotal')).toHaveText('3');
+  const points = await page.locator('[data-points]').filter({
+    has: page.locator('#uva_total_amount'),
+  }).getAttribute('data-points');
+  await expect(page.locator('#hooTotal')).toHaveText(points);
   expect(requests.length).toBeGreaterThanOrEqual(1);
 });
 
@@ -100,7 +108,10 @@ test('ended phase loads final synthetic scores once and announces the winner', a
   await page.clock.install({ time: new Date(end.getTime() + 1_000) });
   const requests = await mockCsv(page, { uva_total_amount: '1' });
   await openReady(page);
-  await expect(page.locator('#hooTotal')).toHaveText('3');
+  const points = await page.locator('[data-points]').filter({
+    has: page.locator('#uva_total_amount'),
+  }).getAttribute('data-points');
+  await expect(page.locator('#hooTotal')).toHaveText(points);
   await page.clock.runFor(6_000);
   await expect(page.locator('#countdown')).toContainText('Hoos win');
   expect(requests).toHaveLength(1);
