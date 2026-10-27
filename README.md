@@ -72,6 +72,19 @@ npm test
 python -m pytest scraper/tests --maxfail=1 -q
 ~~~
 
+### Browser tests (Playwright)
+
+The browser suite runs the actual site on a **local Python HTTP server**, using headless Chromium in desktop and mobile viewports. Synthetic CSV responses are intercepted in the browser. It does not access Gmail, Google Sheets, live donation forms, or production results, and it does not rely on finalized 2026 scoring categories.
+
+Install the pinned browser once after `npm ci`:
+
+~~~bash
+npx playwright install chromium
+npm run test:browser
+~~~
+
+Playwright starts the local web server automatically; no separate terminal is required. For debugging use `npx playwright test --headed` or `npx playwright show-report` after a failure. CI installs Chromium's required Linux dependencies, runs the browser tests, and uploads screenshots/traces on failure. A browser check is also required before SonarCloud runs. Browser tests are intentionally separate from Jest's unit/coverage suite.
+
 For Python coverage locally:
 
 ~~~bash
