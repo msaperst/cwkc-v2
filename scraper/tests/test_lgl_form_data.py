@@ -1,7 +1,6 @@
 from email.message import EmailMessage
 from unittest.mock import MagicMock, patch
 
-import gspread
 import pandas as pd
 import pytest
 
@@ -54,21 +53,15 @@ def test_parse_lgl_email_no_table():
 
 # ---------- update_google_sheet ---------- #
 
-@patch("scraper.getLglFormData.gspread.service_account")
-def test_update_google_sheet_creates_worksheet(mock_gspread):
-    # Mock the sheet
-    ws_mock = MagicMock()
-    sh_mock = MagicMock()
-    sh_mock.worksheet.side_effect = gspread.WorksheetNotFound  # force add_worksheet path
-    sh_mock.add_worksheet.return_value = ws_mock
-    mock_gspread.return_value.open_by_key.return_value = sh_mock
+def test_update_google_sheet_uses_durable_submission_id():
+    ledger = MagicMock()
+    ledger.insert.return_value = True
+    row = {"total amount": "100"}
 
-    # Sample normalized row
-    row = {"name": "John", "total": "100"}
-    lgl.update_google_sheet(mock_gspread.return_value, row)
+    result = lgl.update_google_sheet(ledger, row, "synthetic-id")
 
-    sh_mock.add_worksheet.assert_called_once()
-    ws_mock.append_row.assert_called()  # headers + row appended
+    assert result is True
+    ledger.insert.assert_called_once_with(row, "synthetic-id")
 
 
 # ---------- update_local_csv ---------- #

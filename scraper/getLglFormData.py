@@ -1,4 +1,6 @@
+import argparse
 import email
+import math
 import os
 from email.policy import default
 
@@ -10,6 +12,7 @@ from imapclient import IMAPClient
 
 from .CalculateValues import CalculateValues
 from .EmailParser import EmailParser, determine_source
+from .donation_ledger import NORMALIZED_FIELDS, SubmissionLedger, fingerprint
 
 # ===== CONFIG =====
 load_dotenv()  # assumes .env in same dir
@@ -56,21 +59,61 @@ def parse_lgl_email(raw_msg):
     return email_from, data
 
 
-def update_google_sheet(gc, normalized_row):
-    sh = gc.open_by_key(SPREADSHEET_KEY)
-    try:
-        ws = sh.worksheet(SPREADSHEET_SHEET)
-    except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(title=SPREADSHEET_SHEET, rows="1000", cols=str(len(normalized_row)))
+def update_google_sheet(ledger: SubmissionLedger, normalized_row: dict,
+                        submission_id: str) -> bool:
+    """Insert one identified submission, or recognize a previously stored one."""
+    return ledger.insert(normalized_row, submission_id)
 
-    # Ensure the headers exist
-    headers = ws.row_values(1)
-    if not headers:
-        ws.append_row(list(normalized_row.keys()))  # add headers if sheet is empty
 
-    # Append the normalized row
-    ws.append_row(list(normalized_row.values()))
+def validate_submission(data: dict, normalized_row: dict) -> None:
+    """Do not silently turn malformed live notifications into zero-dollar gifts."""
+    if not ("Total Amount" in data or "Gift amount" in data):
+        raise ValueError("Donation notification is missing its amount")
+    amount = float(normalized_row["total amount"])
+    if not math.isfinite(amount) or amount <= 0:
+        raise ValueError("Donation amount must be positive and finite")
+    if normalized_row["source"].startswith("unknown"):
+        raise ValueError("Donation notification has an unknown Hillel sender")
 
+
+def handle_message(server, uid, ledger, normalizer, reconcile_only):
+    """Handle one notification and return its summary category."""
+    fetched = server.fetch(uid, ["BODY.PEEK[]"])
+    raw = fetched[uid][b"BODY[]"]
+    submission_id = fingerprint(raw)
+    if reconcile_only:
+        return "already_stored" if ledger.known(submission_id) else "pending"
+
+    if ledger.known(submission_id):
+        category = "already_stored"
+    else:
+        sender, data = parse_lgl_email(raw)
+        normalized = normalizer.normalize(
+            data, determine_source(sender, data.get("Form title", "")))
+        validate_submission(data, normalized)
+        if tuple(normalized) != NORMALIZED_FIELDS:
+            raise ValueError("Normalized donation column contract changed")
+        was_inserted = update_google_sheet(ledger, normalized, submission_id)
+        category = "new" if was_inserted else "already_stored"
+    # Only acknowledge an email after the normalized row is durable.
+    server.add_flags(uid, ["\\Seen"])
+    return category
+
+
+def process_messages(server, uids: list, ledger: SubmissionLedger,
+                     *, reconcile_only: bool = False) -> dict:
+    """Process unread emails; never hide a failed notification from retries."""
+    summary = {"new": 0, "already_stored": 0, "pending": 0, "failed": 0}
+    normalizer = EmailParser()
+    for uid in uids:
+        try:
+            category = handle_message(server, uid, ledger, normalizer, reconcile_only)
+            summary[category] += 1
+        except Exception as error:
+            summary["failed"] += 1
+            # Error messages can contain PII; print only type and mailbox UID.
+            print(f"LGL UID {uid} failed ({type(error).__name__}); left unread")
+    return summary
 
 def update_local_csv():
     calc = CalculateValues(spreadsheet_key=SPREADSHEET_KEY)
@@ -100,40 +143,41 @@ def update_local_csv():
 
 
 # ===== MAIN SCRIPT =====
-def main():
-    # Connect to Gmail
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Import unread CWKC LGL submissions")
+    parser.add_argument(
+        "--reconcile-only", action="store_true",
+        help="Read-only preflight: count persisted vs pending unread messages",
+    )
+    args = parser.parse_args(argv)
     with IMAPClient(IMAP_SERVER, ssl=True) as server:
         server.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         server.select_folder(MAILBOX)
 
-        # search for unread LGL emails
-        uids = server.search(['UNSEEN', 'FROM', FROM_FILTER])
-        if not uids:
-            print("No unread LGL emails found.")
-        else:
-            print(f"Found {len(uids)} unread LGL emails.")
-
-            # Connect to Google Sheets
-            normalizer = EmailParser()
-            gc = gspread.service_account(filename='spreadsheet_credentials.json')
-
-            for uid in uids:
-                msg_data = server.fetch(uid, ['BODY.PEEK[]'])  # rather than using RFC822 we're using BODY.PEEK
-                raw_msg = msg_data[uid][b'BODY[]']  # because it's more supported and leaves the message as unread
-                try:
-                    from_email, data = parse_lgl_email(raw_msg)
-                    # Never log donors' personal or gift information in Actions logs.
-                    print(f"Parsing LGL submission UID {uid}")
-                    normalized_row = normalizer.normalize(
-                        data, determine_source(from_email, data.get("Form title", "")))
-                    update_google_sheet(gc, normalized_row)  # data is raw from parse_lgl_email
-                    server.add_flags(uid, ['\\Seen'])  # mark as read
-                    print(f"Processed email UID {uid}")
-                except Exception as e:
-                    print(f"Failed to process email UID {uid}: {e}")
-                    continue
-
-    update_local_csv()
+        uids = server.search(["UNSEEN", "FROM", FROM_FILTER])
+        print(f"Unseen LGL notifications: {len(uids)}")
+        if uids:
+            gc = gspread.service_account(filename="spreadsheet_credentials.json")
+            ledger = SubmissionLedger(
+                gc, SPREADSHEET_KEY, SPREADSHEET_SHEET,
+                NORMALIZED_FIELDS, read_only=args.reconcile_only,
+            )
+            summary = process_messages(
+                server, uids, ledger, reconcile_only=args.reconcile_only,
+            )
+            print("Reconciliation:", ", ".join(
+                f"{key}={value}" for key, value in summary.items()))
+            if ledger.legacy_rows:
+                print(f"WARNING: {ledger.legacy_rows} existing unkeyed Sheet rows need reconciliation")
+            if summary["failed"]:
+                raise RuntimeError(
+                    f"{summary['failed']} LGL notifications remain unprocessed; "
+                    "blocking CSV publication"
+                )
+        if not args.reconcile_only:
+            # No publication on partial email failure. A later run can resume
+            # unread messages and recalculate from the durable Sheet.
+            update_local_csv()
 
 
 if __name__ == "__main__":
