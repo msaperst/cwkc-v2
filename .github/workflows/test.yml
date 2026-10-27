@@ -250,3 +250,37 @@ jobs:
         timeout-minutes: 15
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # One-time diagnostic; delete after analyzing the Sonar findings.
+      - name: Inspect unresolved SonarCloud PR findings
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          query = urlencode({
+              "componentKeys": "msaperst_cwkc-v2",
+              "pullRequest": "49",
+              "resolved": "false",
+              "ps": 100,
+          })
+          auth = base64.b64encode((os.environ["SONAR_TOKEN"] + ":").encode()).decode()
+          url = "https://sonarcloud.io/api/issues/search?" + query
+          request = Request(url, headers={"Authorization": "Basic " + auth})
+          try:
+              with urlopen(request, timeout=30) as response:
+                  payload = json.load(response)
+              print("Unresolved issues:", payload.get("total"))
+              for issue in payload.get("issues", []):
+                  print("SONAR_ISSUE", issue.get("rule"), issue.get("type"),
+                        issue.get("component"), issue.get("line"),
+                        issue.get("message", "")[:260])
+          except Exception as exc:
+              print("Could not retrieve Sonar details:", type(exc).__name__)
+          PY
