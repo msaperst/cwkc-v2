@@ -211,29 +211,3 @@ jobs:
         timeout-minutes: 15
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      # Temporary one-run Sonar issue report; removed after the final issue is fixed.
-      - name: Show remaining Sonar issue
-        if: always()
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          python - <<'PY'
-          import base64
-          import json
-          import os
-          from urllib.parse import urlencode
-          from urllib.request import Request, urlopen
-
-          params = urlencode({"componentKeys": "msaperst_cwkc-v2",
-                              "pullRequest": "47", "resolved": "false"})
-          authorization = base64.b64encode(
-              (os.environ["SONAR_TOKEN"] + ":").encode()).decode()
-          url = "https://sonarcloud.io/api/issues/search?" + params
-          request = Request(url, headers={"Authorization": "Basic " + authorization})
-          with urlopen(request, timeout=30) as response:
-              issues = json.load(response).get("issues", [])
-          for item in issues:
-              print("ISSUE", item.get("rule"), item.get("component"),
-                    item.get("line"), item.get("message"))
-          PY
