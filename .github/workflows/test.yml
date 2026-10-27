@@ -147,11 +147,50 @@ jobs:
             ✅ [View full coverage report (artifact)](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           append: false
 
+  browser-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked Node dependencies
+        run: npm ci
+
+      - name: Install Chromium and operating-system libraries
+        run: npx playwright install --with-deps chromium
+
+      - name: Run desktop and mobile Playwright tests against localhost
+        env:
+          CI: 'true'
+        run: npm run test:browser
+
+      - name: Upload failure reports and traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   sonarcloud:
     runs-on: ubuntu-latest
     needs:
       - python-test
       - javascript-test
+      - browser-test
 
     permissions:
       contents: read
