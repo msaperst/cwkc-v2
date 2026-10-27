@@ -92,10 +92,16 @@ class SubmissionLedger:
         if not self.headers:
             self.headers = [*fields, SUBMISSION_ID]
             if not read_only:
-                retry(
-                    lambda: self.ws.append_row(self.headers, value_input_option="RAW"),
-                    sleeper=self.sleeper,
-                )
+                try:
+                    self.ws.append_row(self.headers, value_input_option="RAW")
+                except Exception:
+                    # A lost response to the header append must not create a
+                    # second header row on retry. Verify or fail closed.
+                    persisted = retry(
+                        lambda: self.ws.row_values(1), sleeper=self.sleeper,
+                    )
+                    if persisted != self.headers:
+                        raise
             return
 
         if not set(fields).issubset(self.headers):
