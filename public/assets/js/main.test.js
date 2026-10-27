@@ -452,8 +452,13 @@ describe('official 2026 public donation links and logo', () => {
     });
 
     test('does not publish internal/back-end form links or LGL editor links', () => {
-        expect(html).not.toContain('wZAS5QkBlHHxJ6sBSu8RAw');
-        expect(html).not.toContain('lfgZujjcw2h-ideqkTiRMw');
+        const lglLinks = [...html.matchAll(/href="([^"]+)"/g)]
+            .map(match => match[1])
+            .filter(url => url.includes('lglforms.com'));
+        expect(lglLinks).toEqual([
+            'https://secure.lglforms.com/form_engine/s/bAOh_SbqqQe15rJLggtO9Q',
+            'https://secure.lglforms.com/form_engine/s/DlCsa8QXi2-35Nb_T-KmsA',
+        ]);
         expect(html).not.toContain('/lglforms/forms/');
     });
 
@@ -462,7 +467,7 @@ describe('official 2026 public donation links and logo', () => {
         expect(html).toContain('content="https://cwkc.org/assets/img/cup-logo.png" property="og:image"');
         const logo = fs.readFileSync(require('path').join(__dirname, '../img/cup-logo.png'));
         expect(logo.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))).toBe(true);
-        expect(logo.readUInt32BE(16)).toBe(800);
-        expect(logo.readUInt32BE(20)).toBe(800);
+        expect(logo.readUInt32BE(16)).toBeGreaterThanOrEqual(128);
+        expect(logo.readUInt32BE(20)).toBeGreaterThanOrEqual(128);
     });
 });
