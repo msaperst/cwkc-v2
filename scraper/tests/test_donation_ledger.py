@@ -117,6 +117,15 @@ def test_new_sheet_stores_id_atomically():
     assert len(sheet.rows) == 2
 
 
+def test_header_append_lost_response_does_not_create_duplicate_header():
+    sheet = FakeSheet()
+    sheet.append_error = requests.exceptions.Timeout("header response lost")
+    ledger = build_ledger(sheet)
+    assert ledger.headers == [*NORMALIZED_FIELDS, SUBMISSION_ID]
+    assert len(sheet.rows) == 1
+    assert sheet.append_attempts == 1
+
+
 def test_existing_legacy_rows_block_unverified_replay():
     sheet = FakeSheet([[*NORMALIZED_FIELDS], ["123", "25"]])
     with pytest.raises(ValueError, match="unkeyed"):
