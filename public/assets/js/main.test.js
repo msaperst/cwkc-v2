@@ -439,3 +439,30 @@ describe('2026 landing page content', () => {
         expect(html).not.toContain('Winner of 11/29 Virginia Tech/UVA');
     });
 });
+
+
+describe('official 2026 public donation links and logo', () => {
+    const html = fs.readFileSync(require('path').join(__dirname, '../../index.html'), 'utf8');
+
+    test('uses the provided UVA and VT public donation forms', () => {
+        expect(html).toContain('href="https://secure.lglforms.com/form_engine/s/bAOh_SbqqQe15rJLggtO9Q"');
+        expect(html).toContain('href="https://secure.lglforms.com/form_engine/s/DlCsa8QXi2-35Nb_T-KmsA"');
+        expect(html).not.toContain('msi8IUvISt_5LHlkvImTFg');
+        expect(html).not.toContain('CGpy6mRNHqYZkJaFadD9hQ');
+    });
+
+    test('does not publish internal/back-end form links or LGL editor links', () => {
+        expect(html).not.toContain('wZAS5QkBlHHxJ6sBSu8RAw');
+        expect(html).not.toContain('lfgZujjcw2h-ideqkTiRMw');
+        expect(html).not.toContain('/lglforms/forms/');
+    });
+
+    test('uses one actual PNG logo for the site and social previews', () => {
+        expect(html).toContain('src="assets/img/cup-logo.png"');
+        expect(html).toContain('content="https://cwkc.org/assets/img/cup-logo.png" property="og:image"');
+        const logo = fs.readFileSync(require('path').join(__dirname, '../img/cup-logo.png'));
+        expect(logo.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))).toBe(true);
+        expect(logo.readUInt32BE(16)).toBe(800);
+        expect(logo.readUInt32BE(20)).toBe(800);
+    });
+});
