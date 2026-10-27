@@ -1,7 +1,7 @@
 """Synthetic, offline replay and quota-failure tests; no production accounts."""
 from email.message import EmailMessage
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import gspread
 import pytest
@@ -217,6 +217,32 @@ def test_unread_backlog_is_acked_only_after_durable_append():
     assert result == {"new": 1, "already_stored": 0, "pending": 0, "failed": 0}
     assert server.seen == {1}
     assert len(sheet.rows) == 2
+
+
+def test_ingested_synthetic_gift_reconciles_to_expected_score():
+    from scraper.CalculateValues import CalculateValues
+
+    sheet = FakeSheet()
+    ledger = build_ledger(sheet)
+    server = FakeServer({1: make_email("$25.00")})
+    summary = lgl.process_messages(server, [1], ledger)
+    assert summary["new"] == 1
+    values = [
+        dict(zip(sheet.rows[0], row, strict=True))
+        for row in sheet.rows[1:]
+    ]
+    worksheet = MagicMock()
+    worksheet.get_all_records.return_value = values
+    spreadsheet = MagicMock()
+    spreadsheet.worksheet.return_value = worksheet
+    client = MagicMock()
+    client.open_by_key.return_value = spreadsheet
+    with patch("scraper.CalculateValues.gspread.service_account", return_value=client):
+        totals = CalculateValues("synthetic-spreadsheet").calculate_all()
+
+    assert totals["vt"]["total_amount"] == 25
+    assert totals["vt"]["most_individual_donors"] == 1
+    assert totals["uva"]["total_amount"] == 0
 
 
 def test_flag_failure_leaves_unread_but_replay_does_not_append_again():
