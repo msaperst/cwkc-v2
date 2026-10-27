@@ -61,47 +61,61 @@ class SubmissionLedger:
                  normalized_fields: tuple[str, ...], *, read_only: bool = False,
                  sleeper=time.sleep):
         self.sleeper = sleeper
-        sh = retry(lambda: gc.open_by_key(spreadsheet_key), sleeper=sleeper)
+        self.ws = self._open_worksheet(
+            gc, spreadsheet_key, worksheet, len(normalized_fields), read_only,
+        )
+        initial_headers = retry(lambda: self.ws.row_values(1), sleeper=self.sleeper)
+        self.headers = list(initial_headers)
+        self._prepare_headers(normalized_fields, read_only)
+        self.id_col = self.headers.index(SUBMISSION_ID) + 1
+        self.tracking_enabled = (
+            bool(initial_headers and SUBMISSION_ID in initial_headers) or not read_only
+        )
+        self.ids, self.legacy_rows = self._read_state()
+        # Previously imported gifts without a stable ID cannot be replayed.
+        if self.legacy_rows and not read_only:
+            raise ValueError("Existing unkeyed donations require reconciliation before ingestion")
+
+    def _open_worksheet(self, gc, key, name, width, read_only):
+        spreadsheet = retry(lambda: gc.open_by_key(key), sleeper=self.sleeper)
         try:
-            self.ws = retry(lambda: sh.worksheet(worksheet), sleeper=sleeper)
+            return retry(lambda: spreadsheet.worksheet(name), sleeper=self.sleeper)
         except gspread.WorksheetNotFound:
             if read_only:
                 raise ValueError("Cannot reconcile: normalized worksheet does not exist")
-            self.ws = retry(
-                lambda: sh.add_worksheet(title=worksheet, rows=1000,
-                                         cols=len(normalized_fields) + 1),
-                sleeper=sleeper,
+            return retry(
+                lambda: spreadsheet.add_worksheet(title=name, rows=1000, cols=width + 1),
+                sleeper=self.sleeper,
             )
 
-        headers = retry(lambda: self.ws.row_values(1), sleeper=sleeper)
-        self.headers = list(headers)
-        if not headers:
-            self.headers = [*normalized_fields, SUBMISSION_ID]
+    def _prepare_headers(self, fields, read_only):
+        if not self.headers:
+            self.headers = [*fields, SUBMISSION_ID]
             if not read_only:
-                retry(lambda: self.ws.append_row(self.headers, value_input_option="RAW"),
-                      sleeper=sleeper)
-        elif not set(normalized_fields).issubset(headers):
-            raise ValueError("Normalized sheet columns do not match expected contract")
-        elif SUBMISSION_ID not in headers:
-            # Preflight legacy rows BEFORE changing the live Sheet schema.
-            if not read_only:
-                rows = retry(lambda: self.ws.get_all_values(), sleeper=sleeper)
-                if any(any(cell for cell in row) for row in rows[1:]):
-                    raise ValueError(
-                        "Existing unkeyed donations require reconciliation before ingestion"
-                    )
-            self.headers.append(SUBMISSION_ID)
-            if not read_only:
-                retry(lambda: self.ws.update_cell(1, len(self.headers), SUBMISSION_ID),
-                      sleeper=sleeper)
+                retry(
+                    lambda: self.ws.append_row(self.headers, value_input_option="RAW"),
+                    sleeper=self.sleeper,
+                )
+            return
 
-        self.id_col = self.headers.index(SUBMISSION_ID) + 1
-        self.tracking_enabled = bool(headers and SUBMISSION_ID in headers) or not read_only
-        self.ids, self.legacy_rows = self._read_state()
-        # A previous import without IDs may have appended an unread donation.
-        # It cannot be replayed automatically without risking a double count.
-        if self.legacy_rows and not read_only:
-            raise ValueError("Existing unkeyed donations require reconciliation before ingestion")
+        if not set(fields).issubset(self.headers):
+            raise ValueError("Normalized sheet columns do not match expected contract")
+        if SUBMISSION_ID in self.headers:
+            return
+
+        # Inspect prior rows before writing even the new header cell.
+        if not read_only:
+            rows = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
+            if any(any(row) for row in rows[1:]):
+                raise ValueError(
+                    "Existing unkeyed donations require reconciliation before ingestion"
+                )
+        self.headers.append(SUBMISSION_ID)
+        if not read_only:
+            retry(
+                lambda: self.ws.update_cell(1, len(self.headers), SUBMISSION_ID),
+                sleeper=self.sleeper,
+            )
 
     def _read_state(self):
         rows = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
