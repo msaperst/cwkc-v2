@@ -99,7 +99,8 @@ class FakeServer:
 
 def test_fingerprint_is_stable_and_does_not_expose_donor():
     email = make_email()
-    assert fingerprint(email) == fingerprint(email)
+    stored_id = fingerprint(email)
+    assert stored_id == fingerprint(email)
     assert fingerprint(email) != fingerprint(make_email("$55"))
     assert "Synthetic" not in fingerprint(email)
     assert len(fingerprint(email)) == 64
@@ -161,8 +162,9 @@ def test_failed_persisted_state_check_fails_closed():
     ledger = build_ledger(sheet)
     sheet.append_error = requests.exceptions.Timeout("lost result")
     sheet.read_error = RuntimeError("cannot verify")
+    row = dict.fromkeys(NORMALIZED_FIELDS, "data")
     with pytest.raises(RuntimeError, match="cannot verify"):
-        ledger.insert(dict.fromkeys(NORMALIZED_FIELDS, "data"), "key")
+        ledger.insert(row, "key")
     assert len(sheet.rows) == 2
 
 
