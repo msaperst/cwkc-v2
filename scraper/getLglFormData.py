@@ -76,42 +76,44 @@ def validate_submission(data: dict, normalized_row: dict) -> None:
         raise ValueError("Donation notification has an unknown Hillel sender")
 
 
+def handle_message(server, uid, ledger, normalizer, reconcile_only):
+    """Handle one notification and return its summary category."""
+    fetched = server.fetch(uid, ["BODY.PEEK[]"])
+    raw = fetched[uid][b"BODY[]"]
+    submission_id = fingerprint(raw)
+    if reconcile_only:
+        return "already_stored" if ledger.known(submission_id) else "pending"
+
+    if ledger.known(submission_id):
+        category = "already_stored"
+    else:
+        sender, data = parse_lgl_email(raw)
+        normalized = normalizer.normalize(
+            data, determine_source(sender, data.get("Form title", "")))
+        validate_submission(data, normalized)
+        if tuple(normalized) != NORMALIZED_FIELDS:
+            raise ValueError("Normalized donation column contract changed")
+        was_inserted = update_google_sheet(ledger, normalized, submission_id)
+        category = "new" if was_inserted else "already_stored"
+    # Only acknowledge an email after the normalized row is durable.
+    server.add_flags(uid, ["\\Seen"])
+    return category
+
+
 def process_messages(server, uids: list, ledger: SubmissionLedger,
                      *, reconcile_only: bool = False) -> dict:
-    """Process the unread backlog; failed or unacknowledged emails remain unread.
-
-    Reconcile-only never writes the Sheet, changes email flags, or writes a CSV.
-    """
+    """Process unread emails; never hide a failed notification from retries."""
     summary = {"new": 0, "already_stored": 0, "pending": 0, "failed": 0}
     normalizer = EmailParser()
     for uid in uids:
         try:
-            fetched = server.fetch(uid, ["BODY.PEEK[]"])
-            raw = fetched[uid][b"BODY[]"]
-            submission_id = fingerprint(raw)
-            if reconcile_only:
-                category = "already_stored" if ledger.known(submission_id) else "pending"
-                summary[category] += 1
-                continue
-            if ledger.known(submission_id):
-                summary["already_stored"] += 1
-            else:
-                sender, data = parse_lgl_email(raw)
-                normalized = normalizer.normalize(
-                    data, determine_source(sender, data.get("Form title", "")))
-                validate_submission(data, normalized)
-                if tuple(normalized) != NORMALIZED_FIELDS:
-                    raise ValueError("Normalized donation column contract changed")
-                was_inserted = update_google_sheet(ledger, normalized, submission_id)
-                summary["new" if was_inserted else "already_stored"] += 1
-            # Only acknowledge an email after its ID is durable in Sheets.
-            server.add_flags(uid, ["\\Seen"])
+            category = handle_message(server, uid, ledger, normalizer, reconcile_only)
+            summary[category] += 1
         except Exception as error:
             summary["failed"] += 1
-            # Exception messages can contain field values or donor information.
+            # Error messages can contain PII; print only type and mailbox UID.
             print(f"LGL UID {uid} failed ({type(error).__name__}); left unread")
     return summary
-
 
 def update_local_csv():
     calc = CalculateValues(spreadsheet_key=SPREADSHEET_KEY)
