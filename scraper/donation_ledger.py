@@ -111,16 +111,19 @@ class SubmissionLedger:
 
         # Inspect prior rows before writing even the new header cell.
         if not read_only:
-            rows = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
-            if any(any(row) for row in rows[1:]):
-                raise ValueError(
-                    "Existing unkeyed donations require reconciliation before ingestion"
-                )
+            self._assert_no_legacy_rows()
         self.headers.append(SUBMISSION_ID)
         if not read_only:
             retry(
                 lambda: self.ws.update_cell(1, len(self.headers), SUBMISSION_ID),
                 sleeper=self.sleeper,
+            )
+
+    def _assert_no_legacy_rows(self):
+        rows = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
+        if any(any(row) for row in rows[1:]):
+            raise ValueError(
+                "Existing unkeyed donations require reconciliation before ingestion"
             )
 
     def _read_state(self):
