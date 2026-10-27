@@ -148,7 +148,7 @@ jobs:
           append: false
 
   browser-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 15
@@ -166,8 +166,10 @@ jobs:
       - name: Install locked Node dependencies
         run: npm ci
 
-      - name: Install Chromium and operating-system libraries
-        run: npx playwright install --with-deps chromium
+      # Ubuntu 24.04 hosted runners already ship the system libraries needed by
+      # Chromium; don't rerun slow/flaky apt installation on every PR.
+      - name: Install pinned Playwright Chromium
+        run: npx playwright install chromium
 
       - name: Run desktop and mobile Playwright tests against localhost
         env:
