@@ -83,7 +83,7 @@ npx playwright install chromium
 npm run test:browser
 ~~~
 
-Playwright starts the local web server automatically; no separate terminal is required. For debugging use `npx playwright test --headed` or `npx playwright show-report` after a failure. CI installs Chromium's required Linux dependencies, runs the browser tests, and uploads screenshots/traces on failure. A browser check is also required before SonarCloud runs. Browser tests are intentionally separate from Jest's unit/coverage suite.
+Playwright starts the local web server automatically; no separate terminal is required. For debugging use `npx playwright test --headed` or `npx playwright show-report` after a failure. CI runs on Ubuntu 24.04, installs the SHA-locked Playwright packages without lifecycle scripts, fetches the pinned Chromium binary, and uploads screenshots/traces only on failure. A browser check is also required before SonarCloud runs. Browser tests are intentionally separate from Jest's unit/coverage suite.
 
 For Python coverage locally:
 
