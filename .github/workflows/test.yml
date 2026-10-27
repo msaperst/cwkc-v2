@@ -166,6 +166,12 @@ jobs:
       - name: Install locked Node dependencies
         run: npm ci
 
+      - name: Verify Playwright package tarball checksums for lockfile
+        run: |
+          npm view @playwright/test@1.64.1 dist.integrity
+          npm view playwright@1.64.1 dist.integrity
+          npm view playwright-core@1.64.1 dist.integrity
+
       - name: Install Chromium and operating-system libraries
         run: npx playwright install --with-deps chromium
 
