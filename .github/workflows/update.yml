@@ -126,7 +126,10 @@ jobs:
           SPREADSHEET_KEY: ${{ secrets.SPREADSHEET_KEY }}
           # Configure the separate 2026 ledger after final form/rules sign-off.
           SPREADSHEET_SHEET: ${{ vars.CWKC_DONATIONS_WORKSHEET || 'entries' }}
-        run: python -m scraper.getLglFormData
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m scraper.getLglFormData | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Update gathering and participation totals
         working-directory: scraper
