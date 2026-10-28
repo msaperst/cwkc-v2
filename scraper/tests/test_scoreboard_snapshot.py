@@ -35,11 +35,10 @@ def two_branch_repo(tmp_path, monkeypatch):
     return target
 
 
-def test_restore_published_data_without_modifying_static_main(two_branch_repo, tmp_path, monkeypatch):
-    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+def test_restore_published_data_without_modifying_static_main(two_branch_repo, tmp_path):
     scoreboard_snapshot.restore_snapshot(backup=True)
     assert two_branch_repo.read_bytes() == PUBLISHED
-    assert (tmp_path / "cwkc-previous-results.csv").read_bytes() == PUBLISHED
+    assert (tmp_path / ".cwkc-previous-results.csv").read_bytes() == PUBLISHED
     assert subprocess.run(["git", "show", "HEAD:public/assets/csv/results.csv"],
                           capture_output=True, check=True).stdout == MAIN
 
