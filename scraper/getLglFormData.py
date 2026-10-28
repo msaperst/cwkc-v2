@@ -2,7 +2,6 @@ import argparse
 import email
 import math
 import os
-from pathlib import Path
 from email.policy import default
 
 import gspread
@@ -177,8 +176,7 @@ def update_local_csv():
 
 def write_processing_summary(uids: list, summary: dict, ledger: SubmissionLedger) -> None:
     """Expose aggregate LGL progress in Actions without logging donor details."""
-    output = os.getenv("GITHUB_STEP_SUMMARY")
-    if not output:
+    if os.getenv("GITHUB_ACTIONS") != "true":
         return
     latest_uid = str(max(uids)) if uids else "None"
     lines = [
@@ -198,8 +196,8 @@ def write_processing_summary(uids: list, summary: dict, ledger: SubmissionLedger
         "Counts are per-run observations, not verification against LGL source totals.",
         "",
     ]
-    with Path(output).open("a", encoding="utf-8") as handle:
-        handle.write("\n".join(lines))
+    # GitHub Actions mirrors stdout to its own step-summary path.
+    print("\n".join(lines))
 
 
 # ===== MAIN SCRIPT =====
