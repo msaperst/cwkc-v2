@@ -9,7 +9,6 @@ import argparse
 import csv
 from datetime import datetime, timezone
 import io
-import os
 from pathlib import Path
 import subprocess
 
@@ -17,6 +16,7 @@ from .contest_window import START
 
 RESULTS_PATH = Path("public/assets/csv/results.csv")
 DATA_REF = "refs/remotes/origin/cwkc-results"
+BACKUP_PATH = Path(".cwkc-previous-results.csv")
 
 
 def _header(payload: bytes) -> list[str]:
@@ -47,9 +47,8 @@ def restore_snapshot(*, backup: bool = False) -> None:
     if _header(RESULTS_PATH.read_bytes()) != _header(previous):
         raise ValueError("Published CSV schema differs from main; migrate data branch before deployment")
     if backup:
-        # GitHub provisions RUNNER_TEMP; the output basename is fixed, not
-        # derived from any external form, workflow or CLI arguments.
-        (Path(os.environ["RUNNER_TEMP"]) / "cwkc-previous-results.csv").write_bytes(previous)
+        # Fixed local file, outside public/. Never accepts user or workflow paths.
+        BACKUP_PATH.write_bytes(previous)
     RESULTS_PATH.write_bytes(previous)
 
 
