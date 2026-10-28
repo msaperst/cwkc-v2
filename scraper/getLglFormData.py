@@ -29,8 +29,21 @@ CSV_PATH = os.getenv("RESULTS_CSV", "public/assets/csv/results.csv")
 
 
 # ===== FUNCTIONS =====
+# VT's conditional form can include both an alumni and a relative's year under
+# the same visible label. Even identical values cannot identify which person
+# they describe; never choose a "last one wins" value.
+AMBIGUOUS_YEAR_FIELDS = frozenset({
+    "grad year", "graduation year", "intended graduation year",
+})
+
+
+def _field_identity(label: str) -> str:
+    """Compare equivalent labels without changing downstream field names."""
+    return " ".join(label.split()).removesuffix(":").casefold()
+
+
 def parse_lgl_email(raw_msg):
-    """Parse an LGL email with a 2-column HTML table and return a dict of form fields."""
+    """Parse one LGL table without silently discarding repeated fields."""
     msg = email.message_from_bytes(raw_msg, policy=default)
     email_from = msg.get("From", "")
 
@@ -43,18 +56,33 @@ def parse_lgl_email(raw_msg):
     soup = BeautifulSoup(html, "html.parser")
 
     data = {}
+    seen_fields = {}
     # Find the first table (assuming the form submission table is the first)
     table = soup.find("table")
     if not table:
         raise ValueError("No table found in email")
 
-    # Iterate over rows
+    # Iterate over rows. Repeated labels from LGL conditional questions
+    # must not silently overwrite previously parsed answers.
     for row in table.find_all("tr"):
         cells = row.find_all(["td", "th"])
-        if len(cells) >= 2:
-            key = cells[0].get_text(strip=True)
-            val = cells[1].get_text(strip=True)
-            data[key] = val
+        if len(cells) < 2:
+            continue
+        key = cells[0].get_text(strip=True)
+        val = cells[1].get_text(strip=True)
+        identity = _field_identity(key)
+
+        if identity in seen_fields:
+            # Same-label graduation questions may refer to *different people*,
+            # even if the year coincidentally matches.
+            if identity in AMBIGUOUS_YEAR_FIELDS:
+                raise ValueError("Repeated graduation-year field is ambiguous")
+            if seen_fields[identity] != " ".join(val.split()):
+                raise ValueError("Conflicting duplicate LGL form field")
+            continue  # Harmless identical duplicate; retain the first label.
+
+        seen_fields[identity] = " ".join(val.split())
+        data[key] = val
 
     return email_from, data
 
