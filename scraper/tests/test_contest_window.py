@@ -114,7 +114,7 @@ def test_update_workflow_guards_and_single_publisher():
     assert workflow.count('python -m scraper.contest_window --require-active') == 2
     assert "if: needs.check-window.outputs.active == 'true'" in workflow
     assert "python -m scraper.contest_window --require-active" in workflow
-    assert 'cmp -s "$RUNNER_TEMP/cwkc-previous-results.csv" public/assets/csv/results.csv' in workflow
+    assert 'cmp -s .cwkc-previous-results.csv public/assets/csv/results.csv' in workflow
     assert "python -m scraper.scoreboard_snapshot restore --backup" in workflow
     assert 'if: steps.changes.outputs.changed == \'true\'' in workflow
     assert "if: needs.recompute.result == 'success' && needs.recompute.outputs.changed == 'true'" in workflow
