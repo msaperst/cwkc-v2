@@ -233,6 +233,8 @@ def _mock_github_connection(monkeypatch, status, payload):
             calls.append(("request", method, path, headers))
         def getresponse(self):
             return FakeResponse()
+        def close(self):
+            pass
     monkeypatch.setattr(monitor.http.client, "HTTPSConnection", FakeConnection)
     return calls
 
