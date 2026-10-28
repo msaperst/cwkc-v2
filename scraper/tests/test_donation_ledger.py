@@ -57,7 +57,7 @@ def build_ledger(sheet, *, read_only=False, sleeper=None):
     )
 
 
-def make_email(amount="$25.00", *, sender=None, include_amount=True):
+def make_email(amount="$25.00", *, sender=None, include_amount=True, extra_rows=()):
     msg = EmailMessage()
     msg["From"] = sender or "Hillel at VT <lglforms-submissions@littlegreenlight.com>"
     msg["Message-ID"] = "<synthetic-message@example.invalid>"
@@ -69,6 +69,7 @@ def make_email(amount="$25.00", *, sender=None, include_amount=True):
     ]
     if include_amount:
         body.append(("Total Amount", amount))
+    body.extend(extra_rows)
     html = "<table>" + "".join(
         f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in body
     ) + "</table>"
@@ -296,6 +297,76 @@ def test_bad_html_does_not_stop_other_messages_but_blocks_publication():
     assert result["new"] == 1
     assert server.seen == {2}
 
+
+
+@pytest.mark.parametrize("extra_rows", [
+    [("Graduation Year", "2026"), ("Graduation Year", "2025")],
+    [("Graduation Year", "2026"), ("Graduation Year", "2026")],
+    [("Total Amount", "$999.00")],
+    [("I am a/an", "Current Parent")],
+])
+def test_ambiguous_notification_is_not_stored_or_marked_seen(extra_rows, capsys):
+    raw = make_email(extra_rows=extra_rows)
+    sheet = FakeSheet()
+    ledger = build_ledger(sheet)
+    server = FakeServer({7: raw})
+
+    summary = lgl.process_messages(server, [7], ledger)
+
+    assert summary == {"new": 0, "already_stored": 0, "pending": 0, "failed": 1}
+    assert sheet.rows == [[*NORMALIZED_FIELDS, SUBMISSION_ID]]
+    assert sheet.append_attempts == 1  # Header only, never a donation.
+    assert server.seen == set()
+    assert server.peek_calls == [7]
+    output = capsys.readouterr().out
+    assert "ValueError" in output
+    assert "$999.00" not in output
+    assert "2026" not in output
+
+
+def test_duplicate_conflict_does_not_prevent_other_email_processing():
+    bad = make_email(extra_rows=[
+        ("Graduation Year", "2025"), ("Graduation Year", "2026"),
+    ])
+    good = make_email()
+    sheet = FakeSheet()
+    ledger = build_ledger(sheet)
+    server = FakeServer({7: bad, 8: good})
+
+    summary = lgl.process_messages(server, [7, 8], ledger)
+
+    assert summary["new"] == 1
+    assert summary["failed"] == 1
+    assert server.seen == {8}
+    assert len(sheet.rows) == 2
+
+
+def test_ambiguous_notification_blocks_csv_publication(monkeypatch):
+    raw = make_email(extra_rows=[
+        ("Graduation Year", "2026"), ("Graduation Year", "2025"),
+    ])
+    server = FakeServer({7: raw})
+    server.login = MagicMock()
+    server.select_folder = MagicMock()
+    server.search = MagicMock(return_value=[7])
+    context = MagicMock()
+    context.__enter__.return_value = server
+    monkeypatch.setattr(lgl, "IMAPClient", lambda *args, **kwargs: context)
+    sheet = FakeSheet()
+    book = MagicMock()
+    book.worksheet.return_value = sheet
+    client = MagicMock()
+    client.open_by_key.return_value = book
+    monkeypatch.setattr(lgl.gspread, "service_account", lambda **kwargs: client)
+    recalculate = MagicMock()
+    monkeypatch.setattr(lgl, "update_local_csv", recalculate)
+
+    with pytest.raises(RuntimeError, match="blocking CSV publication"):
+        lgl.main([])
+
+    recalculate.assert_not_called()
+    assert server.seen == set()
+    assert len(sheet.rows) == 1
 
 def test_reconcile_only_has_no_writes_or_flags():
     raw = make_email()
