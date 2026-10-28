@@ -91,6 +91,35 @@ def test_prelaunch_check_rejects_naive_datetime():
         scoreboard_snapshot.require_prelaunch(contest_window.START.replace(tzinfo=None))
 
 
+
+def test_cli_restore_uses_optional_backup(monkeypatch, tmp_path):
+    import sys
+    backup = tmp_path / "last.csv"
+    called = []
+    monkeypatch.setattr(scoreboard_snapshot, "restore_snapshot",
+                        lambda backup=None: called.append(backup))
+    monkeypatch.setattr(sys, "argv", ["scoreboard_snapshot", "restore", "--backup", str(backup)])
+    scoreboard_snapshot.main()
+    assert called == [backup]
+
+
+def test_cli_prelaunch_gate(monkeypatch):
+    import sys
+    called = []
+    monkeypatch.setattr(scoreboard_snapshot, "require_prelaunch",
+                        lambda: called.append(True))
+    monkeypatch.setattr(sys, "argv", ["scoreboard_snapshot", "require-prelaunch"])
+    scoreboard_snapshot.main()
+    assert called == [True]
+
+
+def test_cli_requires_action(monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "argv", ["scoreboard_snapshot"])
+    with pytest.raises(SystemExit) as exc:
+        scoreboard_snapshot.main()
+    assert exc.value.code == 2
+
 def test_deploy_never_replaces_active_scoreboard_with_main():
     deploy = (Path(__file__).resolve().parents[2] / ".github/workflows/deploy.yml").read_text()
     assert "ref: main" in deploy
