@@ -177,3 +177,39 @@ def test_normalize_row_with_source():
     row = parser.normalize(data, lgl.determine_source("hillel at vt", "Front-End Form"))
     assert row["status"] == "Current Student"
     assert row["source"] == "vt-front"
+
+
+def test_lgl_step_summary_contains_only_synthetic_counts(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    ledger = MagicMock()
+    ledger.ids = {"synthetic-hash"}
+    ledger.legacy_rows = 0
+    values = {"new": 1, "already_stored": 2, "pending": 0, "failed": 1}
+
+    lgl.write_processing_summary([11, 7, 9, 3], values, ledger)
+
+    body = capsys.readouterr().out
+    assert "### CWKC LGL processing\n" in body
+    assert "| Matching unread notifications at start | 4 |" in body
+    assert "| New donation rows persisted | 1 |" in body
+    assert "| Failed notifications (left unread) | 1 |" in body
+    assert "| Highest matched mailbox UID (not a processed watermark) | 11 |" in body
+    assert "| Identified normalized Sheet rows | 1 |" in body
+    assert "synthetic-hash" not in body
+    assert "donor" not in body.lower()
+
+
+def test_lgl_step_summary_is_optional_and_handles_empty_mail(monkeypatch, capsys):
+    ledger = MagicMock()
+    ledger.ids = set()
+    ledger.legacy_rows = 0
+    values = {"new": 0, "already_stored": 0, "pending": 0, "failed": 0}
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    lgl.write_processing_summary([], values, ledger)
+    assert not capsys.readouterr().out
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    lgl.write_processing_summary([], values, ledger)
+    body = capsys.readouterr().out
+    assert "| Matching unread notifications at start | 0 |" in body
+    assert "| Highest matched mailbox UID (not a processed watermark) | None |" in body
