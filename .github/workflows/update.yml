@@ -79,7 +79,7 @@ jobs:
       - name: Restore last published scoreboard
         run: |
           git fetch --no-tags origin refs/heads/cwkc-results:refs/remotes/origin/cwkc-results
-          python -m scraper.scoreboard_snapshot restore --backup "$RUNNER_TEMP/cwkc-previous-results.csv"
+          python -m scraper.scoreboard_snapshot restore --backup
 
       - name: Write private Google service account files
         env:
