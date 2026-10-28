@@ -224,6 +224,8 @@ A regular update also checks the normalized Sheet when no unread mail is present
 
 **Restart or failure:** leave failed emails unread, inspect the Actions job failure and the last successful normalized-Sheet state, run the read-only check, then retry only after correcting the cause. A successful Sheet append followed by a failed IMAP acknowledgment will be recognized by its stored ID during the next run. Any processing failures produce a nonzero exit code so the update workflow cannot publish an incomplete CSV. An LGL duplicate *notification with a different MIME identity* still needs upstream LGL reconciliation; the fingerprint guarantees idempotent **email replay**, not deduplication of distinct form submissions.
 
+**2026 operator go/no-go and restart rehearsal:** [docs/2026-launch-runbook.md](docs/2026-launch-runbook.md). The offline publishing drill runs with `python -m pytest scraper/tests/test_release_rehearsal.py -v`; it creates disposable Git repositories only and does not touch production data or Pages.
+
 ## Scheduled operation, protected main and cutover
 
 The preferred event-week operating mode is **GitHub Actions polling, not a computer left running**. `.github/workflows/update.yml` schedules UTC runs at minutes :02, :07, ..., :57 on Nov 30 and Dec 1–8, plus one best-effort :59 tick at 00:59 UTC on Dec 8 (Dec 7 at 7:59 PM Eastern in 2026). A scheduled run recalculates *both* Google participation and unread LGL notifications, so the separate local IMAP poller is **not needed** in this mode. If both are active, their triggers can cause redundant work; keep `scraper/pollEmail.py` stopped unless using an explicitly coordinated fallback.
