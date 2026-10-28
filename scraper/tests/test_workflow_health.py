@@ -107,6 +107,8 @@ def test_read_snapshot_uses_only_actions_and_branch_metadata(monkeypatch):
         paths.append((path, allow_missing))
         if path.endswith("/branches/cwkc-results"):
             return {"commit": {"commit": {"committer": {"date": PUBLISHED.isoformat()}}}}
+        if path.endswith("/jobs?per_page=100"):
+            return {"jobs": [{"name": "recompute", "conclusion": "success"}]}
         return {"workflow_runs": [run(START)]}
     monkeypatch.setattr(monitor, "_get_json", fake_get)
 
@@ -116,9 +118,44 @@ def test_read_snapshot_uses_only_actions_and_branch_metadata(monkeypatch):
     assert published == PUBLISHED
     assert paths == [
         ("/repos/example/cwkc/actions/workflows/update.yml/runs?branch=main&per_page=30", False),
+        ("/repos/example/cwkc/actions/runs/101/jobs?per_page=100", False),
         ("/repos/example/cwkc/branches/cwkc-results", True),
     ]
 
+
+
+
+def test_skipped_recompute_is_not_a_successful_heartbeat(monkeypatch):
+    now = START + timedelta(hours=2)
+    def fake_get(path, _token, **_kwargs):
+        if path.endswith("/branches/cwkc-results"):
+            return {"commit": {"commit": {"committer": {"date": PUBLISHED.isoformat()}}}}
+        if path.endswith("/jobs?per_page=100"):
+            return {"jobs": [
+                {"name": "check-window", "conclusion": "success"},
+                {"name": "recompute", "conclusion": "skipped"},
+            ]}
+        return {"workflow_runs": [run(now - timedelta(minutes=5))]}
+
+    monkeypatch.setattr(monitor, "_get_json", fake_get)
+    runs, branch = monitor.read_snapshot("example/cwkc", "synthetic-token")
+    assert runs[0]["conclusion"] == "skipped"
+    result = monitor.assess(now, runs, branch)
+    assert not result.healthy
+    assert result.last_success is None
+
+
+def test_missing_recompute_job_is_not_treated_as_success(monkeypatch):
+    now = START + timedelta(hours=2)
+    def fake_get(path, _token, **_kwargs):
+        if path.endswith("/branches/cwkc-results"):
+            return {"commit": {"commit": {"committer": {"date": PUBLISHED.isoformat()}}}}
+        if path.endswith("/jobs?per_page=100"):
+            return {"jobs": [{"name": "check-window", "conclusion": "success"}]}
+        return {"workflow_runs": [run(now - timedelta(minutes=5))]}
+    monkeypatch.setattr(monitor, "_get_json", fake_get)
+    runs, _ = monitor.read_snapshot("example/cwkc", "synthetic-token")
+    assert runs[0]["conclusion"] == "skipped"
 
 def test_branch_404_representation_is_unhealthy(monkeypatch):
     monkeypatch.setattr(
