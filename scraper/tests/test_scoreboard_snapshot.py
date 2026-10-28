@@ -109,8 +109,9 @@ def test_missing_data_branch_allowed_only_before_kickoff():
 
 
 def test_prelaunch_check_rejects_naive_datetime():
+    naive_datetime = contest_window.START.replace(tzinfo=None)
     with pytest.raises(ValueError, match="timezone-aware"):
-        scoreboard_snapshot.require_prelaunch(contest_window.START.replace(tzinfo=None))
+        scoreboard_snapshot.require_prelaunch(naive_datetime)
 
 
 
