@@ -138,7 +138,7 @@ jobs:
         id: changes
         shell: bash
         run: |
-          if cmp -s "$RUNNER_TEMP/cwkc-previous-results.csv" public/assets/csv/results.csv; then
+          if cmp -s .cwkc-previous-results.csv public/assets/csv/results.csv; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             result=$?
