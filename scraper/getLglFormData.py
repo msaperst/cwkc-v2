@@ -39,7 +39,7 @@ AMBIGUOUS_YEAR_FIELDS = frozenset({
 
 def _field_identity(label: str) -> str:
     """Compare equivalent labels without changing downstream field names."""
-    return " ".join(label.split()).removesuffix(":").casefold()
+    return " ".join(label.split()).rstrip(": ").casefold()
 
 
 def parse_lgl_email(raw_msg):
