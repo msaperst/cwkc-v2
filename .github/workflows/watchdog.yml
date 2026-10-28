@@ -46,7 +46,10 @@ jobs:
         env:
           CWKC_INGESTION_ENABLED: ${{ vars.CWKC_INGESTION_ENABLED }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: python -m scraper.workflow_health
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m scraper.workflow_health | tee -a "$GITHUB_STEP_SUMMARY"
 
       # One open incident is enough; don't post a new issue or repeated
       # comments every half hour during the same outage.
