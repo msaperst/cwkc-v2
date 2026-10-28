@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import re
-import subprocess
+import http.client
 
 from .contest_window import START, is_active
 
@@ -65,19 +65,21 @@ def assess(now: datetime, runs: list[dict], published_at: datetime | None) -> He
 
 
 def _get_json(path: str, token: str, *, allow_missing: bool = False):
-    """Read a fixed GitHub metadata path via gh; never print API errors/tokens."""
-    # gh is installed on GitHub-hosted Actions runners. A positional argument
-    # list (no shell) keeps API paths and credentials out of command parsing.
-    result = subprocess.run(
-        ["gh", "api", "--method", "GET", path],
-        env={**os.environ, "GH_TOKEN": token},
-        capture_output=True, text=True, check=False, timeout=20,
-    )
-    if result.returncode != 0:
-        if allow_missing and "HTTP 404" in result.stderr:
+    """Fetch metadata from a fixed GitHub host; no user-selected URL/shell."""
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "cwkc-watchdog",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    with http.client.HTTPSConnection("api.github.com", timeout=15) as connection:
+        connection.request("GET", path, headers=headers)
+        response = connection.getresponse()
+        if allow_missing and response.status == 404:
             return None
-        raise RuntimeError("GitHub monitoring API request failed")
-    return json.loads(result.stdout)
+        if not 200 <= response.status < 300:
+            raise RuntimeError(f"GitHub monitoring API returned HTTP {response.status}")
+        return json.load(response)
 
 
 def read_snapshot(repo: str, token: str) -> tuple[list[dict], datetime | None]:
