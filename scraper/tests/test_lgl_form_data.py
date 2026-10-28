@@ -69,7 +69,8 @@ def test_update_google_sheet_uses_durable_submission_id():
 @patch("scraper.getLglFormData.CalculateValues")
 @patch("scraper.getLglFormData.pd.read_csv")
 @patch("scraper.getLglFormData.pd.DataFrame.to_csv")
-def test_update_local_csv(mock_to_csv, mock_read_csv, mock_calc):
+def test_update_local_csv(mock_to_csv, mock_read_csv, mock_calc, monkeypatch):
+    monkeypatch.setattr(lgl, "SPREADSHEET_SHEET", "entries_2026")
     # Mock CSV dataframe
     df_mock = pd.DataFrame({"vt_total": [0], "uva_total": [0]})
     mock_read_csv.return_value = df_mock
@@ -83,6 +84,10 @@ def test_update_local_csv(mock_to_csv, mock_read_csv, mock_calc):
     mock_calc.return_value = calc_instance
 
     lgl.update_local_csv()
+    mock_calc.assert_called_once_with(
+        spreadsheet_key=lgl.SPREADSHEET_KEY,
+        worksheet_name="entries_2026",
+    )
 
     # Verify DataFrame updated
     assert df_mock.at[0, "vt_total"] == 42
