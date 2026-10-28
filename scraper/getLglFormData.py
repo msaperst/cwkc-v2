@@ -199,7 +199,7 @@ def write_processing_summary(uids: list, summary: dict, ledger: SubmissionLedger
         "",
     ]
     with Path(output).open("a", encoding="utf-8") as handle:
-        handle.write("\\n".join(lines))
+        handle.write("\n".join(lines))
 
 
 # ===== MAIN SCRIPT =====
