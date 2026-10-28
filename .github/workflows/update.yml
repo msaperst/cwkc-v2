@@ -6,6 +6,13 @@ on:
   repository_dispatch:
     types: [sheet-change, lgl-form-submission]
   workflow_dispatch:
+  # GitHub cron is UTC. Tick at :02/:07/.../:57 (off the busy hour),
+  # with a best-effort last pre-cutoff tick at 00:59 UTC on Dec 8.
+  # Year-independent cron is guarded by season.json and the kill switch.
+  schedule:
+    - cron: '2-59/5 * 30 11 *'
+    - cron: '2-59/5 * 1-8 12 *'
+    - cron: '59 0 8 12 *'
 
 # Allow an in-flight run to finish, never cancel while it can acknowledge email.
 concurrency:
@@ -67,6 +74,13 @@ jobs:
       - name: Reject ingestion after cutoff
         run: python -m scraper.contest_window --require-active
 
+      # main holds code; live score data is maintained on cwkc-results.
+      # Missing branch or schema disagreement fails before any mail is read.
+      - name: Restore last published scoreboard
+        run: |
+          git fetch --no-tags origin refs/heads/cwkc-results:refs/remotes/origin/cwkc-results
+          python -m scraper.scoreboard_snapshot restore --backup "$RUNNER_TEMP/cwkc-previous-results.csv"
+
       - name: Write private Google service account files
         env:
           GOOGLE_TYPE: ${{ secrets.TYPE }}
@@ -120,15 +134,13 @@ jobs:
       - name: Reject publication after cutoff
         run: python -m scraper.contest_window --require-active
 
-      - name: Detect actual CSV change
+      - name: Compare computed CSV with published snapshot
         id: changes
         shell: bash
         run: |
-          if git diff --quiet -- public/assets/csv/results.csv; then
+          if cmp -s "$RUNNER_TEMP/cwkc-previous-results.csv" public/assets/csv/results.csv; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            result=$?
-            if [ "$result" -ne 1 ]; then exit "$result"; fi
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -143,15 +155,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Commit the single reconciled results file
+      # Do not bypass main protection for bot-written data. Worktree lets
+      # the scripts and code stay on main while only the CSV is committed.
+      - name: Commit reconciled scoreboard to data branch
         if: steps.changes.outputs.changed == 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- public/assets/csv/results.csv
-          git diff --cached --check
-          git commit -m "Update CWKC results"
-          git push origin HEAD:main
+          git fetch --no-tags origin refs/heads/cwkc-results:refs/remotes/origin/cwkc-results
+          git worktree add --detach "$RUNNER_TEMP/cwkc-published" origin/cwkc-results
+          cp public/assets/csv/results.csv "$RUNNER_TEMP/cwkc-published/public/assets/csv/results.csv"
+          git -C "$RUNNER_TEMP/cwkc-published" config user.name "github-actions[bot]"
+          git -C "$RUNNER_TEMP/cwkc-published" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$RUNNER_TEMP/cwkc-published" add -- public/assets/csv/results.csv
+          git -C "$RUNNER_TEMP/cwkc-published" diff --cached --check
+          git -C "$RUNNER_TEMP/cwkc-published" commit -m "Update CWKC results"
+          git -C "$RUNNER_TEMP/cwkc-published" push origin HEAD:cwkc-results
 
   deploy-results:
     needs: recompute
