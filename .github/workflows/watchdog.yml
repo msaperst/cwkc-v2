@@ -8,10 +8,6 @@ on:
     - cron: '17,47 * 1-8 12 *'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  actions: read
-
 concurrency:
   group: cwkc-watchdog
   cancel-in-progress: false
@@ -25,6 +21,9 @@ jobs:
       vars.CWKC_INGESTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Checkout main
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
