@@ -6,18 +6,16 @@ It never connects to Gmail, LGL or Sheets, and never changes published scores.
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 import json
 import os
 import re
+import subprocess
 
 from .contest_window import START, is_active
 
 MAX_SUCCESS_AGE = timedelta(minutes=45)
 STARTUP_GRACE = timedelta(minutes=45)
 BAD_CONCLUSIONS = frozenset({"failure", "timed_out", "cancelled", "action_required"})
-API_ROOT = "https://api.github.com"
 
 
 def parse_time(value: str) -> datetime:
@@ -68,21 +66,19 @@ def assess(now: datetime, runs: list[dict], published_at: datetime | None) -> He
 
 
 def _get_json(path: str, token: str, *, allow_missing: bool = False):
-    """Only request fixed GitHub metadata endpoints; don't log API responses."""
-    request = Request(
-        API_ROOT + path,
-        headers={"Authorization": f"Bearer {token}",
-                 "Accept": "application/vnd.github+json",
-                 "User-Agent": "cwkc-watchdog",
-                 "X-GitHub-Api-Version": "2022-11-28"},
+    """Read a fixed GitHub metadata path via gh; never print API errors/tokens."""
+    # gh is installed on GitHub-hosted Actions runners. A positional argument
+    # list (no shell) keeps API paths and credentials out of command parsing.
+    result = subprocess.run(
+        ["gh", "api", "--method", "GET", path],
+        env={**os.environ, "GH_TOKEN": token},
+        capture_output=True, text=True, check=False, timeout=20,
     )
-    try:
-        with urlopen(request, timeout=15) as response:
-            return json.load(response)
-    except HTTPError as error:
-        if allow_missing and error.code == 404:
+    if result.returncode != 0:
+        if allow_missing and "HTTP 404" in result.stderr:
             return None
-        raise RuntimeError(f"GitHub monitoring API returned HTTP {error.code}") from None
+        raise RuntimeError("GitHub monitoring API request failed")
+    return json.loads(result.stdout)
 
 
 def read_snapshot(repo: str, token: str) -> tuple[list[dict], datetime | None]:
