@@ -219,6 +219,37 @@ The output contains aggregate counts of `pending`, `already_stored`, and `failed
 
 **Restart or failure:** leave failed emails unread, inspect the Actions job failure and the last successful normalized-Sheet state, run the read-only check, then retry only after correcting the cause. A successful Sheet append followed by a failed IMAP acknowledgment will be recognized by its stored ID during the next run. Any processing failures produce a nonzero exit code so the update workflow cannot publish an incomplete CSV. An LGL duplicate *notification with a different MIME identity* still needs upstream LGL reconciliation; the fingerprint guarantees idempotent **email replay**, not deduplication of distinct form submissions.
 
+## Scheduled operation, protected main and cutover
+
+The preferred event-week operating mode is **GitHub Actions polling, not a computer left running**. `.github/workflows/update.yml` schedules UTC runs at minutes :02, :07, ..., :57 on Nov 30 and Dec 1–8, plus one best-effort :59 tick at 00:59 UTC on Dec 8 (Dec 7 at 7:59 PM Eastern in 2026). A scheduled run recalculates *both* Google participation and unread LGL notifications, so the separate local IMAP poller is **not needed** in this mode. If both are active, their triggers can cause redundant work; keep `scraper/pollEmail.py` stopped unless using an explicitly coordinated fallback.
+
+**Important limitations:** GitHub's schedule is best-effort, may be delayed/dropped, and is automatically disabled after 60 days of inactivity on a public repository. Check the workflow is enabled before the event, monitor successful runs and email backlog, and plan for manual recovery. Cron is recurring each year (UTC), but the authoritative `season.json` window and ingestion switch still block out-of-season processing. Scheduled runs are **not proof** that every gift received before the Dec 7 8 PM ET close made the final snapshot; the Hillels must approve the last-minute reconciliation/cutoff plan separately before go-live. Do **not** widen the event gate ad hoc to include post-cutoff gifts.
+
+### One-time data-branch bootstrap (after final scoring schema is merged; before ingestion)
+
+The `cwkc-results` branch is intentionally **not** automatically created by the workflows. Create it from the final approved `main` after the 2026 score columns and empty snapshot are settled:
+
+~~~bash
+git fetch origin
+git switch -c cwkc-results origin/main
+git push -u origin cwkc-results
+git switch main
+~~~
+
+This creates an ordinary branch from the same public code state but holds the evolving CSV independently. Make sure `cwkc-results` is not covered by the **Main-only** branch rule. Never bootstrap this from a real donor-filled legacy snapshot. On future schema changes, first reconcile and migrate the data branch with a reviewed plan: the workflow **fails closed** if the CSV header in `main` does not match the data branch. A missing data branch is tolerated by normal Pages deployments **only before Nov 30 kickoff**; an ingestion run always refuses to proceed without it. Do not enable collection until this step and a synthetic publication rehearsal are verified.
+
+### Protect application code
+
+The `Main` repository ruleset (Settings → Rules → Rulesets) was **disabled** in the Oct 28 review. After a reviewed rehearsal, enable protections for the **default branch only**, require pull requests and the green Python/Jest/Playwright/SonarCloud checks, and choose appropriate review approvals. Avoid blanket bypasses. Keep `cwkc-results` outside that rule: the results workflow's `GITHUB_TOKEN` requires `contents: write` on that branch, but never on protected `main`. Confirm that code PR merges work and that a **synthetic data-only** push plus Pages deployment works before locking down the last production settings.
+
+### Operating / recovery checks
+
+- Verify the Actions schedule is enabled, `CWKC_INGESTION_ENABLED` remains **false** until authorized kickoff, and normalized donation Sheet legacy rows have been privately reconciled (see #34). No real emails should be acknowledged during preparation.
+- On kickoff: confirm the final four LGL notification contracts, two response Sheets and GCP service-account access, the data-branch bootstrap and a recent successful test run. Then enable the switch only at the approved time.
+- During the event: inspect update/deploy Actions runs, compare last published `cwkc-results` CSV with the live site, and monitor the number of pending unread notifications. Failed imports stay unread for replay. Scheduled runs can occasionally be skipped; ensure an operator checks for stale results.
+- For failures: set the ingestion switch to **false**, stop the local poller if running, use read-only `--reconcile-only` plus authorized LGL/Sheet records, repair the cause, and re-enable only after checks. Do not delete or mark inbox mail as read to unblock a run.
+- Closing: coordinate final source counts and unresolved messages **before the cutoff**. A run that starts after the exact end cannot collect or publish; any missing eligible donations require an explicit Hillel-approved reconciliation and publication procedure, not an undocumented manual date override.
+
 ## Deployment
 
 The site is a static GitHub Pages deployment with custom domain **cwkc.org**:
@@ -228,7 +259,7 @@ The site is a static GitHub Pages deployment with custom domain **cwkc.org**:
 3. Merge the PR into `main`. A push to `main` triggers `.github/workflows/deploy.yml`, which deploys the `public/` directory to GitHub Pages.
 4. Check https://cwkc.org after deployment for correct content, links, HTTPS, browser console errors, and the expected countdown/score display.
 
-**Data refresh is a separate workflow.** `.github/workflows/update.yml` handles `sheet-change`, `lgl-form-submission`, and manual `workflow_dispatch` events. It recalculates both sources in a single serialized run and deploys the resulting CSV only when it changes. A bot-generated CSV commit does not trigger another GitHub Actions push workflow, so the update workflow explicitly deploys Pages.
+**Data refresh is a separate workflow.** `.github/workflows/update.yml` handles scheduled UTC ticks (approximately every five minutes during the planned season), `sheet-change`, `lgl-form-submission`, and manual `workflow_dispatch` events. Every route still requires the exact season window and `CWKC_INGESTION_ENABLED=true`. It recalculates both sources in a single serialized run, commits only the generated CSV to the **`cwkc-results` data branch**, and deploys Pages when data changes. It does **not** push to protected `main`. A normal code deployment always overlays the latest published CSV from that branch so merging a PR does not reset the scoreboard.
 
 **Enable data collection:** after confirming the event start/end instants and validating the Forms, open the repository's **Settings → Secrets and variables → Actions → Variables** and set `CWKC_INGESTION_ENABLED` to `true`. A missing variable or any value other than exactly `true` blocks all ingestion, including manual runs. The collection window (`scraper/contest_window.py`) also blocks runs outside the configured Eastern-time window and manual runs on branches other than `main`. To pause *future* processing, set the variable to `false` and stop the local poller. Disabling it cannot stop an update already in progress. Never use a manual production dispatch as a test run.
 

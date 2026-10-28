@@ -15,3 +15,6 @@
 
 /playwright-report/
 /test-results/
+
+# Ephemeral comparison snapshot, never a source-controlled donor artifact.
+/.cwkc-previous-results.csv
