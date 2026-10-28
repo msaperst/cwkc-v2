@@ -283,7 +283,9 @@ def test_watchdog_workflow_contract():
     assert "python -m scraper.workflow_health" in workflow
     assert "group: cwkc-watchdog" in workflow
     assert "issues: write" in workflow
-    assert "if: failure()" in workflow
+    assert "needs.check.result == 'failure'" in workflow
+    assert "alert:" in workflow and "issues: write" in workflow
+    assert workflow.index("  alert:") < workflow.index("      issues: write")
     assert "gh issue list" in workflow and "if [ -z \"$existing\" ]" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "lgl-form-submission" not in workflow
