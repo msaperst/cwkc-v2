@@ -1,6 +1,8 @@
 """Offline CWKC watchdog contract tests. No network, donations, or Sheets."""
 from datetime import timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
+import json
 import re
 
 import pytest
@@ -214,6 +216,61 @@ def test_unhealthy_run_writes_safe_job_summary_and_exits(monkeypatch, tmp_path, 
     assert "example/cwkc" in output or "No recorded run" in output
     assert "No successful" in output
     assert "ACTION REQUIRED" in capsys.readouterr().out
+
+
+
+
+def test_github_cli_json_read_is_shell_free_and_secret_safe(monkeypatch):
+    commands = []
+    def fake_run(argv, **kwargs):
+        commands.append((argv, kwargs))
+        return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": []}),
+                               stderr="")
+    monkeypatch.setattr(monitor.subprocess, "run", fake_run)
+    output = monitor._get_json("/repos/example/cwkc/actions/workflows/update.yml/runs",
+                               "synthetic-private-token")
+    assert output == {"workflow_runs": []}
+    argv, kwargs = commands[0]
+    assert argv == [
+        "gh", "api", "--method", "GET",
+        "/repos/example/cwkc/actions/workflows/update.yml/runs",
+    ]
+    assert kwargs["check"] is False
+    assert kwargs["capture_output"] is True
+    assert "shell" not in kwargs
+    assert kwargs["env"]["GH_TOKEN"] == "synthetic-private-token"
+    assert "synthetic-private-token" not in " ".join(argv)
+
+
+def test_missing_branch_returns_none_but_other_api_errors_fail_closed(monkeypatch):
+    def missing(_argv, **_kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="HTTP 404 Not Found")
+    monkeypatch.setattr(monitor.subprocess, "run", missing)
+    assert monitor._get_json("/repos/example/cwkc/branches/cwkc-results", "dummy",
+                             allow_missing=True) is None
+    with pytest.raises(RuntimeError, match="monitoring API request failed"):
+        monitor._get_json("/repos/example/cwkc/branches/cwkc-results", "dummy")
+
+    def forbidden(_argv, **_kwargs):
+        return SimpleNamespace(returncode=1, stdout="private donor information",
+                               stderr="HTTP 403 details")
+    monkeypatch.setattr(monitor.subprocess, "run", forbidden)
+    with pytest.raises(RuntimeError, match="GitHub monitoring API request failed") as error:
+        monitor._get_json("/repos/example/cwkc/actions/workflows/update.yml/runs",
+                          "synthetic-private-token", allow_missing=True)
+    assert "private donor information" not in str(error.value)
+    assert "synthetic-private-token" not in str(error.value)
+
+
+def test_invalid_github_api_json_stops_monitoring(monkeypatch):
+    monkeypatch.setattr(
+        monitor.subprocess, "run",
+        lambda _argv, **_kwargs: SimpleNamespace(
+            returncode=0, stdout="{invalid", stderr="",
+        ),
+    )
+    with pytest.raises(json.JSONDecodeError):
+        monitor._get_json("/repos/example/cwkc/branches/cwkc-results", "dummy")
 
 
 def test_watchdog_workflow_contract():
