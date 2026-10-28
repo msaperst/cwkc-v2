@@ -35,11 +35,11 @@ def two_branch_repo(tmp_path, monkeypatch):
     return target
 
 
-def test_restore_published_data_without_modifying_static_main(two_branch_repo, tmp_path):
-    backup = tmp_path / "backup.csv"
-    scoreboard_snapshot.restore_snapshot(two_branch_repo, backup=backup)
+def test_restore_published_data_without_modifying_static_main(two_branch_repo, tmp_path, monkeypatch):
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    scoreboard_snapshot.restore_snapshot(backup=True)
     assert two_branch_repo.read_bytes() == PUBLISHED
-    assert backup.read_bytes() == PUBLISHED
+    assert (tmp_path / "cwkc-previous-results.csv").read_bytes() == PUBLISHED
     assert subprocess.run(["git", "show", "HEAD:public/assets/csv/results.csv"],
                           capture_output=True, check=True).stdout == MAIN
 
@@ -70,13 +70,14 @@ def test_restore_refuses_schema_drift_without_changing_file(two_branch_repo):
     old = b"uva_total,vt_total,new_category\n0,0,0\n"
     two_branch_repo.write_bytes(old)
     with pytest.raises(ValueError, match="schema differs"):
-        scoreboard_snapshot.restore_snapshot(two_branch_repo)
+        scoreboard_snapshot.restore_snapshot()
     assert two_branch_repo.read_bytes() == old
 
 
-def test_restore_refuses_missing_published_file(two_branch_repo):
+def test_restore_refuses_missing_published_file(two_branch_repo, monkeypatch):
+    monkeypatch.setattr(scoreboard_snapshot, "DATA_REF", "refs/remotes/origin/nonexistent")
     with pytest.raises(RuntimeError, match="missing its scoreboard"):
-        scoreboard_snapshot.restore_snapshot(two_branch_repo, ref="refs/remotes/origin/nonexistent")
+        scoreboard_snapshot.restore_snapshot()
     assert two_branch_repo.read_bytes() == MAIN
 
 
@@ -116,13 +117,12 @@ def test_prelaunch_check_rejects_naive_datetime():
 
 def test_cli_restore_uses_optional_backup(monkeypatch, tmp_path):
     import sys
-    backup = tmp_path / "last.csv"
     called = []
     monkeypatch.setattr(scoreboard_snapshot, "restore_snapshot",
-                        lambda backup=None: called.append(backup))
-    monkeypatch.setattr(sys, "argv", ["scoreboard_snapshot", "restore", "--backup", str(backup)])
+                        lambda backup=False: called.append(backup))
+    monkeypatch.setattr(sys, "argv", ["scoreboard_snapshot", "restore", "--backup"])
     scoreboard_snapshot.main()
-    assert called == [backup]
+    assert called == [True]
 
 
 def test_cli_prelaunch_gate(monkeypatch):
