@@ -132,3 +132,49 @@ def test_calculate_all_returns_metrics(calc):
     # Basic sanity checks
     assert metrics['uva']['total_amount'] > 0
     assert metrics['vt']['total_amount'] > 0
+
+
+def test_calculator_reads_only_configured_season_tab():
+    """Keep prior-season gifts intact but exclude them from 2026 totals."""
+    old_row = {
+        "source": "uva-front",
+        "total amount": 9999,
+        "recurring payment": "false",
+        "first name": "Archived",
+        "last name": "Synthetic",
+        "phone number": "old",
+        "anonymous donation": "false",
+        "first time giver": "false",
+        "graduation year": 2025,
+        "status": "Alumni",
+        "work referral": "false",
+    }
+    new_row = {
+        **old_row,
+        "source": "vt-front",
+        "total amount": 25,
+        "first name": "Current",
+        "phone number": "new",
+        "graduation year": 2026,
+    }
+
+    with patch("gspread.service_account") as mock_service:
+        spreadsheet = mock_service.return_value.open_by_key.return_value
+        worksheets = {
+            "entries": MagicMock(),
+            "entries_2026": MagicMock(),
+        }
+        worksheets["entries"].get_all_records.return_value = [old_row]
+        worksheets["entries_2026"].get_all_records.return_value = [new_row]
+        spreadsheet.worksheet.side_effect = worksheets.__getitem__
+
+        calculator = CalculateValues(
+            spreadsheet_key="synthetic-key", worksheet_name="entries_2026",
+        )
+        totals = calculator.calculate_all()
+
+    spreadsheet.worksheet.assert_called_once_with("entries_2026")
+    assert totals["uva"]["total_amount"] == 0
+    assert totals["vt"]["total_amount"] == 25
+    assert worksheets["entries"].get_all_records.call_count == 0
+    worksheets["entries_2026"].get_all_records.assert_called_once_with()
