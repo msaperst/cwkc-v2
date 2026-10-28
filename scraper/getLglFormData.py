@@ -116,7 +116,9 @@ def process_messages(server, uids: list, ledger: SubmissionLedger,
     return summary
 
 def update_local_csv():
-    calc = CalculateValues(spreadsheet_key=SPREADSHEET_KEY)
+    # Read exactly the same season-specific worksheet used by SubmissionLedger.
+    # Otherwise a fresh 2026 import could accidentally publish 2025 totals.
+    calc = CalculateValues(spreadsheet_key=SPREADSHEET_KEY, worksheet_name=SPREADSHEET_SHEET)
     metrics = calc.calculate_all()
     df = pd.read_csv(CSV_PATH)
 
