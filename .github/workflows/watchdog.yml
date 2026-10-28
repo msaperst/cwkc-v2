@@ -7,11 +7,6 @@ on:
     - cron: '17,47 * 30 11 *'
     - cron: '17,47 * 1-8 12 *'
   workflow_dispatch:
-  # Check immediately after a failed update, instead of waiting for the
-  # next 30-minute tick. Successful updates require no secondary job.
-  workflow_run:
-    workflows: ["Update results from multiple locations"]
-    types: [completed]
 
 permissions:
   contents: read
@@ -28,9 +23,7 @@ jobs:
     # failures are checked by the Python season gate before any API requests.
     if: >-
       github.ref == 'refs/heads/main' &&
-      vars.CWKC_INGESTION_ENABLED == 'true' &&
-      (github.event_name != 'workflow_run' ||
-       github.event.workflow_run.conclusion != 'success')
+      vars.CWKC_INGESTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
