@@ -179,9 +179,8 @@ def test_normalize_row_with_source():
     assert row["source"] == "vt-front"
 
 
-def test_lgl_step_summary_contains_only_synthetic_counts(monkeypatch, tmp_path):
-    report = tmp_path / "github-summary.md"
-    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(report))
+def test_lgl_step_summary_contains_only_synthetic_counts(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
     ledger = MagicMock()
     ledger.ids = {"synthetic-hash"}
     ledger.legacy_rows = 0
@@ -189,7 +188,7 @@ def test_lgl_step_summary_contains_only_synthetic_counts(monkeypatch, tmp_path):
 
     lgl.write_processing_summary([11, 7, 9, 3], values, ledger)
 
-    body = report.read_text(encoding="utf-8")
+    body = capsys.readouterr().out
     assert "### CWKC LGL processing\n" in body
     assert "| Matching unread notifications at start | 4 |" in body
     assert "| New donation rows persisted | 1 |" in body
@@ -200,17 +199,17 @@ def test_lgl_step_summary_contains_only_synthetic_counts(monkeypatch, tmp_path):
     assert "donor" not in body.lower()
 
 
-def test_lgl_step_summary_is_optional_and_handles_empty_mail(monkeypatch, tmp_path):
-    report = tmp_path / "summary.md"
+def test_lgl_step_summary_is_optional_and_handles_empty_mail(monkeypatch, capsys):
     ledger = MagicMock()
     ledger.ids = set()
     ledger.legacy_rows = 0
     values = {"new": 0, "already_stored": 0, "pending": 0, "failed": 0}
-    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     lgl.write_processing_summary([], values, ledger)
-    assert not report.exists()
+    assert not capsys.readouterr().out
 
-    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(report))
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
     lgl.write_processing_summary([], values, ledger)
-    assert "| Matching unread notifications at start | 0 |" in report.read_text()
-    assert "| Highest matched mailbox UID (not a processed watermark) | None |" in report.read_text()
+    body = capsys.readouterr().out
+    assert "| Matching unread notifications at start | 0 |" in body
+    assert "| Highest matched mailbox UID (not a processed watermark) | None |" in body
