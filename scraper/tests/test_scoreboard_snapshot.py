@@ -44,6 +44,28 @@ def test_restore_published_data_without_modifying_static_main(two_branch_repo, t
                           capture_output=True, check=True).stdout == MAIN
 
 
+
+def test_synthetic_worktree_publishes_only_csv_to_data_branch(two_branch_repo, tmp_path):
+    """Rehearse the git worktree/commit/push mechanics without GitHub."""
+    remote = tmp_path / "remote.git"
+    _git(tmp_path, "init", "--bare", "-q", str(remote))
+    _git(tmp_path, "remote", "add", "origin", str(remote))
+    _git(tmp_path, "push", "-q", "origin", "cwkc-results")
+    worktree = tmp_path / "published"
+    _git(tmp_path, "worktree", "add", "--detach", str(worktree), "origin/cwkc-results")
+    (worktree / scoreboard_snapshot.RESULTS_PATH).write_bytes(b"uva_total,vt_total\n50,10\n")
+    _git(worktree, "add", "--", str(scoreboard_snapshot.RESULTS_PATH))
+    _git(worktree, "commit", "-qm", "Update CWKC results")
+    _git(worktree, "push", "-q", "origin", "HEAD:cwkc-results")
+
+    result = subprocess.run(["git", "--git-dir", str(remote), "show",
+                             "cwkc-results:public/assets/csv/results.csv"],
+                            capture_output=True, check=True)
+    assert result.stdout == b"uva_total,vt_total\n50,10\n"
+    main = subprocess.run(["git", "show", "HEAD:public/assets/csv/results.csv"],
+                          capture_output=True, check=True)
+    assert main.stdout == MAIN
+
 def test_restore_refuses_schema_drift_without_changing_file(two_branch_repo):
     old = b"uva_total,vt_total,new_category\n0,0,0\n"
     two_branch_repo.write_bytes(old)
