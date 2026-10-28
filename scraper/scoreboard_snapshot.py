@@ -9,6 +9,7 @@ import argparse
 import csv
 from datetime import datetime, timezone
 import io
+import os
 from pathlib import Path
 import subprocess
 
@@ -31,23 +32,25 @@ def _header(payload: bytes) -> list[str]:
     return rows[0]
 
 
-def restore_snapshot(
-    target: Path = RESULTS_PATH, backup: Path | None = None,
-    ref: str = DATA_REF,
-) -> None:
-    """Overlay *only* results.csv, requiring the checked-out code's schema."""
+def restore_snapshot(*, backup: bool = False) -> None:
+    """Restore only the hard-coded scoreboard path from the fixed data ref.
+
+    No user-controlled filenames or Git refs are accepted by the CLI.
+    """
     result = subprocess.run(
-        ["git", "show", f"{ref}:{RESULTS_PATH.as_posix()}"],
+        ["git", "show", f"{DATA_REF}:{RESULTS_PATH.as_posix()}"],
         capture_output=True, check=False,
     )
     if result.returncode:
         raise RuntimeError("Results branch is missing its scoreboard CSV")
     previous = result.stdout
-    if _header(target.read_bytes()) != _header(previous):
+    if _header(RESULTS_PATH.read_bytes()) != _header(previous):
         raise ValueError("Published CSV schema differs from main; migrate data branch before deployment")
-    target.write_bytes(previous)
-    if backup is not None:
-        backup.write_bytes(previous)
+    if backup:
+        # GitHub provisions RUNNER_TEMP; the output basename is fixed, not
+        # derived from any external form, workflow or CLI arguments.
+        (Path(os.environ["RUNNER_TEMP"]) / "cwkc-previous-results.csv").write_bytes(previous)
+    RESULTS_PATH.write_bytes(previous)
 
 
 def require_prelaunch(now: datetime | None = None) -> None:
@@ -63,7 +66,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Manage the public CWKC scoreboard snapshot")
     subcommands = parser.add_subparsers(dest="command", required=True)
     restore = subcommands.add_parser("restore")
-    restore.add_argument("--backup", type=Path)
+    restore.add_argument("--backup", action="store_true")
     subcommands.add_parser("require-prelaunch")
     args = parser.parse_args()
     if args.command == "restore":
