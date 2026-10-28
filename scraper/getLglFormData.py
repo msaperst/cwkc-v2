@@ -156,24 +156,34 @@ def main(argv=None):
 
         uids = server.search(["UNSEEN", "FROM", FROM_FILTER])
         print(f"Unseen LGL notifications: {len(uids)}")
-        if uids:
-            gc = gspread.service_account(filename="spreadsheet_credentials.json")
-            ledger = SubmissionLedger(
-                gc, SPREADSHEET_KEY, SPREADSHEET_SHEET,
-                NORMALIZED_FIELDS, read_only=args.reconcile_only,
+        # Always inspect the normalized ledger, including when the inbox is
+        # empty. Otherwise a read-only preflight could miss prior-season
+        # donations, and a normal refresh could publish legacy scores.
+        # With no new messages, inspection never modifies Sheet headers.
+        gc = gspread.service_account(filename="spreadsheet_credentials.json")
+        ledger = SubmissionLedger(
+            gc, SPREADSHEET_KEY, SPREADSHEET_SHEET,
+            NORMALIZED_FIELDS, read_only=args.reconcile_only or not uids,
+        )
+        summary = process_messages(
+            server, uids, ledger, reconcile_only=args.reconcile_only,
+        )
+        print("Reconciliation:", ", ".join(
+            f"{key}={value}" for key, value in summary.items()))
+        print(
+            f"Normalized Sheet: identified={len(ledger.ids)}, "
+            f"legacy={ledger.legacy_rows}, "
+            f"id_tracking={'enabled' if ledger.tracking_enabled else 'missing'}"
+        )
+        if ledger.legacy_rows:
+            print(f"WARNING: {ledger.legacy_rows} existing unkeyed Sheet rows need reconciliation")
+            if not args.reconcile_only:
+                raise ValueError("Existing unkeyed donations require reconciliation before CSV publication")
+        if summary["failed"]:
+            raise RuntimeError(
+                f"{summary['failed']} LGL notifications remain unprocessed; "
+                "blocking CSV publication"
             )
-            summary = process_messages(
-                server, uids, ledger, reconcile_only=args.reconcile_only,
-            )
-            print("Reconciliation:", ", ".join(
-                f"{key}={value}" for key, value in summary.items()))
-            if ledger.legacy_rows:
-                print(f"WARNING: {ledger.legacy_rows} existing unkeyed Sheet rows need reconciliation")
-            if summary["failed"]:
-                raise RuntimeError(
-                    f"{summary['failed']} LGL notifications remain unprocessed; "
-                    "blocking CSV publication"
-                )
         if not args.reconcile_only:
             # No publication on partial email failure. A later run can resume
             # unread messages and recalculate from the durable Sheet.
