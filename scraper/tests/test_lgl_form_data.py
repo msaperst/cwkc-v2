@@ -51,6 +51,79 @@ def test_parse_lgl_email_no_table():
         lgl.parse_lgl_email(raw_bytes)
 
 
+
+def _email_with_rows(rows):
+    """Only fabricated field/value pairs; no live submissions or accounts."""
+    message = EmailMessage()
+    message["From"] = "Hillel at VT <lglforms-submissions@littlegreenlight.com>"
+    message.set_content("Synthetic form message")
+    table = "<table>" + "".join(
+        f"<tr><td>{field}</td><td>{value}</td></tr>"
+        for field, value in rows
+    ) + "</table>"
+    message.add_alternative(table, subtype="html")
+    return message.as_bytes()
+
+
+@pytest.mark.parametrize(("rows", "error"), [
+    (
+        [("Graduation Year", "2026"), ("Graduation Year", "2025")],
+        "Repeated graduation-year field is ambiguous",
+    ),
+    (
+        [("Graduation Year", "2026"), ("Graduation Year", "2026")],
+        "Repeated graduation-year field is ambiguous",
+    ),
+    (
+        [("Graduation Year", "2026"), (" graduation  YEAR :", "2025")],
+        "Repeated graduation-year field is ambiguous",
+    ),
+    (
+        [("Intended Graduation Year", "2026"), ("Intended Graduation Year", "")],
+        "Repeated graduation-year field is ambiguous",
+    ),
+    (
+        [("Total Amount", "$25.00"), ("Total Amount", "$50.00")],
+        "Conflicting duplicate LGL form field",
+    ),
+    (
+        [("I am a/an", "Alumni"), ("I am a/an", "Current Parent")],
+        "Conflicting duplicate LGL form field",
+    ),
+    (
+        [("Check all that apply:", "Option A"), ("check all that apply", "Option B")],
+        "Conflicting duplicate LGL form field",
+    ),
+])
+def test_parse_lgl_email_rejects_ambiguous_repeated_fields(rows, error):
+    raw = _email_with_rows(rows)
+    with pytest.raises(ValueError, match=error):
+        lgl.parse_lgl_email(raw)
+
+
+def test_parse_lgl_email_accepts_identical_non_year_duplicates():
+    raw = _email_with_rows([
+        ("Form title", "CWKC Donation"),
+        ("Form TITLE:", "CWKC Donation"),
+        ("Total Amount", "$25.00"),
+        ("Total Amount", "$25.00"),
+    ])
+    _, data = lgl.parse_lgl_email(raw)
+    assert data == {"Form title": "CWKC Donation", "Total Amount": "$25.00"}
+
+
+def test_parse_lgl_email_preserves_different_graduation_year_questions():
+    raw = _email_with_rows([
+        ("Alumni Graduation Year", "2026"),
+        ("Related Student Graduation Year", "2025"),
+        ("Intended Graduation Year", "2027"),
+    ])
+    _, data = lgl.parse_lgl_email(raw)
+    assert data["Alumni Graduation Year"] == "2026"
+    assert data["Related Student Graduation Year"] == "2025"
+    assert data["Intended Graduation Year"] == "2027"
+
+
 # ---------- update_google_sheet ---------- #
 
 def test_update_google_sheet_uses_durable_submission_id():
