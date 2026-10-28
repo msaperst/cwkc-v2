@@ -32,6 +32,7 @@ The resulting scoreboard is stored in `public/assets/csv/results.csv`. The stati
 | `scraper/tests/` and `public/assets/js/*.test.js` | Python and JavaScript tests |
 | `.github/workflows/test.yml` | PR test/coverage/SonarCloud checks |
 | `.github/workflows/update.yml` | Google Sheet/LGL ingestion and results publishing |
+| `.github/workflows/watchdog.yml` | Read-only event-week heartbeat checks and failure alerts |
 | `.github/workflows/deploy.yml` | Static website deployment to GitHub Pages |
 
 ## Local development
@@ -229,6 +230,18 @@ The preferred event-week operating mode is **GitHub Actions polling, not a compu
 
 **Important limitations:** GitHub's schedule is best-effort, may be delayed/dropped, and is automatically disabled after 60 days of inactivity on a public repository. Check the workflow is enabled before the event, monitor successful runs and email backlog, and plan for manual recovery. Cron is recurring each year (UTC), but the authoritative `season.json` window and ingestion switch still block out-of-season processing. Scheduled runs are **not proof** that every gift received before the Dec 7 8 PM ET close made the final snapshot; the Hillels must approve the last-minute reconciliation/cutoff plan separately before go-live. Do **not** widen the event gate ad hoc to include post-cutoff gifts.
 
+### Event-week watchdog and failure alerts (issue #40)
+
+The separate `.github/workflows/watchdog.yml` checks **GitHub Actions metadata only**, not donor information. It runs at **:17 and :47 UTC** during the event dates and checks immediately after failed update-workflow completions. The same `CWKC_INGESTION_ENABLED=true` switch and exact season configuration suppress monitoring before kickoff and after cutoff. Its `GITHUB_TOKEN` only accesses repository Actions / branch metadata, plus issue creation for alerts; no LGL, Gmail or Google Sheet credentials are used.
+
+- **Heartbeat:** an update must complete successfully within the last **45 minutes** (with a 45-minute kickoff grace period). The watchdog flags missing scheduled runs, stalled updates, or a newer failed update, even if no new donations were received.
+- **Publishing:** it displays the latest `cwkc-results` branch commit date separately from ingestion success. A missing data branch is an alert; **an unchanged CSV or old result-branch timestamp is not**, by itself, evidence of a failure. The source Sheet and mailbox must still be reconciled to confirm gift completeness.
+- **Alerting:** a failed check makes the watchdog Actions run red and opens **one** GitHub issue titled `[CWKC] Ingestion watchdog alert` (if none is open). Recurring failures do not create duplicate issues/comments. Configure the event-week primary and backup operators to **Watch this repository / subscribe to Issues and Actions failures**; a GitHub issue does not guarantee email/push delivery unless subscriptions are configured. Follow the red run's **Step summary** for the most recent update, last successful update and last branch commit. Do not close the incident until a successful real update and donor reconciliation are verified.
+- **Safety:** the watchdog can **detect workflow staleness**, but it cannot inspect the unread LGL backlog or assert that all real gifts were credited. For actual pending counts, an authorized operator uses `python -m scraper.getLglFormData --reconcile-only` with correct production credentials and verifies LGL totals privately. Never copy donor content into a public issue.
+- **Drill:** use a feature-branch PR to exercise mocked missing/success/failed/stale workflow snapshots in `scraper/tests/test_workflow_health.py`. The dedicated workflow is inactive while the ingestion switch is off. After approval and kickoff, check for a healthy watchdog run, run a read-only reconciliation, and verify alerts are seen by both operators. Do not force production failures or enable early ingestion merely to test alerts.
+
+**Recovery drill for a legitimate incident:** (1) check the watchdog issue and the associated `Update results from multiple locations` run; (2) stop *new* ingestion by setting the switch to `false`, noting that a running job will continue; (3) run a read-only reconciliation and check data branch / last Pages deployment; (4) repair the cause via a reviewed PR or restore credentials without changing message flags; (5) after the authorized window is active and the correction is verified, re-enable ingestion and observe an actual successful run; (6) reconcile LGL source records against the normalized Sheet and only then close the alert. At the exact cutoff, use the separately approved closing procedure: **do not simply extend the season window**.
+
 ### Preserve historical donations using a separate 2026 worksheet
 
 The existing **Donations** workbook has a populated `entries` tab (748 historical records on the Oct 28 read-only metadata/source audit) and prior-year archive tabs. Do **not** clear, overwrite, or fabricate submission IDs for those records. Retain `entries` as the historical source while preparing a **new, empty `entries_2026` tab** in the same workbook only after the operators agree on the rollover and have a private backup.
@@ -258,7 +271,7 @@ This creates an ordinary branch from the same public code state but holds the ev
 
 ### Protect application code
 
-The `Main` repository ruleset (Settings → Rules → Rulesets) was **disabled** in the Oct 28 review. After a reviewed rehearsal, enable protections for the **default branch only**, require pull requests and the green Python/Jest/Playwright/SonarCloud checks, and choose appropriate review approvals. Avoid blanket bypasses. Keep `cwkc-results` outside that rule: the results workflow's `GITHUB_TOKEN` requires `contents: write` on that branch, but never on protected `main`. Confirm that code PR merges work and that a **synthetic data-only** push plus Pages deployment works before locking down the last production settings.
+The `Main` repository ruleset (Settings → Rules → Rulesets) was **enabled by the operator on Oct 28**; read-only GitHub API inspection confirmed `enforcement=active` and required status checks. Keep protection scoped to the **default branch only**, require PRs and Python/Jest/Playwright/SonarCloud checks, and review role-based bypasses. `cwkc-results` must remain outside those rules: the update workflow's `GITHUB_TOKEN` needs `contents: write` on the data branch, never on protected `main`. Verify a **synthetic data-only** push and Pages deploy before enabling live ingestion.
 
 ### Operating / recovery checks
 
