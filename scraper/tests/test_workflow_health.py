@@ -98,8 +98,9 @@ def test_missing_data_branch_is_blocker_even_during_grace():
 def test_missing_or_naive_timestamps_fail_closed():
     with pytest.raises(ValueError, match="timezone"):
         monitor.parse_time("2026-12-01T10:00:00")
+    naive_now = START.replace(tzinfo=None)
     with pytest.raises(ValueError, match="timezone-aware"):
-        monitor.assess(START.replace(tzinfo=None), [], PUBLISHED)
+        monitor.assess(naive_now, [], PUBLISHED)
 
 
 def test_read_snapshot_uses_only_actions_and_branch_metadata(monkeypatch):
@@ -282,16 +283,22 @@ def test_watchdog_workflow_contract():
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "python -m scraper.workflow_health" in workflow
     assert "group: cwkc-watchdog" in workflow
+    check_job = workflow.split("  check:\n", 1)[1].split("  alert:\n", 1)[0]
+    assert "    permissions:\n      contents: read\n      actions: read" in check_job
+    assert "issues: write" not in check_job
     assert "issues: write" in workflow
     assert "needs.check.result == 'failure'" in workflow
-    assert "alert:" in workflow and "issues: write" in workflow
+    assert "alert:" in workflow
+    assert "issues: write" in workflow
     assert workflow.index("  alert:") < workflow.index("      issues: write")
-    assert "gh issue list" in workflow and "if [ -z \"$existing\" ]" in workflow
+    assert "gh issue list" in workflow
+    assert 'if [ -z "$existing" ]' in workflow
     assert "cancel-in-progress: false" in workflow
     assert "lgl-form-submission" not in workflow
     assert "scraper.getLglFormData" not in workflow
     refs = re.findall(r"^\s*uses:\s+(\S+)", workflow, flags=re.MULTILINE)
-    assert refs and all(re.search(r"@[0-9a-f]{40}$", ref) for ref in refs)
+    assert refs
+    assert all(re.search(r"@[0-9a-f]{40}$", ref) for ref in refs)
 
 
 def test_watchdog_schedule_contained_by_backend_season_gate():
