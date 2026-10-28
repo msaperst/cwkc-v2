@@ -3,6 +3,7 @@
 Requires only repository Actions metadata and the results branch commit date.
 It never connects to Gmail, LGL or Sheets, and never changes published scores.
 """
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
@@ -72,7 +73,7 @@ def _get_json(path: str, token: str, *, allow_missing: bool = False):
         "User-Agent": "cwkc-watchdog",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    with http.client.HTTPSConnection("api.github.com", timeout=15) as connection:
+    with closing(http.client.HTTPSConnection("api.github.com", timeout=15)) as connection:
         connection.request("GET", path, headers=headers)
         response = connection.getresponse()
         if allow_missing and response.status == 404:
