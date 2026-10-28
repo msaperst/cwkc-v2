@@ -89,10 +89,27 @@ def read_snapshot(repo: str, token: str) -> tuple[list[dict], datetime | None]:
     """Read recent main-branch update runs and latest data-branch commit."""
     if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) is None:
         raise ValueError("Invalid GitHub repository identity")
-    runs = _get_json(
+    raw_runs = _get_json(
         f"/repos/{repo}/actions/workflows/update.yml/runs?branch=main&per_page=30",
         token,
     )["workflow_runs"]
+    # GitHub reports overall workflow success even when check-window succeeded
+    # but recompute was SKIPPED (e.g. collection was previously switched off).
+    # Only an actual successful recompute is a healthy ingestion heartbeat.
+    runs = []
+    for item in raw_runs:
+        if item.get("status") == "completed" and item.get("conclusion") == "success":
+            job_data = _get_json(
+                f"/repos/{repo}/actions/runs/{int(item['id'])}/jobs?per_page=100",
+                token,
+            )
+            recomputed = any(
+                job.get("name") == "recompute" and job.get("conclusion") == "success"
+                for job in job_data["jobs"]
+            )
+            if not recomputed:
+                item = {**item, "conclusion": "skipped"}
+        runs.append(item)
     branch = _get_json(f"/repos/{repo}/branches/cwkc-results", token,
                        allow_missing=True)
     if branch is None:
