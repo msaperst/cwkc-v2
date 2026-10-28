@@ -10,6 +10,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import json
 import os
+import re
 
 from .contest_window import START, is_active
 
@@ -86,10 +87,7 @@ def _get_json(path: str, token: str, *, allow_missing: bool = False):
 
 def read_snapshot(repo: str, token: str) -> tuple[list[dict], datetime | None]:
     """Read recent main-branch update runs and latest data-branch commit."""
-    if not repo or "/" not in repo or any(
-        c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./"
-        for c in repo
-    ):
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) is None:
         raise ValueError("Invalid GitHub repository identity")
     runs = _get_json(
         f"/repos/{repo}/actions/workflows/update.yml/runs?branch=main&per_page=30",
