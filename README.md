@@ -213,7 +213,9 @@ To check the unread backlog **without processing, marking emails read, or writin
 python -m scraper.getLglFormData --reconcile-only
 ~~~
 
-The output contains aggregate counts of `pending`, `already_stored`, and `failed` unread notifications, plus a warning if the Sheet has historical rows without submission IDs. Donor names and amounts are not printed. This is a point-in-time check, not proof that the Hillels' totals reconcile; compare it against the authorized LGL reports separately.
+The output contains aggregate counts of `pending`, `already_stored`, and `failed` unread notifications, plus **identified/legacy row counts and whether submission-ID tracking exists**. The preflight reads the normalized Sheet **even when there are zero unread emails**, so an empty mailbox is not mistaken for a migrated Sheet. Donor names and amounts are not printed. No IMAP Seen flags, Sheet cells or CSV are changed. This is a point-in-time check, not proof that the Hillels' totals reconcile; compare it against the authorized LGL reports separately.
+
+A regular update also checks the normalized Sheet when no unread mail is present. **Legacy rows or an inaccessible Sheet block CSV publication even on an empty-inbox run**; do not delete records or change the spreadsheet to force the command to succeed. Perform the privately reviewed season archive/reconciliation first.
 
 **One-time migration:** an older normalized Sheet may contain rows without IDs. The importer deliberately **refuses live writes** when any unkeyed rows exist: some might represent donations whose emails were never acknowledged, and blindly replaying those emails would count them twice. Before kickoff, make a **private** backup/export, reconcile the old rows against LGL and pending notifications, and agree on an archive/verified reset or explicit backfill. Do not erase live rows, fabricate identifiers, or mark messages read just to get past the safety check.
 
