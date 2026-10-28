@@ -110,7 +110,7 @@ SPREADSHEET_KEY=replace-with-normalized-donations-spreadsheet-id
 GITHUB_TOKEN=replace-with-GitHub-dispatch-token
 ~~~
 
-Other supported options include `IMAP_SERVER` (default `imap.gmail.com`), `MAILBOX` (default `INBOX`), `FROM_FILTER`, `SPREADSHEET_SHEET` (default `entries`), `GITHUB_REPO`, and `IDLE_TIMEOUT_SECONDS`. Check the corresponding Python script for the variables it actually uses; the poller needs `GITHUB_TOKEN`, while the LGL processor needs `SPREADSHEET_KEY`.
+Other supported options include `IMAP_SERVER` (default `imap.gmail.com`), `MAILBOX` (default `INBOX`), `FROM_FILTER`, `SPREADSHEET_SHEET` (default `entries`), `GITHUB_REPO`, and `IDLE_TIMEOUT_SECONDS`. For production GitHub Actions, set the repository **variable** `CWKC_DONATIONS_WORKSHEET` to select the new season's tab for both importer and calculator; do not update a workbook ID or secrets merely to switch tabs. Check the corresponding Python script for the variables it actually uses; the poller needs `GITHUB_TOKEN`, while the LGL processor needs `SPREADSHEET_KEY`.
 
 Use `servicecwkc@gmail.com` for LGL submission notifications. The **Google Cloud service account** used by `gspread` is a separate identity: its `client_email` must have access to the Google Sheets being read or written.
 
@@ -226,6 +226,20 @@ A regular update also checks the normalized Sheet when no unread mail is present
 The preferred event-week operating mode is **GitHub Actions polling, not a computer left running**. `.github/workflows/update.yml` schedules UTC runs at minutes :02, :07, ..., :57 on Nov 30 and Dec 1–8, plus one best-effort :59 tick at 00:59 UTC on Dec 8 (Dec 7 at 7:59 PM Eastern in 2026). A scheduled run recalculates *both* Google participation and unread LGL notifications, so the separate local IMAP poller is **not needed** in this mode. If both are active, their triggers can cause redundant work; keep `scraper/pollEmail.py` stopped unless using an explicitly coordinated fallback.
 
 **Important limitations:** GitHub's schedule is best-effort, may be delayed/dropped, and is automatically disabled after 60 days of inactivity on a public repository. Check the workflow is enabled before the event, monitor successful runs and email backlog, and plan for manual recovery. Cron is recurring each year (UTC), but the authoritative `season.json` window and ingestion switch still block out-of-season processing. Scheduled runs are **not proof** that every gift received before the Dec 7 8 PM ET close made the final snapshot; the Hillels must approve the last-minute reconciliation/cutoff plan separately before go-live. Do **not** widen the event gate ad hoc to include post-cutoff gifts.
+
+### Preserve historical donations using a separate 2026 worksheet
+
+The existing **Donations** workbook has a populated `entries` tab (748 historical records on the Oct 28 read-only metadata/source audit) and prior-year archive tabs. Do **not** clear, overwrite, or fabricate submission IDs for those records. Retain `entries` as the historical source while preparing a **new, empty `entries_2026` tab** in the same workbook only after the operators agree on the rollover and have a private backup.
+
+The importer and calculator now both honor `SPREADSHEET_SHEET` for the *same* normalized records, which keeps 2025 entries out of 2026 calculations:
+
+1. Before early giving/ingestion, verify the production `SPREADSHEET_KEY` identifies the expected private **Donations** workbook and the service-account identity has access. Do not share the key or donor records in a public issue.
+2. With operator approval, privately back up/retain the existing `entries` tab and create a **new `entries_2026` tab**, containing exactly one header row: the 11 `NORMALIZED_FIELDS` from `scraper/donation_ledger.py`, in their declared order, followed by `submission id`. Leave all rows below the header empty. Do not move prior-season data into the new tab.
+3. In **GitHub Settings → Secrets and variables → Actions → Variables**, set **`CWKC_DONATIONS_WORKSHEET=entries_2026`**. The update workflow passes this as `SPREADSHEET_SHEET` to *both* normalization and scoring. For a local read-only check, set `SPREADSHEET_SHEET=entries_2026` in the process environment. If the repository variable is absent, the workflow retains its legacy `entries` default and will refuse live publication while unkeyed records remain.
+4. Using authorized credentials and with production ingestion still OFF, run `python -m scraper.getLglFormData --reconcile-only`. It must report `legacy=0` and `id_tracking=enabled` for the new tab, and it must not alter inbox Seen flags, Sheet data or the CSV.
+5. Reconcile the historical 748 records privately against the prior-year LGL source and preserve their archive/retention plan. Reconcile the unread current-year notifications separately. Do not automatically infer that all old records have been counted or that every unread email represents a distinct donation.
+
+**Never use a 2025 archive as a 2026 input.** The new tab is an operator-controlled handoff, not something test CI may create in production. Confirm the 2026 scoring and normalization schema in #35/#33 before enabling ingestion or building the final results branch. Manual tab preparation is deliberately separate from this code PR.
 
 ### One-time data-branch bootstrap (after final scoring schema is merged; before ingestion)
 

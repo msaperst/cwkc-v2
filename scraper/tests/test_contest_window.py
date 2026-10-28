@@ -143,3 +143,9 @@ def test_no_mutable_action_refs_in_update_workflow():
     refs = re.findall(r"^\s*uses:\s+(\S+)", workflow, flags=re.MULTILINE)
     assert refs
     assert all(re.search(r"@[0-9a-f]{40}$", action) for action in refs)
+
+
+def test_update_workflow_uses_explicit_2026_donations_sheet_variable():
+    workflow = (ROOT / ".github/workflows/update.yml").read_text(encoding="utf-8")
+    assert "SPREADSHEET_SHEET: ${{ vars.CWKC_DONATIONS_WORKSHEET || 'entries' }}" in workflow
+    assert "python -m scraper.getLglFormData" in workflow
