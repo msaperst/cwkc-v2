@@ -1,0 +1,67 @@
+# Read only GitHub metadata. Never access the donation inbox or Sheets.
+# Scheduled checks run at :17 and :47 UTC during the configured season.
+name: CWKC ingestion watchdog
+
+on:
+  schedule:
+    - cron: '17,47 * 30 11 *'
+    - cron: '17,47 * 1-8 12 *'
+  workflow_dispatch:
+  # Check immediately after a failed update, instead of waiting for the
+  # next 30-minute tick. Successful updates require no secondary job.
+  workflow_run:
+    workflows: ["Update results from multiple locations"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: cwkc-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    # The independent kill switch also prevents prelaunch alerts. Event-week
+    # failures are checked by the Python season gate before any API requests.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      vars.CWKC_INGESTION_ENABLED == 'true' &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.conclusion != 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Check update heartbeat and last publication
+        env:
+          CWKC_INGESTION_ENABLED: ${{ vars.CWKC_INGESTION_ENABLED }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -m scraper.workflow_health
+
+      # One open incident is enough; don't post a new issue or repeated
+      # comments every half hour during the same outage.
+      - name: Raise a single operator alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          alert_title='[CWKC] Ingestion watchdog alert'
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title --jq '.[] | select(.title == "[CWKC] Ingestion watchdog alert") | .number' | head -n 1)"
+          if [ -z "$existing" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$alert_title" \
+              --body "The CWKC event-week ingestion watchdog detected a failed or stale update, a missing results data branch, or a monitoring API failure. See the [watchdog run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) and its step summary for details. Check the actual update and Pages runs; do not mark LGL emails read, change collection dates, or rerun live imports without reconciliation. When recovered, confirm a new successful ingestion run before closing this issue."
+          else
+            echo "Existing CWKC watchdog incident #$existing remains open; no duplicate alert."
+          fi
