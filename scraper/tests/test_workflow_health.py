@@ -199,24 +199,20 @@ def test_watchdog_ignores_out_of_season_even_when_switch_enabled(monkeypatch):
     monitor.main()
 
 
-def test_unhealthy_run_writes_safe_job_summary_and_exits(monkeypatch, tmp_path, capsys):
-    summary = tmp_path / "summary.md"
+def test_unhealthy_run_prints_safe_summary_and_exits(monkeypatch, capsys):
     monkeypatch.setenv("CWKC_INGESTION_ENABLED", "true")
     monkeypatch.setenv("GITHUB_REPOSITORY", "example/cwkc")
     monkeypatch.setenv("GITHUB_TOKEN", "synthetic-secret")
-    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
     monkeypatch.setattr(monitor, "is_active", lambda _now: True)
     monkeypatch.setattr(monitor, "read_snapshot", lambda *_args: ([], PUBLISHED))
     monkeypatch.setattr(monitor, "START", START - timedelta(days=50))
     with pytest.raises(SystemExit, match="watchdog detected"):
         monitor.main()
-    output = summary.read_text(encoding="utf-8")
+    output = capsys.readouterr().out
     assert "ACTION REQUIRED" in output
     assert "synthetic-secret" not in output
-    assert "example/cwkc" in output or "No recorded run" in output
+    assert "No recorded run" in output
     assert "No successful" in output
-    assert "ACTION REQUIRED" in capsys.readouterr().out
-
 
 
 
