@@ -2,6 +2,7 @@ import argparse
 import email
 import math
 import os
+from pathlib import Path
 from email.policy import default
 
 import gspread
@@ -172,6 +173,35 @@ def update_local_csv():
     print("Local CSV updated successfully.")
 
 
+
+
+def write_processing_summary(uids: list, summary: dict, ledger: SubmissionLedger) -> None:
+    """Expose aggregate LGL progress in Actions without logging donor details."""
+    output = os.getenv("GITHUB_STEP_SUMMARY")
+    if not output:
+        return
+    latest_uid = str(max(uids)) if uids else "None"
+    lines = [
+        "### CWKC LGL processing",
+        "",
+        "| Metric | Count |",
+        "| --- | ---: |",
+        f"| Matching unread notifications at start | {len(uids)} |",
+        f"| New donation rows persisted | {summary['new']} |",
+        f"| Previously persisted notifications | {summary['already_stored']} |",
+        f"| Failed notifications (left unread) | {summary['failed']} |",
+        f"| Read-only pending notifications | {summary['pending']} |",
+        f"| Highest matched mailbox UID (not a processed watermark) | {latest_uid} |",
+        f"| Identified normalized Sheet rows | {len(ledger.ids)} |",
+        f"| Legacy rows needing reconciliation | {ledger.legacy_rows} |",
+        "",
+        "Counts are per-run observations, not verification against LGL source totals.",
+        "",
+    ]
+    with Path(output).open("a", encoding="utf-8") as handle:
+        handle.write("\\n".join(lines))
+
+
 # ===== MAIN SCRIPT =====
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Import unread CWKC LGL submissions")
@@ -205,6 +235,7 @@ def main(argv=None):
             f"legacy={ledger.legacy_rows}, "
             f"id_tracking={'enabled' if ledger.tracking_enabled else 'missing'}"
         )
+        write_processing_summary(uids, summary, ledger)
         if ledger.legacy_rows:
             print(f"WARNING: {ledger.legacy_rows} existing unkeyed Sheet rows need reconciliation")
             if not args.reconcile_only:
