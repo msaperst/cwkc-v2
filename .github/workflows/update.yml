@@ -124,6 +124,8 @@ jobs:
           EMAIL_ACCOUNT: ${{ secrets.EMAIL_ACCOUNT }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           SPREADSHEET_KEY: ${{ secrets.SPREADSHEET_KEY }}
+          # Configure the separate 2026 ledger after final form/rules sign-off.
+          SPREADSHEET_SHEET: ${{ vars.CWKC_DONATIONS_WORKSHEET || 'entries' }}
         run: python -m scraper.getLglFormData
 
       - name: Update gathering and participation totals
