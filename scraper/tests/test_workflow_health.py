@@ -1,7 +1,6 @@
 """Offline CWKC watchdog contract tests. No network, donations, or Sheets."""
 from datetime import timedelta, timezone
 from pathlib import Path
-from types import SimpleNamespace
 import json
 import re
 
@@ -216,42 +215,50 @@ def test_unhealthy_run_prints_safe_summary_and_exits(monkeypatch, capsys):
 
 
 
-def test_github_cli_json_read_is_shell_free_and_secret_safe(monkeypatch):
-    commands = []
-    def fake_run(argv, **kwargs):
-        commands.append((argv, kwargs))
-        return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": []}),
-                               stderr="")
-    monkeypatch.setattr(monitor.subprocess, "run", fake_run)
+def _mock_github_connection(monkeypatch, status, payload):
+    calls = []
+    class FakeResponse:
+        def __init__(self):
+            self.status = status
+        def read(self):
+            return payload.encode("utf-8")
+    class FakeConnection:
+        def __init__(self, host, timeout):
+            calls.append(("connect", host, timeout))
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def request(self, method, path, *, headers):
+            calls.append(("request", method, path, headers))
+        def getresponse(self):
+            return FakeResponse()
+    monkeypatch.setattr(monitor.http.client, "HTTPSConnection", FakeConnection)
+    return calls
+
+
+def test_github_api_uses_fixed_host_and_never_logs_token(monkeypatch):
+    calls = _mock_github_connection(monkeypatch, 200,
+                                    json.dumps({"workflow_runs": []}))
     output = monitor._get_json("/repos/example/cwkc/actions/workflows/update.yml/runs",
                                "synthetic-private-token")
     assert output == {"workflow_runs": []}
-    argv, kwargs = commands[0]
-    assert argv == [
-        "gh", "api", "--method", "GET",
-        "/repos/example/cwkc/actions/workflows/update.yml/runs",
-    ]
-    assert kwargs["check"] is False
-    assert kwargs["capture_output"] is True
-    assert "shell" not in kwargs
-    assert kwargs["env"]["GH_TOKEN"] == "synthetic-private-token"
-    assert "synthetic-private-token" not in " ".join(argv)
+    assert calls[0] == ("connect", "api.github.com", 15)
+    method, path, headers = calls[1][1:]
+    assert method == "GET"
+    assert path == "/repos/example/cwkc/actions/workflows/update.yml/runs"
+    assert headers["Authorization"] == "Bearer synthetic-private-token"
 
 
 def test_missing_branch_returns_none_but_other_api_errors_fail_closed(monkeypatch):
-    def missing(_argv, **_kwargs):
-        return SimpleNamespace(returncode=1, stdout="", stderr="HTTP 404 Not Found")
-    monkeypatch.setattr(monitor.subprocess, "run", missing)
+    _mock_github_connection(monkeypatch, 404, "private information")
     assert monitor._get_json("/repos/example/cwkc/branches/cwkc-results", "dummy",
                              allow_missing=True) is None
-    with pytest.raises(RuntimeError, match="monitoring API request failed"):
+    with pytest.raises(RuntimeError, match="HTTP 404"):
         monitor._get_json("/repos/example/cwkc/branches/cwkc-results", "dummy")
 
-    def forbidden(_argv, **_kwargs):
-        return SimpleNamespace(returncode=1, stdout="private donor information",
-                               stderr="HTTP 403 details")
-    monkeypatch.setattr(monitor.subprocess, "run", forbidden)
-    with pytest.raises(RuntimeError, match="GitHub monitoring API request failed") as error:
+    _mock_github_connection(monkeypatch, 403, "private donor information")
+    with pytest.raises(RuntimeError, match="HTTP 403") as error:
         monitor._get_json("/repos/example/cwkc/actions/workflows/update.yml/runs",
                           "synthetic-private-token", allow_missing=True)
     assert "private donor information" not in str(error.value)
@@ -259,14 +266,10 @@ def test_missing_branch_returns_none_but_other_api_errors_fail_closed(monkeypatc
 
 
 def test_invalid_github_api_json_stops_monitoring(monkeypatch):
-    monkeypatch.setattr(
-        monitor.subprocess, "run",
-        lambda _argv, **_kwargs: SimpleNamespace(
-            returncode=0, stdout="{invalid", stderr="",
-        ),
-    )
+    _mock_github_connection(monkeypatch, 200, "{invalid")
     with pytest.raises(json.JSONDecodeError):
         monitor._get_json("/repos/example/cwkc/branches/cwkc-results", "dummy")
+
 
 
 def test_watchdog_workflow_contract():
