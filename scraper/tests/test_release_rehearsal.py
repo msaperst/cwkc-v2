@@ -118,7 +118,9 @@ def test_fresh_deploy_survives_result_branch_commit_and_skips_unchanged(
     changed_sha = git(source, "ls-remote", "origin", "refs/heads/cwkc-results").split()[0]
     assert changed_sha != initial_sha
     assert branch_result(remote) == FIRST
-    assert git(source, "diff", "--name-only", "main", "origin/cwkc-results") == ""
+    git(source, "fetch", "-q", "origin",
+        "refs/heads/cwkc-results:refs/remotes/origin/cwkc-results")
+    assert git(source, "diff", "--name-only", "main", "origin/cwkc-results") == RESULTS.as_posix()
 
     site = fresh_pages_checkout(rehearsal, monkeypatch, "fresh-pages")
     assert (site / RESULTS).read_bytes() == FIRST
