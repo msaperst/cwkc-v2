@@ -92,24 +92,19 @@ def test_missing_enable_switch_blocks_collection_even_in_window(tmp_path, monkey
     assert output.read_text(encoding="utf-8") == "active=false\n"
 
 
-def test_changed_vs_unchanged_csv_detected_by_git(tmp_path):
-    csv_path = tmp_path / "public" / "assets" / "csv" / "results.csv"
-    csv_path.parent.mkdir(parents=True)
-    csv_path.write_text("uva,vt\n0,0\n", encoding="utf-8")
+def test_changed_vs_unchanged_csv_against_published_snapshot(tmp_path):
+    baseline = tmp_path / "last-published.csv"
+    generated = tmp_path / "results.csv"
+    baseline.write_text("uva,vt\n0,0\n", encoding="utf-8")
+    generated.write_bytes(baseline.read_bytes())
 
-    def git(*args):
-        return subprocess.run(["git", *args], cwd=tmp_path, check=False,
-                              capture_output=True, text=True).returncode
+    def identical():
+        return subprocess.run(["cmp", "-s", str(baseline), str(generated)],
+                              check=False).returncode
 
-    assert git("init", "-q") == 0
-    assert git("config", "user.name", "CWKC Test") == 0
-    assert git("config", "user.email", "ci@example.invalid") == 0
-    assert git("add", "public/assets/csv/results.csv") == 0
-    assert git("commit", "-qm", "fixture") == 0
-
-    assert git("diff", "--quiet", "--", "public/assets/csv/results.csv") == 0
-    csv_path.write_text("uva,vt\n1,0\n", encoding="utf-8")
-    assert git("diff", "--quiet", "--", "public/assets/csv/results.csv") == 1
+    assert identical() == 0
+    generated.write_text("uva,vt\n1,0\n", encoding="utf-8")
+    assert identical() == 1
 
 
 def test_update_workflow_guards_and_single_publisher():
@@ -119,7 +114,8 @@ def test_update_workflow_guards_and_single_publisher():
     assert workflow.count('python -m scraper.contest_window --require-active') == 2
     assert "if: needs.check-window.outputs.active == 'true'" in workflow
     assert "python -m scraper.contest_window --require-active" in workflow
-    assert "git diff --quiet -- public/assets/csv/results.csv" in workflow
+    assert 'cmp -s "$RUNNER_TEMP/cwkc-previous-results.csv" public/assets/csv/results.csv' in workflow
+    assert "python -m scraper.scoreboard_snapshot restore --backup" in workflow
     assert 'if: steps.changes.outputs.changed == \'true\'' in workflow
     assert "if: needs.recompute.result == 'success' && needs.recompute.outputs.changed == 'true'" in workflow
     assert "cancel-in-progress: false" in workflow
@@ -128,13 +124,14 @@ def test_update_workflow_guards_and_single_publisher():
     assert "python -m scraper.getLglFormData" in workflow
     assert "python getGoogleFormData.py" in workflow
     assert workflow.index("python -m scraper.getLglFormData") < workflow.index("python getGoogleFormData.py")
-    assert workflow.index("python getGoogleFormData.py") < workflow.index("git diff --quiet")
-    assert workflow.count("git push origin HEAD:main") == 1
+    assert workflow.index("python getGoogleFormData.py") < workflow.index("cmp -s")
+    assert "git push origin HEAD:main" not in workflow
+    assert workflow.count("git -C \"$RUNNER_TEMP/cwkc-published\" push origin HEAD:cwkc-results") == 1
     assert "actions/upload-artifact@" in workflow
     assert "actions/download-artifact@" in workflow
     assert "name: results-csv-" in workflow
     assert workflow.index("Reject publication after cutoff") < workflow.index(
-        "Commit the single reconciled results file")
+        "Commit reconciled scoreboard to data branch")
     assert "git diff public/assets/csv/results.csv &> /dev/null" not in workflow
     assert "|| github.event_name == 'workflow_dispatch'" not in workflow
     assert "2025-11-01" not in workflow
