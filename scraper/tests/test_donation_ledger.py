@@ -352,3 +352,93 @@ def test_main_reconcile_only_does_not_recalculate(monkeypatch):
     csv.assert_not_called()
     assert server.seen == set()
     assert SUBMISSION_ID not in sheet.rows[0]
+
+
+def _prepare_empty_mailbox_main(monkeypatch, sheet):
+    """Use only mocked Gmail and Sheets; no real access or writes."""
+    server = FakeServer({})
+    server.login = MagicMock()
+    server.select_folder = MagicMock()
+    server.search = MagicMock(return_value=[])
+    context = MagicMock()
+    context.__enter__.return_value = server
+    monkeypatch.setattr(lgl, "IMAPClient", lambda *args, **kwargs: context)
+
+    spreadsheet = MagicMock()
+    spreadsheet.worksheet.return_value = sheet
+    gc = MagicMock()
+    gc.open_by_key.return_value = spreadsheet
+    service_account = MagicMock(return_value=gc)
+    monkeypatch.setattr(lgl.gspread, "service_account", service_account)
+
+    recalculate = MagicMock()
+    monkeypatch.setattr(lgl, "update_local_csv", recalculate)
+    return server, service_account, recalculate
+
+
+def test_reconcile_only_checks_sheet_even_with_zero_unread_mail(monkeypatch, capsys):
+    sheet = FakeSheet([[*NORMALIZED_FIELDS], ["historical", "25"]])
+    original = [list(row) for row in sheet.rows]
+    server, service_account, recalculate = _prepare_empty_mailbox_main(monkeypatch, sheet)
+
+    lgl.main(["--reconcile-only"])
+
+    assert sheet.rows == original
+    assert sheet.append_attempts == 0
+    assert server.seen == set()
+    assert server.peek_calls == []
+    assert recalculate.call_count == 0
+    service_account.assert_called_once()
+    output = capsys.readouterr().out
+    assert "Unseen LGL notifications: 0" in output
+    assert "pending=0" in output
+    assert "legacy=1" in output
+    assert "id_tracking=missing" in output
+    assert "existing unkeyed Sheet rows need reconciliation" in output
+
+
+def test_empty_mailbox_legacy_rows_block_live_csv_refresh(monkeypatch):
+    sheet = FakeSheet([[*NORMALIZED_FIELDS], ["historical", "25"]])
+    original = [list(row) for row in sheet.rows]
+    server, _, recalculate = _prepare_empty_mailbox_main(monkeypatch, sheet)
+
+    with pytest.raises(ValueError, match="reconciliation before CSV publication"):
+        lgl.main([])
+
+    recalculate.assert_not_called()
+    assert sheet.rows == original
+    assert sheet.append_attempts == 0
+    assert not server.seen
+
+
+def test_empty_mailbox_clean_ledger_allows_refresh_without_sheet_mutation(
+    monkeypatch, capsys,
+):
+    sheet = FakeSheet([
+        [*NORMALIZED_FIELDS, SUBMISSION_ID],
+        [*[ "synthetic" ] * len(NORMALIZED_FIELDS), "test-id"],
+    ])
+    original = [list(row) for row in sheet.rows]
+    server, _, recalculate = _prepare_empty_mailbox_main(monkeypatch, sheet)
+
+    lgl.main([])
+
+    recalculate.assert_called_once_with()
+    assert sheet.rows == original
+    assert sheet.append_attempts == 0
+    assert not server.seen
+    output = capsys.readouterr().out
+    assert "identified=1, legacy=0, id_tracking=enabled" in output
+
+
+def test_empty_mailbox_fails_closed_when_sheet_is_inaccessible(monkeypatch):
+    sheet = FakeSheet()
+    _, service_account, recalculate = _prepare_empty_mailbox_main(monkeypatch, sheet)
+    gc = service_account.return_value
+    gc.open_by_key.side_effect = PermissionError("synthetic: access denied")
+
+    with pytest.raises(PermissionError, match="access denied"):
+        lgl.main([])
+
+    recalculate.assert_not_called()
+    assert sheet.append_attempts == 0
