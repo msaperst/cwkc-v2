@@ -276,8 +276,8 @@ def test_invalid_github_api_json_stops_monitoring(monkeypatch):
 
 def test_watchdog_workflow_contract():
     workflow = (ROOT / ".github/workflows/watchdog.yml").read_text(encoding="utf-8")
-    assert "workflow_run:" in workflow
-    assert 'workflows: ["Update results from multiple locations"]' in workflow
+    assert "workflow_run:" not in workflow
+    assert "schedule:" in workflow
     assert "CWKC_INGESTION_ENABLED == 'true'" in workflow
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "python -m scraper.workflow_health" in workflow
