@@ -17,29 +17,29 @@ The **primary event-week automation is GitHub Actions**, not a permanently
 running PC or Apps Script dispatch.
 
 1. UVA and VT public/backend Little Green Light (LGL) donation forms send
-   notifications to the dedicated **\`servicecwkc@gmail.com\`** mailbox.
-   \`scraper/getLglFormData.py\` parses unread messages, persists normalized
+   notifications to the dedicated **`servicecwkc@gmail.com`** mailbox.
+   `scraper/getLglFormData.py` parses unread messages, persists normalized
    donations in the private Google Sheet, and calculates donation metrics.
 2. Alumni gathering and Hanukkah photo Google Forms write responses to their
-   respective linked Sheets. \`scraper/getGoogleFormData.py\` reads the approved
+   respective linked Sheets. `scraper/getGoogleFormData.py` reads the approved
    response schemas and calculates participation metrics.
-3. During the **authorized window only**, \`.github/workflows/update.yml\`
+3. During the **authorized window only**, `.github/workflows/update.yml`
    polls **both** sources, reconciles a shared CSV, commits a changed CSV to
-   \`cwkc-results\`, and deploys the site. Unchanged scores do not require a
+   `cwkc-results`, and deploys the site. Unchanged scores do not require a
    results commit. The website itself is served from GitHub Pages.
-4. The independent \`watchdog.yml\` monitors successful processing runs
-   (including a successful \`recompute\` job). It does not read donor data.
+4. The independent `watchdog.yml` monitors successful processing runs
+   (including a successful `recompute` job). It does not read donor data.
 
-Legacy \`scraper/pollEmail.py\` can send an LGL-triggered repository dispatch
+Legacy `scraper/pollEmail.py` can send an LGL-triggered repository dispatch
 from a local computer; an authorized Apps Script can send a
-\`sheet-change\` dispatch. **Neither is required for the current
+`sheet-change` dispatch. **Neither is required for the current
 scheduled-run primary operating mode**, and redundant dispatches complicate
 debugging. Keep them off unless specifically coordinating a fallback.
 
 **Identities are distinct:** the shared Google user
-\`servicecwkc@gmail.com\` is used for mailbox and Form ownership/sharing;
-the separate GCP **service-account \`client_email\`** is the principal that
-\`gspread\` uses to read/write the linked Sheets. Grant Sheet access to both
+`servicecwkc@gmail.com` is used for mailbox and Form ownership/sharing;
+the separate GCP **service-account `client_email`** is the principal that
+`gspread` uses to read/write the linked Sheets. Grant Sheet access to both
 as appropriate; Form-editor permission does not establish service-account
 API access.
 
@@ -59,7 +59,7 @@ npx playwright install chromium
 npm run test:browser
 ~~~
 
-On Windows activate the environment under \`.venv/Scripts/\`.
+On Windows activate the environment under `.venv/Scripts/`.
 Playwright starts its own **localhost** static server and uses synthetic
 scoreboard fixtures; it does not call LGL, Gmail or Sheets. For Python
 coverage:
@@ -69,11 +69,11 @@ python -m pytest scraper/tests --cov=scraper --cov-report=term-missing --cov-rep
 ~~~
 
 The CI workflow uses SHA-pinned GitHub Actions, the fixed, SHA-256 wheel-hashed
-\`scraper/requirements-ci.lock\` on **Python 3.12/Linux x86_64**, Jest,
+`scraper/requirements-ci.lock` on **Python 3.12/Linux x86_64**, Jest,
 Playwright, SonarCloud and GitGuardian. Regenerate and reverify wheel hashes
 when changing the CI Python version, architecture, or dependencies.
 Do development on a branch, require green CI, and merge via PR—never
-push application changes directly to protected \`main\`.
+push application changes directly to protected `main`.
 
 To preview the website locally (no credentials needed):
 
@@ -89,7 +89,7 @@ than modifying the production season to test a layout.
 
 Keep Gmail app passwords, GCP JSON keys and GitHub tokens **out of the
 repository and all test artifacts**. Unit/browser tests require none.
-For local integration configuration, \`scraper/.env\` is ignored by Git:
+For local integration configuration, `scraper/.env` is ignored by Git:
 
 ~~~dotenv
 EMAIL_ACCOUNT=servicecwkc@gmail.com
@@ -98,12 +98,12 @@ SPREADSHEET_KEY=replace-with-private-donations-workbook-id
 GITHUB_TOKEN=replace-with-authorized-dispatch-token
 ~~~
 
-Optional per-script settings include \`IMAP_SERVER\` (default
-\`imap.gmail.com\`), \`MAILBOX\` (default \`INBOX\`), \`FROM_FILTER\`,
-\`SPREADSHEET_SHEET\` (default \`entries\`), \`GITHUB_REPO\` and
-\`IDLE_TIMEOUT_SECONDS\`. The GitHub Actions variable
-\`CWKC_DONATIONS_WORKSHEET\` is passed to the importer as
-\`SPREADSHEET_SHEET\`; **configure it to \`entries_2026\` only after the
+Optional per-script settings include `IMAP_SERVER` (default
+`imap.gmail.com`), `MAILBOX` (default `INBOX`), `FROM_FILTER`,
+`SPREADSHEET_SHEET` (default `entries`), `GITHUB_REPO` and
+`IDLE_TIMEOUT_SECONDS`. The GitHub Actions variable
+`CWKC_DONATIONS_WORKSHEET` is passed to the importer as
+`SPREADSHEET_SHEET`; **configure it to `entries_2026` only after the
 approved new-season worksheet exists**, following the runbook. Do not
 change the workbook secret merely to select a tab.
 
@@ -112,13 +112,13 @@ relative to their working directories**:
 
 | Script | Working directory | Private JSON path |
 | --- | --- | --- |
-| \`python -m scraper.getLglFormData\` | repository root | \`./spreadsheet_credentials.json\` |
-| \`python getGoogleFormData.py\` | \`scraper/\` | \`scraper/spreadsheet_credentials.json\` |
+| `python -m scraper.getLglFormData` | repository root | `./spreadsheet_credentials.json` |
+| `python getGoogleFormData.py` | `scraper/` | `scraper/spreadsheet_credentials.json` |
 
-The production \`update.yml\` creates both files from GitHub Actions
+The production `update.yml` creates both files from GitHub Actions
 Secrets (never from committed credentials). Refer to the workflow for
 its complete current secret contract. The test workflow additionally
-uses \`SONAR_TOKEN\`.
+uses `SONAR_TOKEN`.
 
 ## Verifying a replacement form
 
@@ -127,13 +127,13 @@ uses \`SONAR_TOKEN\`.
 For **each** of UVA/VT public and backend forms:
 
 1. Have the Hillel owner freeze the final form and configure a submission
-   email to \`servicecwkc@gmail.com\`. Verify the notification's actual
+   email to `servicecwkc@gmail.com`. Verify the notification's actual
    sender/display name, two-column HTML structure, form title, and exact
    question labels and options.
 2. Obtain an **approved, sanitized** notification fixture. Check the
-   parser/normalizer contract in \`scraper/getLglFormData.py\`,
-   \`scraper/EmailParser.py\` and \`scraper/tests/\`. Duplicate
-   \`Graduation Year\` labels (including equal answers) intentionally
+   parser/normalizer contract in `scraper/getLglFormData.py`,
+   `scraper/EmailParser.py` and `scraper/tests/`. Duplicate
+   `Graduation Year` labels (including equal answers) intentionally
    fail closed until questions are distinguished and verified.
 3. Rehearse in an **isolated mailbox/folder and disposable Sheet**,
    never the current production donation workbook. Validate the
@@ -151,20 +151,20 @@ python -m scraper.getLglFormData --reconcile-only
 It inspects the unread notifications and **the configured normalized
 Sheet even when the inbox is empty**, without marking mail Seen, writing
 rows or changing the CSV. It returns aggregate
-\`pending\`/\`already_stored\`/\`failed\`, identified/legacy row counts,
+`pending`/`already_stored`/`failed`, identified/legacy row counts,
 and ID-tracking status. This is **not** full reconciliation against
-authoritative LGL financial totals. The legacy \`entries\` worksheet
+authoritative LGL financial totals. The legacy `entries` worksheet
 contains historical donations; do not delete, migrate or relabel them
 just to make the preflight pass.
 
 ### Google Forms and response Sheets
 
-1. Have the owner grant \`servicecwkc@gmail.com\` **Editor** permission
+1. Have the owner grant `servicecwkc@gmail.com` **Editor** permission
    to the Form **and separately** to its linked response Sheet; share
    the response Sheet with the independent GCP service account.
 2. Freeze the response header/column schema and verify which form maps
    to which Sheet. A reordered question can change the columns used
-   by \`getGoogleFormData.py\`. Do not claim the service-account access
+   by `getGoogleFormData.py`. Do not claim the service-account access
    has been proved merely because a human can open the Sheet.
 3. Add mocked schema/malformed/duplicate tests before changing the
    importer. Verify the actual form and Sheet behavior only with an
@@ -178,7 +178,7 @@ just to make the preflight pass.
 
 If authorized, use the **linked response Sheet** →
 **Extensions → Apps Script** and store a GitHub repository-dispatch token
-in **Project Settings → Script properties** as \`GITHUB_TOKEN\`.
+in **Project Settings → Script properties** as `GITHUB_TOKEN`.
 An example script (not installed by this repository):
 
 ~~~javascript
@@ -232,5 +232,5 @@ None of these bypass the need for Hillel form/rule sign-off. Local
 invocations can be state-changing even if the GitHub Actions season
 switch is disabled; only use them with approved production access
 or fully isolated test resources. For safe stop/resume, backup,
-\`entries_2026\`, \`cwkc-results\`, real Pages rehearsal, and end-of-event
+`entries_2026`, `cwkc-results`, real Pages rehearsal, and end-of-event
 reconciliation use the [launch runbook](2026-launch-runbook.md).
