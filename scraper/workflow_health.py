@@ -5,7 +5,6 @@ It never connects to Gmail, LGL or Sheets, and never changes published scores.
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 import json
 import os
 import re
@@ -146,10 +145,8 @@ def main() -> None:
     health = assess(now, runs, published_at)
     summary = render_summary(health, repo)
     print(summary)
-    path = os.getenv("GITHUB_STEP_SUMMARY")
-    if path:
-        with Path(path).open("a", encoding="utf-8") as handle:
-            handle.write(summary)
+    # The workflow shell handles GITHUB_STEP_SUMMARY; never open a path
+    # provided through the environment from this monitoring process.
     if not health.healthy:
         raise SystemExit("CWKC ingestion watchdog detected a problem")
 
