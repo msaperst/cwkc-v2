@@ -94,7 +94,12 @@ describe('contest lifecycle', () => {
         const csv = fs.readFileSync(path.join(__dirname, '../csv/results.csv'), 'utf8');
         const rows = Papa.parse(csv, {header: true, skipEmptyLines: true}).data;
         expect(rows).toHaveLength(1);
-        expect(Object.keys(rows[0])).toHaveLength(28);
+        expect(Object.keys(rows[0])).toHaveLength(26);
+        expect(rows[0]).toHaveProperty('uva_hanukkah_photos');
+        expect(rows[0]).toHaveProperty('vt_hanukkah_photos');
+        expect(rows[0]).toHaveProperty('uva_most_donors_class_2026');
+        expect(rows[0]).not.toHaveProperty('uva_most_undergraduates');
+        expect(rows[0]).not.toHaveProperty('uva_mitzvah_memories');
         for (const [key, value] of Object.entries(rows[0])) {
             if (key.endsWith('_donor_names')) {
                 expect(typeof value).toBe('string');
