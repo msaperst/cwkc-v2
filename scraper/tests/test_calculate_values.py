@@ -22,7 +22,7 @@ def sample_df():
             "phone number": "555",
             "anonymous donation": "false",
             "first time giver": "true",
-            "graduation year": 2025,
+            "graduation year": 2026,
             "status": "Alumni, Current Student",
             "work referral": "false",
         },
@@ -105,10 +105,9 @@ def test_status_based_metrics_counts_multi_status(calc):
     # Only Jordan qualifies: 50*12=600
     assert grandparent_money == 600
 
-    # Check class year donors for 2025
-    class_2025_count = calc._class_year_donors(calc.df, 2025)
-    # Alex is Alumni + Current Student, grad_year 2025 => counts once
-    assert class_2025_count == 1
+    # Class of 2026 counts alumni even when they hold other affiliations.
+    class_2026_count = calc._class_year_donors(calc.df, 2026)
+    assert class_2026_count == 1
 
 
 def test_zero_metrics_for_empty_df(calc):
@@ -178,3 +177,70 @@ def test_calculator_reads_only_configured_season_tab():
     assert totals["vt"]["total_amount"] == 25
     assert worksheets["entries"].get_all_records.call_count == 0
     worksheets["entries_2026"].get_all_records.assert_called_once_with()
+
+
+@pytest.mark.parametrize("grad_year,status,expected", [
+    (2026, "Alumni", 1),
+    ("2026", "Alumni, Current Parent", 1),
+    (2026, "Current Student", 0),
+    (2026, "Current Parent, Current Grandparent", 0),
+    (2025, "Alumni", 0),
+    ("unknown", "Alumni", 0),
+])
+def test_class_of_2026_counts_only_alumni_grad_year(
+    calc, grad_year, status, expected,
+):
+    """Related students' graduation years are not donor-alumni class years."""
+    calc.df = pd.DataFrame([{
+        "source": "uva-front",
+        "total amount": 10,
+        "recurring payment": False,
+        "first name": "Fixture",
+        "last name": "Donor",
+        "phone number": "fixture-phone",
+        "anonymous donation": "false",
+        "first time giver": "false",
+        "graduation year": grad_year,
+        "status": status,
+        "work referral": "false",
+    }])
+    scores = calc._calculate_school_metrics("uva")
+    assert scores["most_donors_class_2026"] == expected
+    assert "most_undergraduates" not in scores
+    assert "most_donors_class_2025" not in scores
+
+
+def test_multiple_qualifying_categories_share_one_gift_and_donor(calc):
+    """Alumni/grandparents earn category credit without duplicate dollars."""
+    calc.df = pd.DataFrame([{
+        "source": "vt-front",
+        "total amount": 120,
+        "recurring payment": False,
+        "first name": "Synthetic",
+        "last name": "Person",
+        "phone number": "fixture-unique-1",
+        "anonymous donation": "false",
+        "first time giver": "true",
+        "graduation year": 2026,
+        "status": "Alumni, Current Parent, Current Grandparent",
+        "work referral": "true",
+    }])
+    totals = calc.calculate_all()
+    vt = totals["vt"]
+    assert vt["total_amount"] == 120
+    assert vt["most_individual_donors"] == 1
+    assert vt["most_first_time_donors"] == 1
+    assert vt["most_donors_class_2026"] == 1
+    assert vt["most_money_families"] == 120
+    assert vt["most_money_grandparents_current_students"] == 120
+    assert vt["most_alum_work_matched"] == 1
+    assert totals["uva"]["total_amount"] == 0
+    assert "most_undergraduates" not in vt
+
+
+def test_zero_and_populated_scores_have_identical_keys(calc):
+    """An empty school must still provide every displayed 2026 metric."""
+    scores = calc.calculate_all()
+    assert scores["uva"].keys() == scores["vt"].keys()
+    assert "most_donors_class_2026" in scores["uva"]
+    assert "most_undergraduates" not in scores["uva"]
