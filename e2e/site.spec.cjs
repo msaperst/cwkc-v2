@@ -160,3 +160,27 @@ test('local images load and public donation buttons remain external', async ({ p
   // Never click a donation link, submit a form, or navigate off localhost.
   await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:8765\//);
 });
+
+
+test('2026 scoreboard shows 15 possible points and the Hanukkah submission form', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(start.getTime() - 60_000));
+  await openReady(page);
+  const rows = page.locator('#score-areas [data-points]');
+  await expect(rows).toHaveCount(12);
+  const weights = await rows.evaluateAll(elements =>
+    elements.map(row => Number(row.dataset.points)));
+  expect(weights.reduce((a, b) => a + b, 0)).toBe(15);
+
+  await expect(page.locator('#most_undergraduates')).toHaveCount(0);
+  await expect(page.locator('#most_donors_class_2025')).toHaveCount(0);
+  await expect(page.locator('#most_donors_class_2026')).toBeVisible();
+  await expect(page.locator('#mitzvah_memories')).toHaveCount(0);
+  const photo = page.locator('#hanukkah_photos');
+  await expect(photo).toContainText(/Hanukkah Celebration Photos/);
+  await expect(photo.locator('a')).toHaveAttribute(
+    'href',
+    'https://docs.google.com/forms/d/e/1FAIpQLSeX0-H3rkiAXy3xpdOYIDuAEYM8BI7tgmgBrPFIryS4Q7_Jbg/viewform'
+  );
+  // Link is displayed but inactive until the competition starts.
+  await expect(photo.locator('a')).toHaveCSS('pointer-events', 'none');
+});

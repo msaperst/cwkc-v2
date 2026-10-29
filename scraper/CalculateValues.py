@@ -73,8 +73,7 @@ class CalculateValues:
                 "most_individual_donors": 0,
                 "donor_names": "",
                 "most_first_time_donors": 0,
-                "most_donors_class_2025": 0,
-                "most_undergraduates": 0,
+                "most_donors_class_2026": 0,
                 "most_gifts_over_1000": 0,
                 "most_alum_monthly_10_plus": 0,
                 "most_alum_work_matched": 0,
@@ -89,8 +88,7 @@ class CalculateValues:
             "most_individual_donors": self._unique_donors_count(school_df),
             "donor_names": self._donor_names(school_df),
             "most_first_time_donors": self._first_time_donors_count(school_df),
-            "most_donors_class_2025": self._class_year_donors(school_df, 2025),
-            "most_undergraduates": self._status_count(school_df, 'Current Student'),
+            "most_donors_class_2026": self._class_year_donors(school_df, 2026),
             "most_gifts_over_1000": self._gifts_over_1000_count(school_df),
             "most_alum_monthly_10_plus": self._alumni_monthly_10_plus(school_df),
             "most_alum_work_matched": self._alumni_work_matched(school_df),
@@ -117,18 +115,15 @@ class CalculateValues:
         return ft_df[[PHONE_NUMBER]].drop_duplicates().shape[0]
 
     def _class_year_donors(self, df: pd.DataFrame, year: int) -> int:
-        # count unique donors who are Current Student or Alumni of the given class
-        class_df = df[df.apply(
-            lambda r: any(s in r['status_list'] for s in ['Current Student', 'Alumni'])
-                      and r['graduation year'] == year,
-            axis=1
-        )]
-        return class_df[[PHONE_NUMBER]].drop_duplicates().shape[0]
+        """Count unique alumni from the specified graduating class.
 
-    def _status_count(self, df: pd.DataFrame, status: str) -> int:
-        # count unique donors with a given status
-        status_df = df[df['status_list'].apply(lambda lst: status in lst)]
-        return status_df[[PHONE_NUMBER]].drop_duplicates().shape[0]
+        Parents' or grandparents' *associated student's* year is not the
+        donor's own graduation year; they cannot earn this category.
+        The final LGL adapter must identify the donor's alumni year.
+        """
+        alumni = df[df['status_list'].apply(lambda statuses: 'Alumni' in statuses)]
+        graduation_years = pd.to_numeric(alumni['graduation year'], errors='coerce')
+        return alumni.loc[graduation_years.eq(year), PHONE_NUMBER].nunique()
 
     def _gifts_over_1000_count(self, df: pd.DataFrame) -> int:
         amounts = df.apply(lambda r: r[TOTAL_AMOUNT] * 12 if r[RECURRING_PAYMENT] else r[TOTAL_AMOUNT], axis=1)
