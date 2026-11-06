@@ -1,248 +1,65 @@
 # Connecting donation and participation forms
 
-This guide explains how to connect or replace the external forms without
-changing the live scoreboard prematurely. For application code, see
-[Development](development.md); for credentials, workflows and cutover, see
-[Running and deploying](operations.md).
+Two sources feed the public scoreboard; **neither payment nor restricted photo files are handled by the public website**.
 
-Two input types are supported:
+| Source | Data path |
+| --- | --- |
+| Donations | Little Green Light (LGL) forms → notification email → `getLglFormData.py` → private normalized Sheet → results CSV |
+| Participation | Google Forms → linked response Sheets → `getGoogleFormData.py` → results CSV |
 
-| Input | Where answers arrive | Importer |
-| --- | --- | --- |
-| LGL donation forms | HTML notification emails to the processing mailbox | `scraper/getLglFormData.py` |
-| Google Forms participation activities | Google Forms linked response Sheets | `scraper/getGoogleFormData.py` |
+The scheduled workflow reads both sources during the authorized event window. An always-on local IMAP poller or Apps Script dispatch is **optional**, not needed for the default deployment. See [Operations](operations.md) for credentials, publishing and failure recovery.
 
-Both importers update **different columns in the same results CSV**.
-The scheduled update workflow runs both together during the authorized event
-window. Google Forms email notices and Apps Script dispatches are **not
-required** for this polling-based mode.
+## LGL: notification contract
 
-## LGL: add or replace a donation form
+There are four separate variants: **UVA public, UVA backend, VT public, VT backend**. Verify each one by receiving an actual, **sanitized** notification after any form change.
 
-The reference competition uses a public and a staff/backend LGL form for
-each organization. Those are **four distinct notification variants** that
-must be verified separately.
+1. **Routing:** the expected mailbox is `servicecwkc@gmail.com`, with unread mail sent by `lglforms-submissions@littlegreenlight.com`. The `From` display name must identify `Brody Jewish Center` (UVA) or `Hillel at VT` (VT); `Form title` must distinguish front versus back end. See `EmailParser.determine_source`.
+2. **Encoding and fields:** notifications use a two-column HTML table, usually single-part quoted-printable. Parse the MIME content, not raw quoted-printable text. Labels and option values are the contract—not the question's visual help text. Check amount (`Total Amount`/`Gift Amount`), name and donor phone, affiliations, recurring flag, anonymity, first-time gift and workplace referral.
+3. **Graduation years:** use separate fields for **donor** `Alumni Graduation Year`, donor `Intended Graduation Year` and `Related Student Graduation Year`. If multiple statuses apply, emit each applicable year independently. The donor's own alumni year alone supplies the Class of 2026 alumni metric. **Never infer the role from field order or substitute a child's year.** Repeated ambiguous labels reject the email and leave it unread.
+4. **Multi-affiliation:** retain every applicable affiliation but count actual gift dollars once and unique donors once. VT undergraduate and graduate statuses both normalize to `Current Student`; the separate undergraduate *point category* no longer exists.
+5. **Other distinctions:** a workplace-match request is not proof that matching funds were received. VT's separate challenge-grant opt-in is not a workplace-match gift. Recurring monthly commitments currently annualize ×12; organizer accounting rules must be confirmed. A staff-entered/backend gift is not inherently evidence that money was received—reconcile it with LGL.
+6. **Staff forms:** **do not publish backend form URLs or LGL editor URLs in this repo or on the public site**. Restrict staff access at the LGL/organizational level; obscurity of an URL is not access control.
 
-1. **Decide which organization and flow the form represents.** Record the
-   official public donation URL, backend form name, and the correct
-   source/school. The Python parser currently infers UVA or VT from the
-   **displayed From header**, and front/back from the `Form title` value
-   (look at `EmailParser.determine_source`). A fork **must change this
-   mapping** for its Hillels; updating URLs alone will not suffice.
-2. **Have the form owner enable submission notifications** to the dedicated
-   processing mailbox. The current default is `servicecwkc@gmail.com`;
-   the importer searches the configured IMAP folder for **unread** mail
-   from the default `lglforms-submissions@littlegreenlight.com` sender.
-   `FROM_FILTER` and `MAILBOX` can override those settings.
-3. **Capture the actual notification layout** with the form owner. The
-   parser expects an HTML message with a first table of field/value rows.
-   Check exact labels, case, option values, conditional questions,
-   `Form title`, and sender branding for each flow. Examples include
-   `Total Amount` / `Gift amount`, `Name - First Name`,
-   `I am a/an`, `Is Recurring` and `Check all that apply`.
-   This is a **code contract**, not a generic LGL data API.
-4. **Resolve ambiguous fields at the source.** Repeated
-   `Graduation Year`, `Grad Year` or `Intended Graduation Year`
-   fields fail closed even if their values match; other conflicting
-   repeated labels also fail. Use **distinct question names** for
-   alumni and relatives, then verify which one should count under
-   the approved scoring rule.
-   **Verified VT 2026 public notification (November 6):** selecting
-   Alumni and Current Parent produces two identically labeled
-   `Graduation Year` rows (the alumnus's own year and the associated
-   student's year). The importer deliberately rejects this notification,
-   leaves it unread, and blocks publication. Do **not** assume first/second
-   position identifies which person graduated. VT's LGL owner should rename
-   the two visible fields to distinct labels, preferably
-   `Alumni Graduation Year` and `Related Student Graduation Year`,
-   then confirm their actual emailed labels with a safe form submission.
-   This narrow form-contract correction is required even though the
-   general form freeze is otherwise complete. Existing VT public
-   notifications containing duplicate years remain blocked until an
-   explicitly reviewed resolution is provided. VT's `Matching Grant`
-   (challenge-grant opt-in) is distinct from workplace-match referral
-   and must not automatically create an extra donation or match amount.
-   **Verified VT 2026 backend notification (November 6):** when both
-   `Current Parent` and `Alum` are selected, the backend form sends
-   `Donor is a/an...: Current Parent||Alum` but only **one**
-   `Grad Year` field, populated with the *related student's* year.
-   No donor alumni year is collected in that observed combination.
-   The importer now fails closed for VT backend alumni+related-person
-   submissions without a distinct donor year, avoiding accidental
-   Class of 2026 scoring for a student's 2026 year. For parent-only
-   entries, the generic student year is not stored as a donor year.
+The importer stores `donation_ledger.NORMALIZED_FIELDS` and a `submission id` on a private, season-specific worksheet. The ID guards replay of the **identical MIME message**, not separate notifications of the same transaction. An ambiguous or invalid donation fails closed and must be repaired/reconciled, not marked read to hide it.
 
-   VT's form owner must **add a required, conditional donor question**
-   titled `Alumni Graduation Year` when `Alum` is selected, and
-   **rename the existing student question** to
-   `Related Student Graduation Year` when `Current Parent` is selected;
-   keep both visible and required when both affiliations are checked.
-   Verify the *email* contains distinct names and both year values
-   in a controlled no-charge test before authorizing ingestion.
+For 2026-specific unresolved form changes and safe retesting, see the [launch checklist](2026-launch-runbook.md) and [#33](https://github.com/msaperst/cwkc-v2/issues/33). No real donor identities, staff form URLs, credentials or full raw notifications should appear in source fixtures or public issues.
 
-   VT backend sends `Gift Amount`, `Check All That Apply` and
-   `Is This Gift Being Matched by Their Workplace?`; label casing is
-   normalized, and a Yes workplace answer is a referral, not proof
-   of a received match. Backend `Passthrough from`, `Check Number`,
-   `Date` and `Transaction Details` are not part of the current
-   normalized scoring columns: reconcile these separately with LGL
-   accounting before counting staff-entered gifts.
-5. **Update the adapter and tests** (`EmailParser.py`,
-   `getLglFormData.py`, and `scraper/tests/`) when the final
-   labels, statuses, recurring options or school identifiers differ.
-   `NORMALIZED_FIELDS` in `donation_ledger.py` defines the
-   destination row contract. Preserve the submission-ID column so a
-   previously imported **same MIME notification** can be recognized.
-6. **Test safely before enabling production ingestion.** Use fabricated
-   or organizer-approved redacted email fixtures and a fully isolated
-   test inbox and Sheet. Verify all four variants, malformed amounts,
-   missing fields, repeated labels, duplicate replay, acknowledgement
-   failure and no partial CSV publication. Do **not** make real,
-   chargeable payments merely to produce test emails.
+### Read-only preflight
 
-### Normalized donation worksheet
-
-A destination Sheet needs the fields defined by
-`donation_ledger.NORMALIZED_FIELDS` plus `submission id`. The
-importer will validate the header and can initialize an empty worksheet,
-but it **refuses to write over old rows without IDs**. Preserve
-historical seasons on separate tabs, and prepare a clean current-event
-tab after approval.
-
-Set `SPREADSHEET_KEY` to the workbook ID and
-`SPREADSHEET_SHEET` to the selected tab for local runs. In GitHub Actions
-the corresponding repository variable is
-`CWKC_DONATIONS_WORKSHEET`; **both the importer and calculator read that
-same tab**.
-
-The read-only preflight is:
+After an authorized operator configures the private mailbox and GCP service account:
 
 ~~~bash
 python -m scraper.getLglFormData --reconcile-only
 ~~~
 
-Run only with authorized credentials. It reads **unread** notifications
-and the normalized Sheet without acknowledging emails, modifying rows or
-writing the CSV. It reports aggregate pending/previously stored counts,
-legacy rows and ID tracking. It cannot establish that all real LGL
-financial transactions have arrived or that two distinct emails aren't
-the same donation.
+It reports unread/stored counts and legacy-row/ID readiness **without marking mail read, writing Sheets or publishing CSV**. It does **not** validate the pending emails' fields or reconcile amounts with LGL's financial records. A normal importer run with live credentials **can mutate** IMAP Seen flags and Google Sheets even while the GitHub workflow's ingestion switch is off.
 
-## Google Forms: add or replace a participation activity
+## Google Forms: participation
 
-The reference app counts participation from linked response Sheets
-rather than parsing Google Forms notification emails. Current examples
-include alumni gatherings and memory/photo submissions.
+1. Create each Form and its linked response Sheet. Share the Form/Sheet with the authorized human editor **and separately** share the response Sheet with the GCP service account's `client_email`. A human's Editor share does not grant the API bot access.
+2. Verify the exact Sheet/tab and header columns before mapping them in `getGoogleFormData.py`; the implementation currently uses fixed IDs/columns, not auto-discovery. Retain a current-season boundary so historical responses cannot count.
+3. **Hanukkah:** one qualifying participant per normalized email per school. The eligible respondent's Yes answer determines eligibility; photo public-display permission is **independent** of scoring. A photo is not publishable without explicit consent and organizer moderation, including permissions for any minors.
+4. **Alumni gatherings:** in-person gathering of four or more attendees including the host, with a required photo. Validate and deduplicate source responses under the agreed rules.
+5. Test with fabricated/authorized non-financial responses, then remove test rows from **both** the linked Sheet and Forms response store and verify a clean read-only baseline.
 
-1. **Create or identify the Google Form** and link it to a response
-   spreadsheet under the intended organization account.
-2. **Define eligibility and data needed** (school selection, submitter,
-   attendee count or names, graduation/affiliation answers and any
-   photo-consent questions). Require consent before any public image
-   display; scoring and publication permissions are **separate**.
-3. **Share appropriately:** give the shared Hillel Google user
-   **Editor** access to the Form and, separately, the linked Sheet.
-   The independent Google Cloud **service-account email** used by
-   `gspread` must also be granted access to the response Sheet.
-   Human Editor access alone is not API access for that bot.
-4. **Inspect the actual response headers and columns.** The current
-   `getGoogleFormData.py` contains **hardcoded spreadsheet IDs,
-   positional column references and eligibility checks**; it cannot
-   discover arbitrary Forms automatically. Change its sheet IDs,
-   column mapping and scoring functions in a reviewed code PR.
-5. **Add synthetic response fixtures** for qualifying/nonqualifying
-   entries, blanks, renamed/reordered columns and duplicate participants.
-   Verify the importer updates the intended CSV columns. Use a
-   disposable Sheet for any authorized real Google API test.
-6. **Check a scheduled update** after the entire workflow has been
-   approved. A Google Form submission does not have to dispatch
-   immediately: the normal updater periodically reads both sources.
-
-### Optional near-real-time notification via Apps Script
-
-Only add this if waiting for the next scheduled run is unacceptable.
-It is **not a prerequisite** for normal operation.
-
-In the **linked response Sheet**, open **Extensions → Apps Script**.
-Save a repository-dispatch-capable GitHub token as a **Script property**
-named `GITHUB_TOKEN` (never in script source). A sample:
-
-~~~javascript
-function triggerGithubAction() {
-  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
-  if (!token) throw new Error('Missing GITHUB_TOKEN script property');
-
-  const response = UrlFetchApp.fetch(
-    'https://api.github.com/repos/msaperst/cwkc-v2/dispatches',
-    {
-      method: 'post',
-      contentType: 'application/json',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        Accept: 'application/vnd.github+json'
-      },
-      payload: JSON.stringify({event_type: 'sheet-change'}),
-      muteHttpExceptions: true
-    }
-  );
-  if (response.getResponseCode() !== 204) {
-    throw new Error('Dispatch failed: HTTP ' + response.getResponseCode());
-  }
-}
-~~~
-
-**Forks must replace the repo path.** Authorize an installable **On
-form submit** trigger under the dedicated organization account. It runs
-as its creator, so avoid a volunteer's personal account. Add a second
-On change trigger **only** if manual row edits must cause updates; duplicate
-triggers generate redundant runs. Test dispatches only in an approved
-isolation environment; GitHub's main-branch/season switch still guards
-the receiving updater.
-
-## When something breaks
-
-- **Wrong school or donation type:** inspect the actual From header,
-  `Form title`, `determine_source`, and the fixture used to approve it.
-- **Missing or wrong metric:** check the normalized columns, exact
-  answer values, Sheet ID, column indexes and CSV header together.
-- **Permission error (403):** confirm the **GCP service account**
-  was shared on the correct Sheet, not just the human CWKC account.
-- **Sheets API 429:** the ledger retries transient failures and verifies
-  a possibly completed append before retrying; do not replay blindly.
-- **Ambiguous LGL email:** it remains unread on failure. Fix the
-  field/adapter contract and reprocess, rather than marking it read.
-- **Old donations in the new scoreboard:** verify both importer and
-  calculator use the same season-specific `SPREADSHEET_SHEET`.
-
-See [Running and deploying](operations.md) for safe pause/restart and
-cutoff reconciliation. These procedures affect private records and must
-be performed by an authorized operator.
-
-**Hanukkah identity rule:** score at most **one qualifying submission per normalized email per school**. A different name using the same email is not an additional participant, while people sharing a name with different emails are distinct. The graduation year is optional/informational and does not override a **Yes** eligibility declaration. Public photo-release consent never changes scoring. Missing email on an otherwise qualifying photo fails validation rather than silently counting a person we cannot deduplicate.
-
-## Check participation data without publishing
-
-For an authorized read-only check, run from `scraper/` with the private
-GCP service-account credentials file available:
+From `scraper/` with an authorized, local, gitignored `spreadsheet_credentials.json`:
 
 ~~~bash
 python getGoogleFormData.py --dry-run
 ~~~
 
-This reads both response Sheets and prints **aggregate** participation
-counts without modifying response rows, the scoreboard CSV or GitHub
-Pages. It requires `scraper/spreadsheet_credentials.json` and network
-access; never commit that credential file. Routine CI continues to test
-parsing, eligibility and failure handling with synthetic records.
+This reads participation sources and reports aggregate results without writing the CSV or publishing. A public slideshow is optional and separate from scorekeeping; see [#50](https://github.com/msaperst/cwkc-v2/issues/50).
 
-For any manual Form test, first record the baseline, then submit a
-non-payment test response, check the expected aggregate change, and
-remove the test from both the Form response store and linked Sheet
-before the competition. A later authorized recomputation is required
-if source data was already published.
+## Troubleshooting
 
-The finalized Hanukkah question allows recent alumni **or parents of
-recent alumni** to self-declare eligibility. It is scored from their
-**Yes** answer and uploaded photo; graduation year is informational.
-Each normalized email counts once per school, regardless of name.
-Public photo-release consent never changes scoring.
+| Symptom | First check |
+| --- | --- |
+| Missing email | Sender/To address, mailbox `UNSEEN` filter, LGL notification settings |
+| Wrong school/source | `From` display name and `Form title` |
+| Bad status, year or match | Actual HTML table labels and option text; synthetic regression fixture |
+| Duplicate/ambiguous year | Form-side distinct labels; keep email unread until resolved |
+| Sheets 403 | Access for the **GCP service account** to the exact workbook/tab |
+| Sheets 429 or failed append | The replay ledger's read-after-write and retry path; never blindly append |
+| Incorrect scores | Source tabs, normalized fields, CSV schema, scorer and public HTML hooks together |
+
+See [Operations: Pause, recover or close](operations.md#pause-recover-or-close) before repairing any live import.
