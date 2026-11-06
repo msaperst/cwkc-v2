@@ -110,17 +110,19 @@ def test_photo_consent_does_not_affect_eligible_scoring(harness, consent):
     assert counts.hoos == 0
 
 
-def test_duplicate_photo_submissions_count_once_even_if_release_changes(harness):
+def test_hanukkah_deduplicates_email_but_never_name(harness):
     updater, _, photos, _, _ = harness
     photos.get_all_values.return_value += [
         hanukkah(name="Alumnus", email="one@example.invalid", consent="No"),
+        # The same name with a different email is a distinct person.
         hanukkah(name="  ALUMNUS  ", email="other@example.invalid", consent="Yes"),
-        hanukkah(name="Another Person", email="ONE@example.invalid", consent="Yes"),
+        # A different name with the same email does not add another participant.
+        hanukkah(name="Another Person", email=" ONE@EXAMPLE.INVALID ", consent="Yes"),
         hanukkah(name="Person Two", email="two@example.invalid", consent="Yes"),
         hanukkah(school="Brody", name="UVA Person", email="uva@example.invalid"),
     ]
     scores = updater.get_hanukkah_photos()
-    assert scores.hokies == 2
+    assert scores.hokies == 3
     assert scores.hoos == 1
 
 
@@ -144,7 +146,7 @@ def test_photos_ignore_no_eligibility_missing_upload_and_old_year(harness):
 @pytest.mark.parametrize("bad_row,error", [
     (hanukkah(eligible="Maybe"), "eligibility"),
     (hanukkah(school="Undecided"), "Unrecognized school"),
-    (hanukkah(name="", email=""), "participant identity"),
+    (hanukkah(name="Name Is Present", email=""), "missing email"),
     (hanukkah(date="not a date"), "timestamp"),
 ])
 def test_invalid_photo_response_fails_closed(harness, bad_row, error):
@@ -408,3 +410,56 @@ def test_python_script_entrypoint_runs_with_mocked_api_without_writing(
 def test_normalization_of_whitespace_and_missing_attendees():
     assert forms._normalize("  StUdent\tAlumni   ") == "student alumni"
     assert forms._attendance_names(" , ;\n\r ") == set()
+
+
+def test_hanukkah_shared_email_counts_once_per_school(harness):
+    updater, _, photos, _, _ = harness
+    photos.get_all_values.return_value += [
+        hanukkah(school="Tech", name="First Name", email="household@example.invalid"),
+        hanukkah(school="Tech", name="Different Name", email="HOUSEHOLD@example.invalid"),
+        hanukkah(school="Brody", name="Third Name", email="household@example.invalid"),
+    ]
+    result = updater.get_hanukkah_photos()
+    assert result.hokies == 1
+    assert result.hoos == 1
+
+
+def test_hanukkah_same_name_different_email_counts_separately(harness):
+    updater, _, photos, _, _ = harness
+    photos.get_all_values.return_value += [
+        hanukkah(name="Alex Lee", email="alex1@example.invalid"),
+        hanukkah(name="Alex Lee", email="alex2@example.invalid"),
+    ]
+    assert updater.get_hanukkah_photos().hokies == 2
+
+
+@pytest.mark.parametrize("graduation_year", [
+    "", "2026", "2000", "two thousand twenty five", "not sure",
+])
+def test_hanukkah_graduation_year_is_optional_and_not_validated(
+    harness, graduation_year,
+):
+    updater, _, photos, _, _ = harness
+    row = hanukkah(eligible="Yes")
+    row[5] = graduation_year
+    photos.get_all_values.return_value.append(row)
+    assert updater.get_hanukkah_photos().hokies == 1
+
+
+def test_hanukkah_email_identifies_participant_without_a_name(harness):
+    updater, _, photos, _, _ = harness
+    photos.get_all_values.return_value.append(
+        hanukkah(name="", email="person@example.invalid")
+    )
+    assert updater.get_hanukkah_photos().hokies == 1
+
+
+def test_missing_email_fails_closed_without_changing_scoreboard(harness):
+    updater, _, photos, csv, _ = harness
+    photos.get_all_values.return_value.append(
+        hanukkah(name="Name Present", email=" \t ")
+    )
+    before = csv.read_bytes()
+    with pytest.raises(ValueError, match="missing email"):
+        updater.update_results()
+    assert csv.read_bytes() == before
