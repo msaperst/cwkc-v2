@@ -95,7 +95,7 @@ def update_google_sheet(ledger: SubmissionLedger, normalized_row: dict,
 
 def validate_submission(data: dict, normalized_row: dict) -> None:
     """Do not silently turn malformed live notifications into zero-dollar gifts."""
-    if not ("Total Amount" in data or "Gift amount" in data):
+    if not any(_field_identity(key) in {"total amount", "gift amount"} for key in data):
         raise ValueError("Donation notification is missing its amount")
     amount = float(normalized_row["total amount"])
     if not math.isfinite(amount) or amount <= 0:
