@@ -27,8 +27,9 @@ DATE = "11/06/2026 10:25:00"
 
 
 def gathering(school="Brody", host="Alice Example", people="Bob, Carol, Dave",
-              venue="Coffee Shop", photo="fixture-photo", date=DATE):
-    return [date, host, school, "Alumni", people, venue, photo]
+              venue="Coffee Shop", photo="fixture-photo", date=DATE,
+              affiliation="Alumni"):
+    return [date, host, school, affiliation, people, venue, photo]
 
 
 def hanukkah(school="Tech", name="Person One", email="one@example.invalid",
@@ -171,6 +172,10 @@ def test_in_person_gatherings_include_host_and_require_four_unique_people(harnes
         gathering(host="Zoe", people="A, B, C", venue="Virtual Zoom"),
         gathering(host="Wes", people="A, B, C", photo=""),  # no proof photo
         gathering(host="Prior", people="A, B, C", date="11/07/2025 12:00:00"),
+        gathering(host="Noneligible", people="A, B, C",
+                  affiliation="Community Member", venue="Park"),
+        gathering(host="Student", people="A, B, C",
+                  affiliation="Current Student", venue="Library"),
     ]
     counts = updater.get_alumni_gatherings()
     assert counts.hoos == 1
@@ -221,3 +226,12 @@ def test_results_csv_missing_new_photo_column_rejected(harness):
     with pytest.raises(ValueError, match="2026 participation schema"):
         updater.update_results()
     assert csv.read_bytes() == before
+
+
+def test_current_parent_can_host_a_gathering(harness):
+    updater, gatherings, _, _, _ = harness
+    gatherings.get_all_values.return_value += [
+        gathering(host="Parent Host", people="A, B, C",
+                  affiliation="Current Parent", school="UVA Hillel"),
+    ]
+    assert updater.get_alumni_gatherings().hoos == 1
