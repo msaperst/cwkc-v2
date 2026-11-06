@@ -70,7 +70,7 @@ def _normalize(value: object) -> str:
 def _school(value: str) -> str:
     school = _normalize(value)
     if school in {"brody", "uva", "university of virginia", "brody jewish center",
-                  "hillel at uva", "university"} or "brody" in school or re.search(r"\\buva\\b", school):
+                  "hillel at uva", "university"} or "brody" in school or re.search(r"\buva\b", school):
         return "uva"
     if school in {"vt", "hillel at vt", "virginia tech", "hillel at virginia tech"} or "tech" in school:
         return "vt"
