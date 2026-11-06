@@ -129,7 +129,7 @@ class EmailParser:
         )
 
         check_all_values = {
-            x.strip().replace("\\xa0", " ").replace("  ", " ")
+            x.strip().replace("\xa0", " ").replace("  ", " ")
             for x in fields.get("check all that apply", "").split("||")
             if x.strip()
         }
