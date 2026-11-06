@@ -193,3 +193,22 @@ def test_standalone_vt_alumni_graduation_year_is_parsed():
     ]
     _, record = _normalized(fields)
     assert record["graduation year"] == "2006"
+
+
+def test_direct_normalizer_fails_on_conflicting_case_variants():
+    with pytest.raises(ValueError, match="Conflicting duplicate"):
+        EmailParser().normalize(
+            {"Total Amount": "$5.00", "total amount:": "$10.00"},
+            "vt-front",
+        )
+
+
+def test_vt_public_first_time_checkbox_is_recognized_after_label_canonicalization():
+    fields = [
+        (label, "This is my first gift to Hillel at VT")
+        if label == "Check All That Apply:" else (label, value)
+        for label, value in _distinct_year_labels()
+    ]
+    _, record = _normalized(fields)
+    assert record["first time giver"] == "true"
+    assert record["anonymous donation"] == "false"
