@@ -1,59 +1,33 @@
-# Commonwealth Kiddush Cup
+# Commonwealth Kiddush Cup (CWKC)
 
-A live fundraising competition website built for **two Hillels**. Each organization
-collects donations through its own Little Green Light (LGL) forms. This project
-combines those gifts with Google Forms participation activities, calculates
-competition metrics, and publishes a points scoreboard to GitHub Pages.
+A two-Hillel fundraising competition site: donations are handled by each school's **Little Green Light** (LGL) forms, participation comes from Google Forms, and Python calculates scores for a static GitHub Pages website.
 
-**CWKC website:** https://cwkc.org
+**Public site:** https://cwkc.org
 
-![Overview of the data flow](highLevelWorkflow.png)
+![High-level data flow](highLevelWorkflow.png)
 
-## What it does
+## Where to start
 
-1. **Collect:** The Hillels own the payment forms. LGL sends donation
-   notifications to a shared processing mailbox; Google Forms record
-   non-financial participation in linked Google Sheets.
-2. **Calculate:** Python scripts normalize new donation emails, prevent replay
-   of already stored emails, read the participation Sheets, and update
-   `public/assets/csv/results.csv`.
-3. **Display:** A static HTML/JavaScript site compares the two sides across
-   scoring categories. The HTML supplies category weights through
-   `data-points`; JavaScript updates totals, winners, donor names and the timer.
-4. **Publish:** GitHub Actions refreshes results during the configured event
-   window. Approved application code lives on `main`; published scores are
-   committed separately to `cwkc-results`. A watchdog reports failed or
-   stalled updates.
+| I want to… | Read |
+| --- | --- |
+| Understand or run the app locally | [Development](docs/development.md) |
+| Connect LGL donation or Google participation forms | [Forms](docs/forms.md) |
+| Configure, deploy, monitor or recover a live event | [Operations](docs/operations.md) |
+| Check **this year's** go/no-go decisions | [2026 launch checklist](docs/2026-launch-runbook.md) · [issue #41](https://github.com/msaperst/cwkc-v2/issues/41) |
+| Adapt the code for different Hillels | [Adapting CWKC](docs/adapting.md) |
 
-`scraper/pollEmail.py` and Google Apps Script dispatches are optional
-ways to request a refresh. **The scheduled GitHub workflow already polls both
-sources; neither extra trigger is required for the default setup.**
+## How it works
 
-## Use the application
+1. **Collect:** Schools own their payment forms. LGL sends notification emails to a dedicated mailbox; Google Forms write participation to linked Sheets.
+2. **Normalize:** Python importers validate and deduplicate as appropriate, storing donation rows in a **private**, season-specific Google Sheet. Ambiguous submissions fail closed.
+3. **Calculate:** Donation and participation metrics become `public/assets/csv/results.csv`, which the static HTML/JavaScript site displays.
+4. **Publish:** GitHub Actions refreshes results during the event window on `cwkc-results`; `main` holds reviewed code and a safe starter CSV. A watchdog flags stale/failed ingestion.
 
-**As a visitor:** Open the public site, follow your organization's donation
-link during the giving period, and return to see categories and totals.
-Donations are processed by the Hillels' forms, **not by this website**.
-Participation links (when present) lead to separate Google Forms.
+The default setup uses scheduled GitHub Actions: **no personal computer or always-on local poller** is required. Donor source records and actual donation reconciliation remain the Hillels' responsibility.
 
-**As an organizer:** Set the competition dates, scoring rules, donation
-forms and response Sheets before opening; use GitHub Actions to monitor
-updates; verify donations against your LGL records. You don't need
-a continuously running personal computer. Start with
-[Running and deploying](docs/operations.md).
+## Local quick start
 
-**As a developer:** Run the site without credentials, change the HTML/JS
-or Python code, and test with synthetic records. Start with
-[Development](docs/development.md).
-
-**As another Hillel:** This is a **working example, not a white-label
-one-click service**. You can fork the repository, but names, sources,
-scoring rules and branding require code changes. Follow
-[Adapting CWKC for another competition](docs/adapting.md).
-
-## Quick start for developers
-
-Requires Git, **Python 3.12**, **Node.js 24** and npm.
+Use Git, Python **3.12**, Node.js **24**, and npm:
 
 ~~~bash
 git clone https://github.com/msaperst/cwkc-v2.git
@@ -65,10 +39,7 @@ python -m pip install -r scraper/requirements-test.txt
 python -m http.server 8000 --directory public
 ~~~
 
-Open http://localhost:8000. No mailbox, Google Sheet or payment credentials
-are needed to preview the website. On Windows activate the environment
-from `.venv/Scripts/`. Score display is time-gated; use the offline tests
-to exercise competition-time behavior.
+Open http://localhost:8000. No private credentials are necessary to preview the site (the timer may hide scores outside event dates). Test with synthetic data:
 
 ~~~bash
 npm test
@@ -77,35 +48,6 @@ npx playwright install chromium
 npm run test:browser
 ~~~
 
-See [Development](docs/development.md) for the architecture, test structure,
-and how to change scoring categories safely.
+See [Development](docs/development.md) for component paths, score/schema changes and more detailed testing.
 
-## Documentation
-
-| Guide | What you'll find |
-| --- | --- |
-| [Development](docs/development.md) | Running, testing and changing the frontend, parser and scoring logic |
-| [Connecting forms](docs/forms.md) | Setting up LGL donation notifications and Google Form response Sheets |
-| [Running and deploying](docs/operations.md) | Credentials, event setup, schedules, deployments, monitoring and recovery |
-| [Adapting for another Hillel](docs/adapting.md) | What can be reused, what is hardcoded, and how to create an independent fork |
-
-The [current CWKC event checklist](docs/2026-launch-runbook.md) is separate
-from these general guides. It records this year's outstanding organizer
-decisions and launch checks; it is **not** part of the reusable app setup.
-
-## Main files
-
-| Path | Role |
-| --- | --- |
-| `public/index.html` and `public/assets/js/main.js` | Public scoreboard and scoring display |
-| `public/assets/config/season.json` | Competition dates and timezone |
-| `public/assets/csv/results.csv` | Scoreboard data contract |
-| `scraper/getLglFormData.py` and `EmailParser.py` | LGL email parsing and normalization |
-| `scraper/donation_ledger.py` and `CalculateValues.py` | Stored submissions and donation metrics |
-| `scraper/getGoogleFormData.py` | Google Forms participation totals |
-| `.github/workflows/` | Tests, result updates, deployment and monitoring |
-
-**Before running live integrations:** These scripts can write private
-Sheets, mark emails read, and publish results. Do not use a production
-mailbox, real donations, or current season Sheets as test fixtures.
-Use the documented isolated tests and preflight checks first.
+**Safety:** Do not commit real donor data, full LGL notifications, credentials, or **staff/backend LGL URLs**. Live import scripts can modify Google Sheets and IMAP Seen flags even when the GitHub Actions ingestion switch is disabled. Run isolated tests and authorized read-only preflights first.
