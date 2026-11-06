@@ -47,6 +47,21 @@ must be verified separately.
    repeated labels also fail. Use **distinct question names** for
    alumni and relatives, then verify which one should count under
    the approved scoring rule.
+   **Verified VT 2026 public notification (November 6):** selecting
+   Alumni and Current Parent produces two identically labeled
+   `Graduation Year` rows (the alumnus's own year and the associated
+   student's year). The importer deliberately rejects this notification,
+   leaves it unread, and blocks publication. Do **not** assume first/second
+   position identifies which person graduated. VT's LGL owner should rename
+   the two visible fields to distinct labels, preferably
+   `Alumni Graduation Year` and `Related Student Graduation Year`,
+   then confirm their actual emailed labels with a safe form submission.
+   This narrow form-contract correction is required even though the
+   general form freeze is otherwise complete. Existing VT public
+   notifications containing duplicate years remain blocked until an
+   explicitly reviewed resolution is provided. VT's `Matching Grant`
+   (challenge-grant opt-in) is distinct from workplace-match referral
+   and must not automatically create an extra donation or match amount.
 5. **Update the adapter and tests** (`EmailParser.py`,
    `getLglFormData.py`, and `scraper/tests/`) when the final
    labels, statuses, recurring options or school identifiers differ.
