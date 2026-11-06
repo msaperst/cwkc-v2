@@ -62,6 +62,60 @@ def _synthetic_uva_notification():
     return message.as_bytes()
 
 
+def _synthetic_uva_singlepart_qp_notification():
+    """Match LGL's actual Content-Type/transfer encoding without using donor PII."""
+    rows = "".join(
+        f"<tr><td>{escape(field)}{' ' if field == 'Does your workplace match charitable giving?' else ''}</td>"
+        f"<td>{escape(value)}</td></tr>"
+        for field, value in UVA_FRONT_2026_FIELDS
+    )
+    message = EmailMessage()
+    message["From"] = (
+        "Brody Jewish Center <lglforms-submissions@littlegreenlight.com>"
+    )
+    message["To"] = (
+        "manager@example.invalid, organizer@example.invalid, "
+        "service@example.invalid"
+    )
+    message["Subject"] = (
+        "New Submission: Donor -- 14th Annual Commonwealth Kiddush Cup "
+        "Front End Form"
+    )
+    # The real LGL delivery was one text/html part, not multipart/alternative,
+    # and used quoted-printable encoding with wrapped lines (= sequences).
+    message.set_content(
+        f"<p><table>{rows}</table></p>",
+        subtype="html",
+        charset="utf-8",
+        cte="quoted-printable",
+    )
+    assert not message.is_multipart()
+    assert message.get_content_type() == "text/html"
+    assert message["Content-Transfer-Encoding"] == "quoted-printable"
+    return message.as_bytes()
+
+
+def test_real_2026_uva_mime_shape_single_html_quoted_printable():
+    """A single-part quoted-printable LGL email must parse like multipart HTML."""
+    sender, raw = parse_lgl_email(_synthetic_uva_singlepart_qp_notification())
+    assert "Brody Jewish Center" in sender
+    assert raw["Form title"] == "14th Annual Commonwealth Kiddush Cup Front End Form"
+    assert raw["Does your workplace match charitable giving?"] == (
+        "Yes! I'll go ahead and ask them"
+    )
+    normalized = EmailParser().normalize(
+        raw, determine_source(sender, raw["Form title"])
+    )
+    validate_submission(raw, normalized)
+    assert tuple(normalized) == NORMALIZED_FIELDS
+    assert normalized["source"] == "uva-front"
+    assert normalized["total amount"] == "5.0"
+    assert normalized["status"] == "Alumni"
+    assert normalized["first time giver"] == "true"
+    assert normalized["work referral"] == "true"
+    assert normalized["recurring payment"] == "false"
+
+
 def _parse_and_normalize():
     sender, raw = parse_lgl_email(_synthetic_uva_notification())
     source = determine_source(sender, raw["Form title"])
