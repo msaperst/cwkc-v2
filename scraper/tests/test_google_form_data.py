@@ -307,9 +307,11 @@ def test_photo_release_prefix_matches_longer_question_exactly_once(harness):
     updater, _, photos, _, _ = harness
     photos.get_all_values.return_value.append(hanukkah(consent="No"))
     assert updater.get_hanukkah_photos().hokies == 1
-    photos.get_all_values.return_value[0].append(
-        "PHOTO RELEASE: Would you allow a second display option?"
-    )
+    # Copy the shared header fixture: mutating it would corrupt later tests.
+    photos.get_all_values.return_value[0] = [
+        *HANUKKAH_HEADER,
+        "PHOTO RELEASE: Would you allow a second display option?",
+    ]
     with pytest.raises(ValueError, match="photo_release"):
         updater.get_hanukkah_photos()
 
