@@ -178,7 +178,7 @@ See [Running and deploying](operations.md) for safe pause/restart and
 cutoff reconciliation. These procedures affect private records and must
 be performed by an authorized operator.
 
-## Preview participation submissions without publishing
+**Hanukkah identity rule:** score at most **one qualifying submission per normalized email per school**. A different name using the same email is not an additional participant, while people sharing a name with different emails are distinct. The graduation year is optional/informational and does not override a **Yes** eligibility declaration. Public photo-release consent never changes scoring. Missing email on an otherwise qualifying photo fails validation rather than silently counting a person we cannot deduplicate.\n\n## Preview participation submissions without publishing
 
 After approving a new participation Form, the repository's **Preview
 participation form scores (read-only)** workflow can be run manually from
