@@ -121,6 +121,27 @@ class EmailParser:
                        fields.get("grad year", fields.get("graduation year", ""))),
         )
 
+        # The verified 2026 VT backend form uses "Grad Year" for a *related
+        # student* when a donor selects Current Parent and Alum together.
+        # That untyped year must never be treated as the donor's alumni year,
+        # which could incorrectly award Class of 2026 credit.
+        related_affiliations = {
+            "Current Parent", "Current Grandparent",
+            "Parent of Alumni", "Grandparent of Alumni",
+        }
+        if source == "vt-back" and set(statuses).intersection(related_affiliations):
+            donor_year = fields.get(
+                "alumni graduation year",
+                fields.get("donor graduation year", ""),
+            )
+            if "Alumni" in statuses and not donor_year:
+                raise ValueError(
+                    "VT backend donor alumni year is missing or ambiguous"
+                )
+            # If there is no alumni affiliation, all year information from
+            # related-person questions is irrelevant to donor-class scoring.
+            grad_year = donor_year
+
         recurring_raw = fields.get("is recurring", "").lower()
         monthly_raw = fields.get("is this a monthly gift?", "").lower()
         recurring_payment = (
@@ -142,13 +163,16 @@ class EmailParser:
             else "false"
         )
 
-        workplace_answer_1 = fields.get("is this gift being matched by workplace?", "")
-        workplace_answer_2 = fields.get("does your workplace match charitable giving?", "")
+        workplace_answers = (
+            fields.get("is this gift being matched by workplace?", ""),
+            fields.get("does your workplace match charitable giving?", ""),
+            fields.get("is this gift being matched by their workplace?", ""),
+        )
         matching_answers = {v.casefold() for v in self.WORK_REFERRAL_YES_VALUES}
         work_referral = (
             bool(check_all_values.intersection(self.WORK_REFERRAL_CHECK_ALL))
-            or workplace_answer_1.casefold() in matching_answers
-            or workplace_answer_2.casefold() in matching_answers
+            or any(answer.casefold() in matching_answers
+                   for answer in workplace_answers)
         )
         # The VT "Matching Grant" question is a separate challenge grant
         # election, NOT proof of workplace matching or additional gift dollars.
