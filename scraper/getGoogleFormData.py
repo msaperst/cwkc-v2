@@ -10,6 +10,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import gspread
 import pandas as pd
@@ -91,6 +92,49 @@ def _attendance_names(value: str) -> set[str]:
             if _normalize(name)}
 
 
+
+def _gathering_identity(record: dict[str, str], season_year: int) -> tuple | None:
+    """Get a stable identity for an eligible in-person gathering."""
+    if not _in_season(record["timestamp"], season_year):
+        return None
+    school = _school(record["school"])
+    affiliation = _normalize(record["affiliation"])
+    if not ("alum" in affiliation or "current parent" in affiliation):
+        return None
+    venue = _normalize(record["venue"])
+    if not venue or any(token in venue for token in
+                        ("virtual", "zoom", "online", "google meet", "teams meeting")):
+        return None
+    # The attendee list might already contain the host.
+    attendees = _attendance_names(record["attendees"])
+    host = _normalize(record["host"])
+    if host:
+        attendees.add(host)
+    if len(attendees) < 4 or not record["photo"]:
+        return None
+    return (school, _normalize(record["timestamp"]), host, venue,
+            tuple(sorted(attendees)))
+
+
+def _hanukkah_identity(record: dict[str, str], season_year: int) -> tuple | None:
+    """Resolve an eligible submitter without consulting photo-release consent."""
+    if not _in_season(record["timestamp"], season_year):
+        return None
+    school = _school(record["school"])
+    eligibility = _normalize(record["qualifies"])
+    if eligibility in {"no", "false"}:
+        return None
+    if not eligibility.startswith("yes"):
+        raise ValueError("Unrecognized Hanukkah eligibility answer")
+    if not record["photo"]:
+        return None
+    name = _normalize(record["name"])
+    email = _normalize(record["email"])
+    if not name and not email:
+        raise ValueError("Hanukkah response missing participant identity")
+    return school, email, name
+
+
 class SubmissionUpdater:
     """Read current Forms response tabs, validate and update the result CSV."""
 
@@ -131,65 +175,49 @@ class SubmissionUpdater:
         data = SubmittedData()
         seen = set()
         for record in self._response_rows(GATHERING_SHEET_ID, GATHERING_FIELDS):
-            if not _in_season(record["timestamp"], self.season_year):
-                continue
-            school = _school(record["school"])
-            affiliation = _normalize(record["affiliation"])
-            # The scoreboard category is alumni or current-parent gatherings;
-            # a community-only or student-only host does not qualify.
-            if not ("alum" in affiliation or "current parent" in affiliation):
-                continue
-            venue = _normalize(record["venue"])
-            if not venue or any(token in venue for token in
-                                ("virtual", "zoom", "online", "google meet", "teams meeting")):
-                continue
-            # Names field can include the host; include them exactly once.
-            attendees = _attendance_names(record["attendees"])
-            host = _normalize(record["host"])
-            if host:
-                attendees.add(host)
-            if len(attendees) < 4 or not record["photo"]:
-                continue
-            identity = (school, _normalize(record["timestamp"]), host, venue,
-                        tuple(sorted(attendees)))
-            if identity in seen:
+            identity = _gathering_identity(record, self.season_year)
+            if identity is None or identity in seen:
                 continue
             seen.add(identity)
-            data.increment(school)
+            data.increment(identity[0])
         return data
 
     def get_hanukkah_photos(self) -> SubmittedData:
-        """Count unique qualifying photo submitters, regardless of release answer."""
+        """Count unique eligible participants, independent of photo release."""
         data = SubmittedData()
         seen_emails = set()
         seen_names = set()
         for record in self._response_rows(HANUKKAH_SHEET_ID, HANUKKAH_FIELDS):
-            if not _in_season(record["timestamp"], self.season_year):
+            identity = _hanukkah_identity(record, self.season_year)
+            if identity is None:
                 continue
-            school = _school(record["school"])
-            eligibility = _normalize(record["qualifies"])
-            if eligibility in {"no", "false"}:
+            school, email, name = identity
+            if (email and (school, email) in seen_emails) or (
+                name and (school, name) in seen_names
+            ):
                 continue
-            if not eligibility.startswith("yes"):
-                raise ValueError("Unrecognized Hanukkah eligibility answer")
-            if not record["photo"]:
-                continue
-            name = _normalize(record["name"])
-            email = _normalize(record["email"])
-            if not name and not email:
-                raise ValueError("Hanukkah response missing participant identity")
-            email_key = (school, email) if email else None
-            name_key = (school, name) if name else None
-            if email_key in seen_emails or name_key in seen_names:
-                continue
-            if email_key is not None:
-                seen_emails.add(email_key)
-            if name_key is not None:
-                seen_names.add(name_key)
-            # PHOTO RELEASE: Yes/No is intentionally NOT checked here.
-            # It controls optional public display, not scoring.
+            if email:
+                seen_emails.add((school, email))
+            if name:
+                seen_names.add((school, name))
             data.increment(school)
         return data
+
+    def _write_results_atomically(self) -> None:
+        """Preserve the last good CSV if a write or rename fails."""
+        destination = Path(self.results_csv_path)
+        temporary_path = None
+        try:
+            with NamedTemporaryFile(
+                mode="w", encoding="utf-8", newline="", dir=destination.parent,
+                prefix=".cwkc-results-", suffix=".tmp", delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+                self.df.to_csv(temporary, index=False)
+            temporary_path.replace(destination)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
 
     def update_results(self, dry_run: bool = False) -> SubmittedData:
         """Validate both inputs before writing the existing scoreboard schema."""
@@ -208,7 +236,7 @@ class SubmissionUpdater:
         if dry_run:
             print("Read-only preview: results CSV was not written")
         else:
-            self.df.to_csv(self.results_csv_path, index=False)
+            self._write_results_atomically()
             print("Results CSV updated")
         return photos
 
