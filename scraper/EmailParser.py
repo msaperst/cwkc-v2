@@ -37,6 +37,8 @@ class EmailParser:
     # ========== Canonical Enums / Mappings ==========
     STATUS_MAP = {
         'Current Student': 'Current Student',
+        'Undergraduate Student': 'Current Student',
+        'Graduate Student': 'Current Student',
         'Current Parent': 'Current Parent',
         'Current Grandparent': 'Current Grandparent',
         'Alumni': 'Alumni',
@@ -66,82 +68,92 @@ class EmailParser:
 
     WORK_REFERRAL_YES_VALUES: Set[str] = {
         "Yes",  # "Is this gift being matched by workplace?"
-        "Yes! I'll go ahead and ask them"  # "Does your workplace match charitable giving?"
+        "Yes! I'll go ahead and ask them",  # "Does your workplace match charitable giving?"
+        "I'm not sure, can you look into it for me?"  # VT requests follow-up
     }
 
-    def normalize(self, parsed_email: Dict[str, str], source: str) -> Dict[str, str]:
-        """
-        Convert parsed email key/value pairs into a normalized row for Google Sheets.
-        """
+    @staticmethod
+    def _canonical_fields(parsed_email: Dict[str, str]) -> Dict[str, str]:
+        """Accept harmless LGL capitalization and trailing-colon differences.
 
-        # Status
-        raw_status = parsed_email.get("I am a/an", parsed_email.get("I am a/an...",
-                                                                    parsed_email.get("Donor is a/an...",
-                                                                                     parsed_email.get("Donor is a/n...",
-                                                                                                      COMMUNITY_MEMBER))
-                                                                    ))
-        # Split on '||', normalize, and map each to canonical form
+        Do not hide conflicting duplicate values if normalize is called
+        directly, rather than through parse_lgl_email's earlier guard.
+        """
+        fields = {}
+        for label, value in parsed_email.items():
+            key = " ".join(label.split()).rstrip(": ").casefold()
+            cleaned = value.strip()
+            if key in fields and fields[key] != cleaned:
+                raise ValueError("Conflicting duplicate LGL form field")
+            fields[key] = cleaned
+        return fields
+
+    def normalize(self, parsed_email: Dict[str, str], source: str) -> Dict[str, str]:
+        """Convert parsed email values into the fixed Google Sheets schema."""
+        fields = self._canonical_fields(parsed_email)
+
+        raw_status = fields.get(
+            "i am a/an",
+            fields.get("i am a/an...",
+                       fields.get("donor is a/an...",
+                                  fields.get("donor is a/n...", COMMUNITY_MEMBER))),
+        )
         statuses = [
             self.STATUS_MAP.get(s.strip(), COMMUNITY_MEMBER)
-            for s in raw_status.split("||")
-            if s.strip()
+            for s in raw_status.split("||") if s.strip()
         ]
-        # Join multiple statuses with commas (e.g., "Alumni, Parent of Alumni")
         status = ", ".join(sorted(set(statuses))) if statuses else COMMUNITY_MEMBER
 
-        # Name fields
-        first_name = parsed_email.get("Name - First Name", "").strip()
-        last_name = parsed_email.get("Name - Last Name", "").strip()
+        first_name = fields.get("name - first name", "")
+        last_name = fields.get("name - last name", "")
+        phone = fields.get("phone", "") or self.generate_fallback_phone()
 
-        # Phone
-        phone = parsed_email.get("Phone", "").strip()
-        if not phone:
-            phone = self.generate_fallback_phone()
-
-        # Total amount
-        raw_amount = parsed_email.get("Total Amount", parsed_email.get("Gift amount", "0"))
-        clean_amount = (
-            raw_amount
-            .replace("$", "")
-            .replace(",", "")
-            .strip()
-        )
+        raw_amount = fields.get("total amount", fields.get("gift amount", "0"))
+        clean_amount = raw_amount.replace("$", "").replace(",", "").strip()
         total_amount = str(float(clean_amount))
 
-        # Graduation year
-        grad_year = parsed_email.get("Grad Year", "").strip()
+        # Use the donor's own alumni year, never a distinct related-student year.
+        # Identical repeated "Graduation Year" labels still fail closed in
+        # parse_lgl_email; do not guess from their order in a notification.
+        grad_year = fields.get(
+            "alumni graduation year",
+            fields.get("donor graduation year",
+                       fields.get("grad year", fields.get("graduation year", ""))),
+        )
 
-        # Recurring payment (check front-end 'Is Recurring' or back-end 'Is this a monthly gift?')
-        recurring_raw = parsed_email.get("Is Recurring", "").strip().lower()
-        monthly_raw = parsed_email.get("Is this a monthly gift?", "").strip().lower()
-        recurring_payment = "true" if recurring_raw in ("true", "yes") or monthly_raw in ("true", "yes") else "false"
+        recurring_raw = fields.get("is recurring", "").lower()
+        monthly_raw = fields.get("is this a monthly gift?", "").lower()
+        recurring_payment = (
+            "true" if recurring_raw in ("true", "yes")
+            or monthly_raw in ("true", "yes") else "false"
+        )
 
-        # Check-all-that-apply
-        check_all_raw = parsed_email.get("Check all that apply", parsed_email.get("Check all that apply:", ""))
         check_all_values = {
-            x.strip().replace('\xa0', ' ').replace("  ", " ")
-            for x in check_all_raw.split("||")
+            x.strip().replace("\xa0", " ").replace("  ", " ")
+            for x in fields.get("check all that apply", "").split("||")
             if x.strip()
         }
+        first_time_giver = (
+            "true" if check_all_values.intersection(self.FIRST_TIME_GIFTS)
+            else "false"
+        )
+        anonymous_donation = (
+            "true" if check_all_values.intersection(self.ANONYMOUS_DONATIONS)
+            else "false"
+        )
 
-        # First-time giver
-        first_time_giver = "true" if check_all_values.intersection(self.FIRST_TIME_GIFTS) else "false"
+        workplace_answer_1 = fields.get("is this gift being matched by workplace?", "")
+        workplace_answer_2 = fields.get("does your workplace match charitable giving?", "")
+        matching_answers = {v.casefold() for v in self.WORK_REFERRAL_YES_VALUES}
+        work_referral = (
+            bool(check_all_values.intersection(self.WORK_REFERRAL_CHECK_ALL))
+            or workplace_answer_1.casefold() in matching_answers
+            or workplace_answer_2.casefold() in matching_answers
+        )
+        # The VT "Matching Grant" question is a separate challenge grant
+        # election, NOT proof of workplace matching or additional gift dollars.
 
-        # Anonymous donation
-        anonymous_donation = "true" if check_all_values.intersection(self.ANONYMOUS_DONATIONS) else "false"
-
-        # Work referral
-        work_referral = False
-        if check_all_values.intersection(self.WORK_REFERRAL_CHECK_ALL):
-            work_referral = True
-
-        workplace_field_1 = parsed_email.get("Is this gift being matched by workplace?", "")
-        workplace_field_2 = parsed_email.get("Does your workplace match charitable giving?", "")
-        if workplace_field_1.strip() in self.WORK_REFERRAL_YES_VALUES or workplace_field_2.strip() in self.WORK_REFERRAL_YES_VALUES:
-            work_referral = True
-        work_referral = "true" if work_referral else "false"
-
-        normalized = {
+        return {
             "phone number": phone,
             "total amount": total_amount,
             "first name": first_name,
@@ -150,12 +162,10 @@ class EmailParser:
             "first time giver": first_time_giver,
             "graduation year": grad_year,
             "status": status,
-            "work referral": work_referral,
+            "work referral": "true" if work_referral else "false",
             "recurring payment": recurring_payment,
-            "source": source
+            "source": source,
         }
-
-        return normalized
 
     @staticmethod
     def generate_fallback_phone() -> str:
