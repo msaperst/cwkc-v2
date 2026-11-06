@@ -62,6 +62,31 @@ must be verified separately.
    explicitly reviewed resolution is provided. VT's `Matching Grant`
    (challenge-grant opt-in) is distinct from workplace-match referral
    and must not automatically create an extra donation or match amount.
+   **Verified VT 2026 backend notification (November 6):** when both
+   `Current Parent` and `Alum` are selected, the backend form sends
+   `Donor is a/an...: Current Parent||Alum` but only **one**
+   `Grad Year` field, populated with the *related student's* year.
+   No donor alumni year is collected in that observed combination.
+   The importer now fails closed for VT backend alumni+related-person
+   submissions without a distinct donor year, avoiding accidental
+   Class of 2026 scoring for a student's 2026 year. For parent-only
+   entries, the generic student year is not stored as a donor year.
+
+   VT's form owner must **add a required, conditional donor question**
+   titled `Alumni Graduation Year` when `Alum` is selected, and
+   **rename the existing student question** to
+   `Related Student Graduation Year` when `Current Parent` is selected;
+   keep both visible and required when both affiliations are checked.
+   Verify the *email* contains distinct names and both year values
+   in a controlled no-charge test before authorizing ingestion.
+
+   VT backend sends `Gift Amount`, `Check All That Apply` and
+   `Is This Gift Being Matched by Their Workplace?`; label casing is
+   normalized, and a Yes workplace answer is a referral, not proof
+   of a received match. Backend `Passthrough from`, `Check Number`,
+   `Date` and `Transaction Details` are not part of the current
+   normalized scoring columns: reconcile these separately with LGL
+   accounting before counting staff-entered gifts.
 5. **Update the adapter and tests** (`EmailParser.py`,
    `getLglFormData.py`, and `scraper/tests/`) when the final
    labels, statuses, recurring options or school identifiers differ.
