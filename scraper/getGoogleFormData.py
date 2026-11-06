@@ -70,7 +70,7 @@ def _normalize(value: object) -> str:
 def _school(value: str) -> str:
     school = _normalize(value)
     if school in {"brody", "uva", "university of virginia", "brody jewish center",
-                  "hillel at uva", "university"} or "brody" in school:
+                  "hillel at uva", "university"} or "brody" in school or re.search(r"\\buva\\b", school):
         return "uva"
     if school in {"vt", "hillel at vt", "virginia tech", "hillel at virginia tech"} or "tech" in school:
         return "vt"
@@ -134,6 +134,11 @@ class SubmissionUpdater:
             if not _in_season(record["timestamp"], self.season_year):
                 continue
             school = _school(record["school"])
+            affiliation = _normalize(record["affiliation"])
+            # The scoreboard category is alumni or current-parent gatherings;
+            # a community-only or student-only host does not qualify.
+            if not ("alum" in affiliation or "current parent" in affiliation):
+                continue
             venue = _normalize(record["venue"])
             if not venue or any(token in venue for token in
                                 ("virtual", "zoom", "online", "google meet", "teams meeting")):
