@@ -177,3 +177,58 @@ the receiving updater.
 See [Running and deploying](operations.md) for safe pause/restart and
 cutoff reconciliation. These procedures affect private records and must
 be performed by an authorized operator.
+
+## Preview participation submissions without publishing
+
+After approving a new participation Form, the repository's **Preview
+participation form scores (read-only)** workflow can be run manually from
+**GitHub → Actions → Preview participation form scores (read-only) → Run
+workflow**. This is available after the workflow is merged to `main`.
+
+The workflow reads the final gathering and Hanukkah response tabs using
+the GitHub-configured GCP service-account credentials. It prints only
+aggregate UVA/VT counts and explicitly runs the importer with
+`--dry-run`; it does **not** modify response Sheets, emails, the score CSV,
+the `cwkc-results` branch or GitHub Pages. It also works **before the
+competition opens** while normal ingestion is disabled.
+
+To exercise it safely:
+
+1. Run it once before manual submissions and record the initial counts.
+   Both should normally be zero on an empty new-year response tab.
+2. Submit **one legitimate non-payment test** through each participation
+   Form. A gathering requires at least **four distinct people including
+   the host**, an in-person venue and an event photo. Hanukkah requires
+   an eligible response and photo upload; the release answer does
+   **not** change whether the submission counts.
+3. Rerun the preflight. Confirm the intended school's count increases by
+   exactly one. Negative tests: insufficient gathering attendees, virtual
+   venue, Hanukkah eligibility No, missing required photo, and
+   repeated submissions by the same individual.
+4. Review Form responses and the linked Sheet, then **remove the test
+   submissions from both the Form's response store and the response Sheet**
+   as appropriate. Remove their test-upload files from Drive if desired,
+   observing your organization's retention policy.
+5. Rerun the preflight and confirm counts return to their baseline.
+   Do not delete genuine donor or participation responses. If an
+   import already published scores, deleting a source response alone
+   does not instantly update the website; a later authorized
+   reconciliation/recompute is required.
+
+For local, authorized testing from the `scraper/` directory, the equivalent
+read-only command is:
+
+~~~bash
+python getGoogleFormData.py --dry-run
+~~~
+
+This local command requires the private `scraper/spreadsheet_credentials.json`
+GCP service-account file and network access. Never commit that file.
+The preflight workflow is preferable when using the existing Actions secrets.
+
+**Important 2026 distinction:** The Hanukkah eligibility question currently
+says **alumni who graduated in the past 15 years *or a parent of one***.
+The earlier organizer description emphasized alumni only. This importer
+follows the Form's explicit Yes eligibility response for now. Confirm the
+intended interpretation when inspecting your manual results; do not
+misrepresent a photo-release No as an ineligible submission.
