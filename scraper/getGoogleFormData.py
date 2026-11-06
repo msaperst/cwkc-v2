@@ -128,11 +128,10 @@ def _hanukkah_identity(record: dict[str, str], season_year: int) -> tuple | None
         raise ValueError("Unrecognized Hanukkah eligibility answer")
     if not record["photo"]:
         return None
-    name = _normalize(record["name"])
     email = _normalize(record["email"])
-    if not name and not email:
-        raise ValueError("Hanukkah response missing participant identity")
-    return school, email, name
+    if not email:
+        raise ValueError("Hanukkah response missing email for deduplication")
+    return school, email
 
 
 class SubmissionUpdater:
@@ -186,21 +185,12 @@ class SubmissionUpdater:
         """Count unique eligible participants, independent of photo release."""
         data = SubmittedData()
         seen_emails = set()
-        seen_names = set()
         for record in self._response_rows(HANUKKAH_SHEET_ID, HANUKKAH_FIELDS):
             identity = _hanukkah_identity(record, self.season_year)
-            if identity is None:
+            if identity is None or identity in seen_emails:
                 continue
-            school, email, name = identity
-            if (email and (school, email) in seen_emails) or (
-                name and (school, name) in seen_names
-            ):
-                continue
-            if email:
-                seen_emails.add((school, email))
-            if name:
-                seen_names.add((school, name))
-            data.increment(school)
+            seen_emails.add(identity)
+            data.increment(identity[0])
         return data
 
     def _write_results_atomically(self) -> None:
