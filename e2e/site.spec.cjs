@@ -176,7 +176,7 @@ test('2026 scoreboard shows 15 possible points and the Hanukkah submission form'
   await expect(page.locator('#most_donors_class_2026')).toBeVisible();
   await expect(page.locator('#mitzvah_memories')).toHaveCount(0);
   const photo = page.locator('#hanukkah_photos');
-  await expect(photo).toContainText(/Hanukkah Celebration Photos/);
+  await expect(photo).toContainText(/Hanukkah Photo Participants/);
   await expect(photo.locator('a')).toHaveAttribute(
     'href',
     'https://docs.google.com/forms/d/e/1FAIpQLSeX0-H3rkiAXy3xpdOYIDuAEYM8BI7tgmgBrPFIryS4Q7_Jbg/viewform'

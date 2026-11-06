@@ -1,0 +1,77 @@
+name: Preview participation form scores (read-only)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: cwkc-participation-preflight
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    name: Read both participation Sheets without publishing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install hash-verified Python dependencies
+        env:
+          PIP_NO_DEPS: 'true'
+          PIP_ONLY_BINARY: ':all:'
+        run: python -m pip install --require-hashes -r scraper/requirements-ci.lock
+
+      - name: Write temporary read-only Google credential file
+        env:
+          GOOGLE_TYPE: ${{ secrets.TYPE }}
+          GOOGLE_PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          GOOGLE_PRIVATE_KEY_ID: ${{ secrets.PRIVATE_KEY_ID }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          GOOGLE_CLIENT_EMAIL: ${{ secrets.CLIENT_EMAIL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GOOGLE_AUTH_URI: ${{ secrets.AUTH_URI }}
+          GOOGLE_TOKEN_URI: ${{ secrets.TOKEN_URI }}
+          GOOGLE_AUTH_PROVIDER_X509_CERT_URL: ${{ secrets.AUTH_PROVIDER_X509_CERT_URL }}
+          GOOGLE_CLIENT_X509_CERT_URL: ${{ secrets.CLIENT_X509_CERT_URL }}
+          GOOGLE_UNIVERSE_DOMAIN: ${{ secrets.UNIVERSE_DOMAIN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          fields = ("type", "project_id", "private_key_id", "private_key",
+                    "client_email", "client_id", "auth_uri", "token_uri",
+                    "auth_provider_x509_cert_url", "client_x509_cert_url")
+          if any(not os.environ.get("GOOGLE_" + key.upper()) for key in fields):
+              raise SystemExit("Missing Google service-account credentials")
+          credentials = {key: os.environ["GOOGLE_" + key.upper()] for key in fields}
+          credentials["private_key"] = credentials["private_key"].replace("\\n", "\n")
+          if os.environ.get("GOOGLE_UNIVERSE_DOMAIN"):
+              credentials["universe_domain"] = os.environ["GOOGLE_UNIVERSE_DOMAIN"]
+          target = Path("scraper/spreadsheet_credentials.json")
+          target.write_text(json.dumps(credentials), encoding="utf-8")
+          target.chmod(0o600)
+          PY
+
+      - name: Preview gathering and Hanukkah scores (NO writes)
+        working-directory: scraper
+        shell: bash
+        run: |
+          set -o pipefail
+          python getGoogleFormData.py --dry-run | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify scoreboard CSV was not altered
+        run: git diff --exit-code -- public/assets/csv/results.csv
+
+      - name: Delete temporary credentials
+        if: always()
+        run: rm -f scraper/spreadsheet_credentials.json
