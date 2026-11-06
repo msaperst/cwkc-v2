@@ -40,11 +40,8 @@ For repeatable operational instructions, see [Operations](operations.md); for fo
 - [ ] Assign primary and backup operators; verify receipt of watchdog/Actions alerts, recovery procedure, and final cutoff/reconciliation responsibility ([#40](https://github.com/msaperst/cwkc-v2/issues/40)).
 - [ ] Receive both Hillels' final sign-off, then enable `CWKC_INGESTION_ENABLED=true` **at** the approved opening instant—not earlier.
 
-## Already implemented in code
+## Implementation status
 
-- 2026 website/date/score contract, safe prelaunch behavior: [#42](https://github.com/msaperst/cwkc-v2/pull/42), [#58](https://github.com/msaperst/cwkc-v2/pull/58).
-- Replay-safe, fail-closed donation importer and year/label defenses: [#47](https://github.com/msaperst/cwkc-v2/pull/47), [#54](https://github.com/msaperst/cwkc-v2/pull/54), [#62–66](https://github.com/msaperst/cwkc-v2/pull/66).
-- 2026 participation-source integration, private dry run, Hanukkah deduplication: [#59](https://github.com/msaperst/cwkc-v2/pull/59), [#60](https://github.com/msaperst/cwkc-v2/pull/60).
-- Isolated donation worksheet, results publication, watchdog, offline recovery drill: [#53](https://github.com/msaperst/cwkc-v2/pull/53), [#51](https://github.com/msaperst/cwkc-v2/pull/51), [#55](https://github.com/msaperst/cwkc-v2/pull/55), [#56](https://github.com/msaperst/cwkc-v2/pull/56).
+The 2026 site, scoring, four-email parser regression tests, participation forms, replay-safe ledger, separate results branch, watchdog and offline recovery tests are **merged**. See the [launch tracker #41](https://github.com/msaperst/cwkc-v2/issues/41) for the concise PR map; this checklist tracks only remaining approvals and live verification.
 
 **Never** use real donor records as fixtures, make unapproved chargeable donations, mark failed messages as read, or move the competition window to bypass a failure. See [Pause, recover or close](operations.md#pause-recover-or-close).
