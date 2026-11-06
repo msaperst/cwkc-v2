@@ -28,7 +28,7 @@ VT_BACK_2026_FIELDS = [
     ("Date", "11/07/2026"),
     ("Is this a monthly gift?", "No"),
     ("Passthrough from", "Check"),
-    ("Check Number", "1234"),
+    ("Check Number", "TEST-CHECK-0001"),
     ("Other", ""),
     ("Transaction Details", "Gift in hand"),
     ("Gift Notes", "synthetic test record"),
