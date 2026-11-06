@@ -2,6 +2,10 @@
 
 All rows and email/photo identifiers here are synthetic. No Google API is called.
 """
+import json
+import runpy
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pandas as pd
@@ -235,3 +239,170 @@ def test_current_parent_can_host_a_gathering(harness):
                   affiliation="Current Parent", school="UVA Hillel"),
     ]
     assert updater.get_alumni_gatherings().hoos == 1
+
+
+def test_invalid_school_cannot_increment_a_score():
+    counts = forms.SubmittedData()
+    with pytest.raises(ValueError, match="Unsupported school"):
+        counts.increment("unrecognized")
+    assert counts.hoos == 0
+    assert counts.hokies == 0
+
+
+def test_default_season_year_is_read_from_config(harness, monkeypatch, tmp_path):
+    _, _, _, csv, _ = harness
+    config = tmp_path / "season.json"
+    config.write_text(json.dumps({"year": 2027}), encoding="utf-8")
+    monkeypatch.setattr(forms, "SEASON_CONFIG", config)
+    updater = forms.SubmissionUpdater("fake-credentials.json", str(csv))
+    assert updater.season_year == 2027
+
+
+def test_invalid_season_config_does_not_silently_choose_a_year(
+    harness, monkeypatch, tmp_path,
+):
+    _, _, _, csv, _ = harness
+    config = tmp_path / "season.json"
+    config.write_text('{"timezone": "America/New_York"}', encoding="utf-8")
+    monkeypatch.setattr(forms, "SEASON_CONFIG", config)
+    with pytest.raises(KeyError, match="year"):
+        forms.SubmissionUpdater("fake-credentials.json", str(csv))
+
+
+@pytest.mark.parametrize("sheet_name", ["gathering", "hanukkah"])
+def test_sheet_with_no_header_fails_closed(harness, sheet_name):
+    updater, gatherings, photos, csv, _ = harness
+    source = gatherings if sheet_name == "gathering" else photos
+    source.get_all_values.return_value = []
+    before = csv.read_bytes()
+    with pytest.raises(ValueError, match="no header row"):
+        updater.update_results()
+    assert csv.read_bytes() == before
+
+
+def test_empty_response_row_is_skipped_without_counting_or_error(harness):
+    updater, gatherings, photos, _, _ = harness
+    gatherings.get_all_values.return_value.extend([
+        ["", " ", "  "],
+        gathering(),
+    ])
+    photos.get_all_values.return_value.extend([
+        ["", "", ""],
+        hanukkah(),
+    ])
+    assert updater.get_alumni_gatherings().hoos == 1
+    assert updater.get_hanukkah_photos().hokies == 1
+
+
+def test_short_response_row_uses_blank_missing_values_not_index_error(harness):
+    updater, _, photos, _, _ = harness
+    photos.get_all_values.return_value.append(
+        hanukkah(photo="yes")[:6]
+    )
+    # An absent upload value is treated as empty; fail eligibility safely.
+    assert updater.get_hanukkah_photos().hokies == 0
+
+
+def test_photo_release_prefix_matches_longer_question_exactly_once(harness):
+    updater, _, photos, _, _ = harness
+    photos.get_all_values.return_value.append(hanukkah(consent="No"))
+    assert updater.get_hanukkah_photos().hokies == 1
+    photos.get_all_values.return_value[0].append(
+        "PHOTO RELEASE: Would you allow a second display option?"
+    )
+    with pytest.raises(ValueError, match="photo_release"):
+        updater.get_hanukkah_photos()
+
+
+@pytest.mark.parametrize("failed_sheet", ["gathering", "hanukkah"])
+def test_google_api_error_does_not_write_csv(harness, failed_sheet):
+    updater, gatherings, photos, csv, _ = harness
+    gatherings.get_all_values.return_value.append(gathering())
+    photos.get_all_values.return_value.append(hanukkah())
+    source = gatherings if failed_sheet == "gathering" else photos
+    source.get_all_values.side_effect = PermissionError(
+        "The service account cannot read this response Sheet"
+    )
+    before = csv.read_bytes()
+    with pytest.raises(PermissionError, match="service account"):
+        updater.update_results()
+    assert csv.read_bytes() == before
+
+
+def test_csv_write_failure_preserves_previous_results_and_cleans_temp(
+    harness, monkeypatch,
+):
+    updater, gatherings, photos, csv, _ = harness
+    gatherings.get_all_values.return_value.append(gathering())
+    photos.get_all_values.return_value.append(hanukkah())
+    before = csv.read_bytes()
+
+    def fail_during_csv_write(_df, output, index):
+        assert index is False
+        output.write("incomplete,unpublishable")
+        raise OSError("synthetic write failure")
+
+    monkeypatch.setattr(pd.DataFrame, "to_csv", fail_during_csv_write)
+    with pytest.raises(OSError, match="synthetic write failure"):
+        updater.update_results()
+
+    assert csv.read_bytes() == before
+    assert list(csv.parent.glob(".cwkc-results-*.tmp")) == []
+
+
+def test_failed_atomic_replace_preserves_previous_results_and_cleans_temp(
+    harness, monkeypatch,
+):
+    updater, gatherings, _, csv, _ = harness
+    gatherings.get_all_values.return_value.append(gathering())
+    before = csv.read_bytes()
+
+    def fail_replace(_source, _target):
+        raise OSError("synthetic rename failure")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="synthetic rename failure"):
+        updater.update_results()
+    assert csv.read_bytes() == before
+    assert list(csv.parent.glob(".cwkc-results-*.tmp")) == []
+
+
+def test_main_respects_dry_run_and_explicit_paths(harness, monkeypatch, capsys):
+    _, gatherings, photos, csv, _ = harness
+    gatherings.get_all_values.return_value.append(gathering())
+    photos.get_all_values.return_value.append(hanukkah())
+    before = csv.read_bytes()
+    monkeypatch.setattr(sys, "argv", [
+        "getGoogleFormData.py", "--dry-run",
+        "--credentials-file", "fake-credentials.json",
+        "--results-csv", str(csv),
+    ])
+
+    forms.main()
+
+    assert csv.read_bytes() == before
+    assert "Read-only preview" in capsys.readouterr().out
+
+
+def test_python_script_entrypoint_runs_with_mocked_api_without_writing(
+    harness, monkeypatch, capsys,
+):
+    _, gatherings, photos, csv, _ = harness
+    gatherings.get_all_values.return_value.append(gathering())
+    photos.get_all_values.return_value.append(hanukkah())
+    before = csv.read_bytes()
+    monkeypatch.setattr(sys, "argv", [
+        str(Path(forms.__file__)), "--dry-run",
+        "--credentials-file", "fake-credentials.json",
+        "--results-csv", str(csv),
+    ])
+
+    runpy.run_path(str(Path(forms.__file__)), run_name="__main__")
+
+    assert csv.read_bytes() == before
+    assert "Hanukkah submitters: UVA=0, VT=1" in capsys.readouterr().out
+
+
+def test_normalization_of_whitespace_and_missing_attendees():
+    assert forms._normalize("  StUdent\tAlumni   ") == "student alumni"
+    assert forms._attendance_names(" , ;\n\r ") == set()
