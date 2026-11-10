@@ -189,3 +189,21 @@ def test_multi_affiliation_keeps_family_and_alumni_independently(parser):
     assert record["status"] == "Alumni, Current Parent, Family Member of Alumni"
     # The related student's year does not prove donor Class-of-2026 eligibility.
     assert record["graduation year"] == ""
+
+
+
+@pytest.mark.parametrize("relative", [
+    "Family member of an Alum",
+    "Other Student Relative",
+])
+def test_legacy_generic_year_cannot_prove_class_when_alum_is_also_relative(
+    parser, relative,
+):
+    record = parser.normalize({
+        "I am a/an": f"Alum||{relative}",
+        "Grad Year": "2026",
+        "Total Amount": "$10.00",
+        "Phone": "5550001234",
+    }, source="uva-front")
+    assert "Alumni" in record["status"]
+    assert record["graduation year"] == ""
