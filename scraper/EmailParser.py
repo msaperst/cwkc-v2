@@ -112,35 +112,58 @@ class EmailParser:
         clean_amount = raw_amount.replace("$", "").replace(",", "").strip()
         total_amount = str(float(clean_amount))
 
-        # Use the donor's own alumni year, never a distinct related-student year.
-        # Identical repeated "Graduation Year" labels still fail closed in
-        # parse_lgl_email; do not guess from their order in a notification.
-        grad_year = fields.get(
-            "alumni graduation year",
-            fields.get("donor graduation year",
-                       fields.get("grad year", fields.get("graduation year", ""))),
+        # The scored graduation year always belongs to the *donor*, never
+        # the child/grandchild named by a separate conditional question.
+        # Both schools' November 10 public notifications use distinct labels,
+        # though UVA abbreviates them ("Alumni Grad Year" and "Related Grad Year").
+        donor_year_labels = (
+            "alumni graduation year", "alumni grad year", "donor graduation year",
         )
-
-        # The verified 2026 VT backend form uses "Grad Year" for a *related
-        # student* when a donor selects Current Parent and Alum together.
-        # That untyped year must never be treated as the donor's alumni year,
-        # which could incorrectly award Class of 2026 credit.
+        donor_year = next(
+            (fields[label] for label in donor_year_labels if fields.get(label)),
+            "",
+        )
         related_affiliations = {
             "Current Parent", "Current Grandparent",
             "Parent of Alumni", "Grandparent of Alumni",
         }
-        if source == "vt-back" and set(statuses).intersection(related_affiliations):
-            donor_year = fields.get(
-                "alumni graduation year",
-                fields.get("donor graduation year", ""),
+        is_alumni = "Alumni" in statuses
+        is_related = bool(set(statuses).intersection(related_affiliations))
+        raw_generic_year = fields.get(
+            "grad year", fields.get("graduation year", ""),
+        )
+        distinct_fields_present = any(
+            label in fields for label in (
+                *donor_year_labels, "related grad year",
+                "related student graduation year", "intended grad year",
+                "intended graduation year",
             )
-            if "Alumni" in statuses and not donor_year:
+        )
+
+        if is_alumni:
+            if donor_year:
+                grad_year = donor_year
+            elif source == "vt-back" and is_related:
+                # Retain the specific established VT backend error.
                 raise ValueError(
                     "VT backend donor alumni year is missing or ambiguous"
                 )
-            # If there is no alumni affiliation, all year information from
-            # related-person questions is irrelevant to donor-class scoring.
-            grad_year = donor_year
+            elif distinct_fields_present or is_related:
+                # A single untyped year is insufficient for overlapping
+                # alumni + family affiliations. A blank Alumni year in a
+                # multi-year form is not permission to use the student's.
+                raise ValueError(
+                    "Donor alumni graduation year is missing or ambiguous"
+                )
+            else:
+                # Backward-compatible standalone *alumni* form contract.
+                grad_year = raw_generic_year
+        elif is_related:
+            # Prior staff forms used a generic "Grad Year" for a related
+            # person. It is never a donor-alumni graduation year.
+            grad_year = ""
+        else:
+            grad_year = ""
 
         recurring_raw = fields.get("is recurring", "").lower()
         monthly_raw = fields.get("is this a monthly gift?", "").lower()
