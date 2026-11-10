@@ -3,6 +3,8 @@ from typing import Dict, Any
 import gspread
 import pandas as pd
 
+from .EmailParser import FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE
+
 PHONE_NUMBER = 'phone number'
 TOTAL_AMOUNT = 'total amount'
 RECURRING_PAYMENT = 'recurring payment'
@@ -13,7 +15,11 @@ class CalculateValues:
     Pulls normalized donation data from Google Sheets and calculates metrics per school.
     """
 
-    FAMILY_STATUSES = ['Current Parent', 'Current Grandparent', 'Parent of Alumni', 'Grandparent of Alumni']
+    FAMILY_STATUSES = [
+        'Current Parent', 'Current Grandparent',
+        'Parent of Alumni', 'Grandparent of Alumni',
+        FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
+    ]
     GRANDPARENT_STATUS = ['Current Grandparent']
 
     def __init__(self, spreadsheet_key: str, worksheet_name: str = "entries",
