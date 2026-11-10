@@ -103,19 +103,21 @@ def _parse_and_normalize(fields):
     return data, row
 
 
-def test_vt_backend_original_contract_is_unsafe_without_donor_year():
+def test_legacy_vt_backend_parent_alumni_without_donor_year_keeps_other_credit():
     sender, raw = parse_lgl_email(_mime())
     assert determine_source(sender, raw["Form title"]) == "vt-back"
     assert raw["Gift Amount"] == "20"
     assert raw["Donor is a/an..."] == "Current Parent||Alum"
     assert raw["Grad Year"] == "2028"
     assert "Alumni Graduation Year" not in raw
-    with pytest.raises(ValueError, match="VT backend donor alumni year"):
-        EmailParser().normalize(raw, "vt-back")
+    row = EmailParser().normalize(raw, "vt-back")
+    validate_submission(raw, row)
+    assert row["status"] == "Alumni, Current Parent"
+    assert row["graduation year"] == ""
 
 
 @pytest.mark.parametrize("student_year", ["2026", "2028"])
-def test_bad_vt_backend_year_stays_unread_with_no_sheet_write(student_year):
+def test_legacy_vt_backend_related_year_is_not_assigned_to_alumni(student_year):
     fields = [
         (label, student_year) if label == "Grad Year" else (label, value)
         for label, value in VT_BACK_2026_FIELDS
@@ -124,11 +126,14 @@ def test_bad_vt_backend_year_stays_unread_with_no_sheet_write(student_year):
     server.fetch.return_value = {73: {b"BODY[]": _mime(fields)}}
     ledger = MagicMock()
     ledger.known.return_value = False
+    ledger.insert.return_value = True
     result = process_messages(server, [73], ledger)
-    assert result == {"new": 0, "already_stored": 0, "pending": 0, "failed": 1}
+    assert result == {"new": 1, "already_stored": 0, "pending": 0, "failed": 0}
     server.fetch.assert_called_once_with(73, ["BODY.PEEK[]"])
-    ledger.insert.assert_not_called()
-    server.add_flags.assert_not_called()
+    saved = ledger.insert.call_args.args[0]
+    assert saved["graduation year"] == ""
+    assert saved["status"] == "Alumni, Current Parent"
+    server.add_flags.assert_called_once_with(73, ["\\Seen"])
 
 
 def test_distinct_backend_years_recognize_all_actual_labels_and_flags():
