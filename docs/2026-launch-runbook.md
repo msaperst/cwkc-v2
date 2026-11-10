@@ -19,7 +19,7 @@ For repeatable operational instructions, see [Operations](operations.md); for fo
 | Alumni gatherings | In person, at least four attendees including the host |
 | Processing | Scheduled GitHub Actions, `cwkc-results` publication branch; `CWKC_INGESTION_ENABLED` remains **off** until go/no-go |
 
-**Accounting decisions still to confirm:** monthly recurring gifts are presently annualized ×12; VT's optional $75,000 challenge grant is **not** automatically added or treated as workplace matching. See [#35](https://github.com/msaperst/cwkc-v2/issues/35).
+**Confirmed accounting decision (November 10):** count the full LGL-reported amount for both schools, including an optional donor-paid 3% processing-fee contribution. For example, a $250 gift with fee coverage counts as $257.50; $100 counts as $103. The existing code already uses public `Total Amount` (not `Amount - Details`) or backend `Gift amount`; no form changes are needed. **Other accounting notes:** monthly gifts remain annualized ×12 under current rules; VT's optional $75,000 challenge grant is **not** automatically added or treated as workplace matching. See [#35](https://github.com/msaperst/cwkc-v2/issues/35).
 
 ## Final LGL notification contract (Nov 10)
 
