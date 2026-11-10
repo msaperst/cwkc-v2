@@ -154,3 +154,38 @@ def test_total_amount_with_commas(parser):
     result = parser.normalize(email_data, source="vt-front")
 
     assert result["total amount"] == "1030.0"
+
+
+
+@pytest.mark.parametrize("raw_affiliation,expected", [
+    ("Family member of an Alum", "Family Member of Alumni"),
+    ("Family member of Alumni", "Family Member of Alumni"),
+    ("Family Member of Alumni", "Family Member of Alumni"),
+    ("Other Student Relative", "Other Student Relative"),
+])
+def test_family_relatives_are_not_downgraded_to_community_member(
+    parser, raw_affiliation, expected,
+):
+    result = parser.normalize({
+        "I am a/an": raw_affiliation,
+        "Name - First Name": "Example",
+        "Name - Last Name": "Supporter",
+        "Phone": "5550001234",
+        "Total Amount": "$257.50",
+    }, source="uva-front")
+    assert result["status"] == expected
+    assert result["status"] != "Community Member"
+    assert result["graduation year"] == ""
+
+
+def test_multi_affiliation_keeps_family_and_alumni_independently(parser):
+    record = parser.normalize({
+        "I am a/an": "Alum||Family member of an Alum||Current Parent",
+        "Alumni Grad Year": "",
+        "Related Grad Year": "2026",
+        "Total Amount": "$25.00",
+        "Phone": "5550001234",
+    }, source="uva-front")
+    assert record["status"] == "Alumni, Current Parent, Family Member of Alumni"
+    # The related student's year does not prove donor Class-of-2026 eligibility.
+    assert record["graduation year"] == ""
