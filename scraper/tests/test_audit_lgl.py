@@ -328,3 +328,99 @@ def test_identical_mime_notifications_are_projected_once():
     assert report["identical_mime_skipped"] == 1
     assert report["provisional_metrics"]["uva"]["total_amount"] == "5.00"
     assert report["provisional_metrics"]["uva"]["most_individual_donors"] == 1
+
+
+
+@pytest.mark.parametrize("school,affiliation,expected_family", [
+    ("uva", "Family member of an Alum", "257.50"),
+    ("vt", "Other Student Relative", "257.50"),
+])
+def test_readonly_preview_matches_family_supporter_scoring(
+    school, affiliation, expected_family,
+):
+    raw = _mime(
+        school, audit.FORM_TITLES[f"{school}-front"],
+        "synthetic-relative-donation", "$257.50",
+        [("I am a/an" if school == "uva" else "I am a/an...", affiliation)],
+    )
+    server = _fake_server({101: raw})
+    report = audit.audit_unread(server)
+    assert report["failed"] == 0
+    assert report["independent_score_comparison"] == "passed"
+    metrics = report["provisional_metrics"][school]
+    assert metrics["total_amount"] == "257.50"
+    assert metrics["most_money_families"] == expected_family
+    assert metrics["most_individual_donors"] == 1
+    server.add_flags.assert_not_called()
+
+
+
+def test_unknown_affiliation_is_flagged_without_changing_mailbox(tmp_path):
+    raw = _mime(
+        "uva", audit.FORM_TITLES["uva-front"],
+        "synthetic-unrecognized-affiliation", "$25.00",
+        [("I am a/an", "New school category not mapped")],
+    )
+    server = _fake_server({103: raw})
+    report = audit.audit_unread(server)
+    assert report["parsed"] == 0
+    assert report["failed"] == 1
+    assert report["errors"] == [{"uid": 103, "error_type": "ValueError"}]
+    with pytest.raises(ValueError, match="Incomplete audit"):
+        audit.build_preview_csv(report, tmp_path / "preview.csv")
+    server.add_flags.assert_not_called()
+    server.delete_messages.assert_not_called()
+
+
+
+@pytest.mark.parametrize("school,full_amount,details,expected_family", [
+    (
+        "uva", "$257.50",
+        "- Sponsor a program planned by our Hillel Jewish Leadership "
+        "Institute students: $250.00",
+        "257.50",
+    ),
+    ("vt", "$103.00", "Amount: $100.00", "103.00"),
+    ("vt", "$100.00", "Amount: $100.00", "100.00"),
+])
+def test_readonly_csv_includes_full_reported_donation_with_fee_if_present(
+    school, full_amount, details, expected_family,
+):
+    """The full LGL charge is the score, even if it includes a 3% add-on."""
+    raw = _mime(
+        school, audit.FORM_TITLES[f"{school}-front"],
+        "synthetic-fee-example", full_amount,
+        [
+            ("Amount - Details", details),
+            (
+                "I am a/an" if school == "uva" else "I am a/an...",
+                "Current Parent",
+            ),
+            ("Is Recurring", "false"),
+        ],
+    )
+    server = _fake_server({204: raw})
+    report = audit.audit_unread(server)
+    assert report["failed"] == 0
+    assert report["independent_score_comparison"] == "passed"
+    assert report["provisional_metrics"][school]["total_amount"] == expected_family
+    assert report["provisional_metrics"][school]["most_money_families"] == expected_family
+    assert report["provisional_metrics"][school]["most_individual_donors"] == 1
+    server.add_flags.assert_not_called()
+
+
+def test_fee_included_in_recurring_annualization_without_extra_multiplier():
+    """A $10 monthly amount plus optional 3% becomes $10.30 x 12."""
+    raw = _mime(
+        "vt", audit.FORM_TITLES["vt-front"],
+        "synthetic-monthly-fee", "$10.30",
+        [
+            ("Amount - Details", "Amount: $10.00"),
+            ("I am a/an...", "Alumni"),
+            ("Is Recurring", "true"),
+        ],
+    )
+    report = audit.audit_unread(_fake_server({205: raw}))
+    assert report["failed"] == 0
+    assert report["provisional_metrics"]["vt"]["total_amount"] == "123.60"
+    assert report["provisional_metrics"]["vt"]["most_alum_monthly_10_plus"] == 1

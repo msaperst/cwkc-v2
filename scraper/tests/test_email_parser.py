@@ -154,3 +154,85 @@ def test_total_amount_with_commas(parser):
     result = parser.normalize(email_data, source="vt-front")
 
     assert result["total amount"] == "1030.0"
+
+
+
+@pytest.mark.parametrize("raw_affiliation,expected", [
+    ("Family member of an Alum", "Family Member of Alumni"),
+    ("Family member of Alumni", "Family Member of Alumni"),
+    ("Family Member of Alumni", "Family Member of Alumni"),
+    ("Other Student Relative", "Other Student Relative"),
+])
+def test_family_relatives_are_not_downgraded_to_community_member(
+    parser, raw_affiliation, expected,
+):
+    result = parser.normalize({
+        "I am a/an": raw_affiliation,
+        "Name - First Name": "Example",
+        "Name - Last Name": "Supporter",
+        "Phone": "5550001234",
+        "Total Amount": "$257.50",
+    }, source="uva-front")
+    assert result["status"] == expected
+    assert result["status"] != "Community Member"
+    assert result["graduation year"] == ""
+
+
+def test_multi_affiliation_keeps_family_and_alumni_independently(parser):
+    record = parser.normalize({
+        "I am a/an": "Alum||Family member of an Alum||Current Parent",
+        "Alumni Grad Year": "",
+        "Related Grad Year": "2026",
+        "Total Amount": "$25.00",
+        "Phone": "5550001234",
+    }, source="uva-front")
+    assert record["status"] == "Alumni, Current Parent, Family Member of Alumni"
+    # The related student's year does not prove donor Class-of-2026 eligibility.
+    assert record["graduation year"] == ""
+
+
+
+@pytest.mark.parametrize("relative", [
+    "Family member of an Alum",
+    "Other Student Relative",
+])
+def test_legacy_generic_year_cannot_prove_class_when_alum_is_also_relative(
+    parser, relative,
+):
+    record = parser.normalize({
+        "I am a/an": f"Alum||{relative}",
+        "Grad Year": "2026",
+        "Total Amount": "$10.00",
+        "Phone": "5550001234",
+    }, source="uva-front")
+    assert "Alumni" in record["status"]
+    assert record["graduation year"] == ""
+
+
+
+@pytest.mark.parametrize("school,total,details,expected", [
+    (
+        "uva",
+        "$257.50",
+        "- Sponsor a program planned by our Hillel Jewish Leadership "
+        "Institute students: $250.00",
+        "257.5",
+    ),
+    ("vt", "$103.00", "Amount: $100.00", "103.0"),
+])
+def test_optional_processing_fee_counts_full_lgl_total(
+    parser, school, total, details, expected,
+):
+    """Organizer decision: never subtract the optional 3% fee contribution.
+
+    Amount - Details describes the underlying donation selection, while
+    Total Amount is the full charged amount used for CWKC scoring.
+    """
+    parsed = {
+        "Total Amount": total,
+        "Amount - Details": details,
+        "I am a/an": "Current Parent",
+        "Is Recurring": "false",
+    }
+    row = parser.normalize(parsed, source=f"{school}-front")
+    assert row["total amount"] == expected
