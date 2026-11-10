@@ -1,11 +1,9 @@
 import random
 from typing import Dict, Set
 
-COMMUNITY_MEMBER = 'Community Member'
-GRANDPARENT_OF_ALUMNI = 'Grandparent of Alumni'
-PARENT_OF_ALUMNI = 'Parent of Alumni'
-FAMILY_MEMBER_OF_ALUMNI = 'Family Member of Alumni'
-OTHER_STUDENT_RELATIVE = 'Other Student Relative'
+from .affiliations import (
+    AFFILIATION_ALIASES, ALUMNI, COMMUNITY_MEMBER, RELATED_PERSON_AFFILIATIONS,
+)
 
 
 def determine_source(email_from: str, form_title: str) -> str:
@@ -36,25 +34,8 @@ class EmailParser:
     Class to normalize donation email data into a consistent format for Google Sheets.
     """
 
-    # ========== Canonical Enums / Mappings ==========
-    STATUS_MAP = {
-        'Current Student': 'Current Student',
-        'Undergraduate Student': 'Current Student',
-        'Graduate Student': 'Current Student',
-        'Current Parent': 'Current Parent',
-        'Current Grandparent': 'Current Grandparent',
-        'Alumni': 'Alumni',
-        'Alum': 'Alumni',
-        PARENT_OF_ALUMNI: PARENT_OF_ALUMNI,
-        'Parent of an Alum': PARENT_OF_ALUMNI,
-        GRANDPARENT_OF_ALUMNI: GRANDPARENT_OF_ALUMNI,
-        'Grandparent of an Alum': GRANDPARENT_OF_ALUMNI,
-        FAMILY_MEMBER_OF_ALUMNI: FAMILY_MEMBER_OF_ALUMNI,
-        'Family member of an Alum': FAMILY_MEMBER_OF_ALUMNI,
-        'Family member of Alumni': FAMILY_MEMBER_OF_ALUMNI,
-        OTHER_STUDENT_RELATIVE: OTHER_STUDENT_RELATIVE,
-        COMMUNITY_MEMBER: COMMUNITY_MEMBER
-    }
+    # Compatibility alias; labels and groups are defined in affiliations.py.
+    STATUS_MAP = AFFILIATION_ALIASES
 
     FIRST_TIME_GIFTS: Set[str] = {
         "Donor's first gift to Hillel at VT",
@@ -104,10 +85,15 @@ class EmailParser:
                        fields.get("donor is a/an...",
                                   fields.get("donor is a/n...", COMMUNITY_MEMBER))),
         )
-        statuses = [
-            self.STATUS_MAP.get(s.strip(), COMMUNITY_MEMBER)
-            for s in raw_status.split("||") if s.strip()
-        ]
+        try:
+            statuses = [
+                self.STATUS_MAP[value.strip()]
+                for value in raw_status.split("||") if value.strip()
+            ]
+        except KeyError:
+            # Unknown LGL labels must not silently lose eligibility for
+            # family or other scoring categories.
+            raise ValueError("Unrecognized donor affiliation") from None
         status = ", ".join(sorted(set(statuses))) if statuses else COMMUNITY_MEMBER
 
         first_name = fields.get("name - first name", "")
@@ -129,13 +115,8 @@ class EmailParser:
             (fields[label] for label in donor_year_labels if fields.get(label)),
             "",
         )
-        related_affiliations = {
-            "Current Parent", "Current Grandparent",
-            "Parent of Alumni", "Grandparent of Alumni",
-            FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
-        }
-        is_alumni = "Alumni" in statuses
-        is_related = bool(set(statuses).intersection(related_affiliations))
+        is_alumni = ALUMNI in statuses
+        is_related = bool(RELATED_PERSON_AFFILIATIONS.intersection(statuses))
         raw_generic_year = fields.get(
             "grad year", fields.get("graduation year", ""),
         )
