@@ -153,7 +153,8 @@ def test_readonly_mode_closes_connection_and_does_not_log_donors(capsys):
     client.__enter__.return_value = server
     with patch.object(audit, "IMAPClient", return_value=client), \
          patch.object(audit, "EMAIL_ACCOUNT", "service@example.invalid"), \
-         patch.object(audit, "EMAIL_PASSWORD", "fake-local-only"):
+         patch.object(audit, "EMAIL_PASSWORD", "fake-local-only"), \
+         patch.dict("os.environ", {"GITHUB_ACTIONS": "false"}):
         audit.main([])
 
     server.select_folder.assert_called_once_with(
@@ -291,3 +292,34 @@ def test_actions_summary_is_redacted(tmp_path, monkeypatch):
     assert "auditor@example.invalid" not in contents
     assert "Example" not in contents
     assert "unreconciled" in contents
+
+
+
+def test_public_github_actions_requires_private_output(monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    with pytest.raises(SystemExit):
+        audit.main([])
+
+
+def test_private_workflow_logs_no_amounts_or_names(tmp_path, monkeypatch, capsys):
+    server = _fake_server()
+    client = MagicMock()
+    client.__enter__.return_value = server
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary.md"))
+    with patch.object(audit, "IMAPClient", return_value=client), \
+         patch.object(audit, "EMAIL_ACCOUNT", "service@example.invalid"), \
+         patch.object(audit, "EMAIL_PASSWORD", "fake-local-only"):
+        audit.main([
+            "--private-workflow", "--preview-csv",
+            str(tmp_path / "preview.csv"),
+        ])
+    output = capsys.readouterr().out
+    summary = (tmp_path / "summary.md").read_text()
+    assert (tmp_path / "preview.csv").exists()
+    assert "245.00" not in output + summary
+    assert "7.06" not in output + summary
+    assert "auditor@example.invalid" not in output + summary
+    assert "Preview" in summary or "preview" in summary
+    assert "encrypted" in summary
+    server.add_flags.assert_not_called()
