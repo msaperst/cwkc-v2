@@ -132,6 +132,7 @@ class EmailParser:
         related_affiliations = {
             "Current Parent", "Current Grandparent",
             "Parent of Alumni", "Grandparent of Alumni",
+            FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
         }
         is_alumni = "Alumni" in statuses
         is_related = bool(set(statuses).intersection(related_affiliations))
