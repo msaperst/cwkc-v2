@@ -14,7 +14,7 @@ import pandas as pd
 
 from .CalculateValues import CalculateValues
 from .EmailParser import EmailParser, determine_source
-from .donation_ledger import NORMALIZED_FIELDS
+from .donation_ledger import NORMALIZED_FIELDS, fingerprint
 from .getLglFormData import (
     EMAIL_ACCOUNT, EMAIL_PASSWORD, FROM_FILTER, IMAP_SERVER, MAILBOX,
     IMAPClient, parse_lgl_email, validate_submission,
@@ -179,10 +179,20 @@ def audit_unread(server, excluded_ids=frozenset()):
     """Audit all matching UNSEEN mail without acknowledging or changing it."""
     uids = server.search(["UNSEEN", "FROM", FROM_FILTER])
     entries, errors = [], []
+    seen_fingerprints = set()
+    identical_mime_skipped = 0
     for uid in uids:
         try:
             fetched = server.fetch(uid, ["BODY.PEEK[]"])
-            entry = _parse_one(fetched[uid][b"BODY[]"], uid)
+            raw = fetched[uid][b"BODY[]"]
+            identity = fingerprint(raw)
+            if identity in seen_fingerprints:
+                # Production's durable ledger keys the complete raw MIME.
+                # Count identical notifications only once in this projection.
+                identical_mime_skipped += 1
+                continue
+            entry = _parse_one(raw, uid)
+            seen_fingerprints.add(identity)
             entries.append(entry)
         except Exception as exc:
             # Exception text may contain PII; only the type is safe to show.
@@ -210,6 +220,7 @@ def audit_unread(server, excluded_ids=frozenset()):
     return {
         "unread_matching": len(uids),
         "parsed": len(entries),
+        "identical_mime_skipped": identical_mime_skipped,
         "failed": len(errors),
         "excluded": sum(x["excluded"] for x in inventory),
         "unreconciled_flags": sum(
@@ -379,6 +390,7 @@ def main(argv=None):
         "Read-only audit:",
         f"unread={report['unread_matching']}",
         f"parsed={report['parsed']}",
+        f"duplicate_mime={report['identical_mime_skipped']}",
         f"failed={report['failed']}",
         f"excluded={report['excluded']}",
         f"flagged={report['unreconciled_flags']}",
