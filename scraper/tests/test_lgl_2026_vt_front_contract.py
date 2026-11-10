@@ -105,24 +105,39 @@ def _normalized(fields):
 
 
 @pytest.mark.parametrize("same_year", [False, True])
-def test_real_vt_duplicate_graduation_years_fail_closed(same_year):
+def test_verified_legacy_vt_duplicate_years_preserve_gift_without_class_credit(same_year):
     fields = [
         (label, "2006" if same_year and label == "Graduation Year" else value)
         for label, value in VT_FRONT_2026_FIELDS
     ]
-    with pytest.raises(ValueError, match="Repeated graduation-year field is ambiguous"):
-        parse_lgl_email(_message(fields))
+    sender, raw = parse_lgl_email(_message(fields))
+    assert raw["__ambiguous_alumni_year__"] == "true"
+    assert "Graduation Year" not in raw
+    record = EmailParser().normalize(
+        raw, determine_source(sender, raw["Form title"]),
+    )
+    validate_submission(raw, record)
+    assert record["graduation year"] == ""
+    assert record["status"] == "Alumni, Current Parent"
+    assert record["total amount"] == "5.0"
 
 
-def test_unparseable_vt_email_stays_unread_and_does_not_write_to_sheet():
+def test_legacy_vt_email_is_stored_with_missing_alumni_class_credit(capsys):
     server, ledger = MagicMock(), MagicMock()
     server.fetch.return_value = {17: {b"BODY[]": _message()}}
     ledger.known.return_value = False
+    ledger.insert.return_value = True
     result = process_messages(server, [17], ledger)
-    assert result == {"new": 0, "already_stored": 0, "pending": 0, "failed": 1}
+    assert result == {"new": 1, "already_stored": 0, "pending": 0, "failed": 0}
     server.fetch.assert_called_once_with(17, ["BODY.PEEK[]"])
-    server.add_flags.assert_not_called()
-    ledger.insert.assert_not_called()
+    saved = ledger.insert.call_args.args[0]
+    assert saved["graduation year"] == ""
+    assert saved["status"] == "Alumni, Current Parent"
+    assert saved["total amount"] == "5.0"
+    server.add_flags.assert_called_once_with(17, ["\\Seen"])
+    log = capsys.readouterr().out
+    assert "class credit withheld" in log
+    assert "donor@example" not in log
 
 
 def test_safe_distinct_year_labels_normalize_multiaffiliation_and_vt_answers():
@@ -188,7 +203,8 @@ def test_vt_undergraduate_and_grad_students_map_to_current_student(student_optio
 
 def test_standalone_vt_alumni_graduation_year_is_parsed():
     fields = [
-        (label, value) for label, value in VT_FRONT_2026_FIELDS
+        (label, "Alumni") if label == "I am a/an..." else (label, value)
+        for label, value in VT_FRONT_2026_FIELDS
         if not (label == "Graduation Year" and value == "2028")
     ]
     _, record = _normalized(fields)
