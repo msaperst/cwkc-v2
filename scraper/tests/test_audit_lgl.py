@@ -352,3 +352,21 @@ def test_readonly_preview_matches_family_supporter_scoring(
     assert metrics["most_money_families"] == expected_family
     assert metrics["most_individual_donors"] == 1
     server.add_flags.assert_not_called()
+
+
+
+def test_unknown_affiliation_is_flagged_without_changing_mailbox(tmp_path):
+    raw = _mime(
+        "uva", audit.FORM_TITLES["uva-front"],
+        "synthetic-unrecognized-affiliation", "$25.00",
+        [("I am a/an", "New school category not mapped")],
+    )
+    server = _fake_server({103: raw})
+    report = audit.audit_unread(server)
+    assert report["parsed"] == 0
+    assert report["failed"] == 1
+    assert report["errors"] == [{"uid": 103, "error_type": "ValueError"}]
+    with pytest.raises(ValueError, match="Incomplete audit"):
+        audit.build_preview_csv(report, tmp_path / "preview.csv")
+    server.add_flags.assert_not_called()
+    server.delete_messages.assert_not_called()
