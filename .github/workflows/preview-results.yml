@@ -76,7 +76,7 @@ jobs:
           if any(not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", item)
                  for item in identifiers):
               raise SystemExit("Invalid exclusion format; no processing performed")
-          path = Path(os.environ["RUNNER_TEMP"]) / "excluded-ids.txt"
+          path = Path(".cwkc-excluded-submissions.txt")
           path.write_text("\n".join(identifiers) + "\n", encoding="utf-8")
           path.chmod(0o600)
           print(f"Number of verified exclusions requested: {len(identifiers)}")
@@ -126,12 +126,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--exclude-file "$RUNNER_TEMP/excluded-ids.txt"
-                --preview-csv "$RUNNER_TEMP/proposed-results.csv")
           if [ "$INCLUDE_FORMS" = "true" ]; then
-            args+=(--include-forms --credentials-file scraper/spreadsheet_credentials.json)
+            python -m scraper.audit_lgl --private-workflow --include-forms
+          else
+            python -m scraper.audit_lgl --private-workflow
           fi
-          python -m scraper.audit_lgl --private-workflow "${args[@]}"
 
       # The repository is PUBLIC. Never upload the plaintext projected CSV,
       # and never print financial totals in a public Actions step summary.
@@ -149,8 +148,8 @@ jobs:
           fi
           age -r "$AGE_RECIPIENT" \
             -o "$RUNNER_TEMP/proposed-results.csv.age" \
-            "$RUNNER_TEMP/proposed-results.csv"
-          rm -f "$RUNNER_TEMP/proposed-results.csv"
+            ".cwkc-preview-results.csv"
+          rm -f ".cwkc-preview-results.csv" ".cwkc-excluded-submissions.txt"
           test -s "$RUNNER_TEMP/proposed-results.csv.age"
 
       - name: Download encrypted preview only (NOT published)
