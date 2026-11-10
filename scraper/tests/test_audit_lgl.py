@@ -328,3 +328,27 @@ def test_identical_mime_notifications_are_projected_once():
     assert report["identical_mime_skipped"] == 1
     assert report["provisional_metrics"]["uva"]["total_amount"] == "5.00"
     assert report["provisional_metrics"]["uva"]["most_individual_donors"] == 1
+
+
+
+@pytest.mark.parametrize("school,affiliation,expected_family", [
+    ("uva", "Family member of an Alum", "257.50"),
+    ("vt", "Other Student Relative", "257.50"),
+])
+def test_readonly_preview_matches_family_supporter_scoring(
+    school, affiliation, expected_family,
+):
+    raw = _mime(
+        school, audit.FORM_TITLES[f"{school}-front"],
+        "synthetic-relative-donation", "$257.50",
+        [("I am a/an" if school == "uva" else "I am a/an...", affiliation)],
+    )
+    server = _fake_server({101: raw})
+    report = audit.audit_unread(server)
+    assert report["failed"] == 0
+    assert report["independent_score_comparison"] == "passed"
+    metrics = report["provisional_metrics"][school]
+    assert metrics["total_amount"] == "257.50"
+    assert metrics["most_money_families"] == expected_family
+    assert metrics["most_individual_donors"] == 1
+    server.add_flags.assert_not_called()
