@@ -29,11 +29,10 @@ CSV_PATH = os.getenv("RESULTS_CSV", "public/assets/csv/results.csv")
 
 
 # ===== FUNCTIONS =====
-# VT's conditional form can include both an alumni and a relative's year under
-# the same visible label. Even identical values cannot identify which person
-# they describe; never choose a "last one wins" value.
+# Never use repeated unqualified graduation-year labels as donor-alumni proof.
+GRADUATION_YEAR_FIELD = "graduation year"
 AMBIGUOUS_YEAR_FIELDS = frozenset({
-    "grad year", "graduation year", "intended graduation year",
+    "grad year", GRADUATION_YEAR_FIELD, "intended graduation year",
 })
 
 
@@ -42,70 +41,88 @@ def _field_identity(label: str) -> str:
     return " ".join(label.split()).rstrip(": ").casefold()
 
 
+def _is_verified_legacy_vt_year(
+    identity: str, data: dict, email_from: str, already_downgraded: bool,
+) -> bool:
+    """Identify only the known November 6 VT parent+alumni form variant."""
+    affiliations = {
+        affiliation.strip()
+        for affiliation in data.get("I am a/an...", "").split("||")
+    }
+    return (
+        identity == GRADUATION_YEAR_FIELD
+        and not already_downgraded
+        and "hillel at vt" in email_from.casefold()
+        and data.get("Form title") == "CWKC 2026 Donation Form"
+        and {"Alumni", "Current Parent"} <= affiliations
+    )
+
+
+def _handle_repeated_field(
+    identity: str, value: str, data: dict, seen_fields: dict,
+    email_from: str, already_downgraded: bool,
+) -> bool:
+    """Reject ambiguous duplicates except the verified old VT year pair.
+
+    Return whether that legacy year pair has already been downgraded.
+    """
+    if _is_verified_legacy_vt_year(
+        identity, data, email_from, already_downgraded,
+    ):
+        # Both old "Graduation Year" values describe unidentified people.
+        # The legitimate gift can count, but neither year can earn class credit.
+        original_key = next(
+            key for key in data if _field_identity(key) == identity
+        )
+        del data[original_key]
+        data["__ambiguous_alumni_year__"] = "true"
+        return True
+
+    if identity in AMBIGUOUS_YEAR_FIELDS:
+        raise ValueError("Repeated graduation-year field is ambiguous")
+    if seen_fields[identity] != " ".join(value.split()):
+        raise ValueError("Conflicting duplicate LGL form field")
+
+    # Identical ordinary duplicate: retain its first label and value.
+    return already_downgraded
+
+
 def parse_lgl_email(raw_msg):
     """Parse one LGL table without silently discarding repeated fields."""
     msg = email.message_from_bytes(raw_msg, policy=default)
     email_from = msg.get("From", "")
 
-    # Get the HTML part
-    html_part = msg.get_body(preferencelist=('html'))
+    html_part = msg.get_body(preferencelist=("html",))
     if html_part is None:
         raise ValueError("Email has no HTML part")
 
-    html = html_part.get_content()
-    soup = BeautifulSoup(html, "html.parser")
-
-    data = {}
-    seen_fields = {}
-    downgraded_legacy_vt_year = False
-    # Find the first table (assuming the form submission table is the first)
+    soup = BeautifulSoup(html_part.get_content(), "html.parser")
     table = soup.find("table")
     if not table:
         raise ValueError("No table found in email")
 
-    # Iterate over rows. Repeated labels from LGL conditional questions
-    # must not silently overwrite previously parsed answers.
+    data = {}
+    seen_fields = {}
+    downgraded_legacy_vt_year = False
+
+    # Conditional questions can have repeated labels; don't overwrite them.
     for row in table.find_all("tr"):
         cells = row.find_all(["td", "th"])
         if len(cells) < 2:
             continue
+
         key = cells[0].get_text(strip=True)
-        val = cells[1].get_text(strip=True)
+        value = cells[1].get_text(strip=True)
         identity = _field_identity(key)
-
         if identity in seen_fields:
-            # The *verified* older VT 2026 public form used "Graduation
-            # Year" twice for a donor who was both Alumni and Current
-            # Parent. Preserve the actual donation but explicitly discard
-            # the unidentified years; the donor's class is unverified.
-            affiliations = {
-                value.strip() for value in
-                data.get("I am a/an...", "").split("||")
-            }
-            older_vt_parent_alum = (
-                identity == "graduation year"
-                and not downgraded_legacy_vt_year
-                and "hillel at vt" in email_from.casefold()
-                and data.get("Form title") == "CWKC 2026 Donation Form"
-                and "Alumni" in affiliations
-                and "Current Parent" in affiliations
+            downgraded_legacy_vt_year = _handle_repeated_field(
+                identity, value, data, seen_fields, email_from,
+                downgraded_legacy_vt_year,
             )
-            if older_vt_parent_alum:
-                for existing_key in list(data):
-                    if _field_identity(existing_key) == identity:
-                        del data[existing_key]
-                downgraded_legacy_vt_year = True
-                # Internal marker: not persisted in the public score schema.
-                data["__ambiguous_alumni_year__"] = "true"
-                continue
-            if identity in AMBIGUOUS_YEAR_FIELDS:
-                raise ValueError("Repeated graduation-year field is ambiguous")
-            if seen_fields[identity] != " ".join(val.split()):
-                raise ValueError("Conflicting duplicate LGL form field")
-            continue  # Harmless identical duplicate; retain the first label.
+            continue
 
-        seen_fields[identity] = " ".join(val.split())
-        data[key] = val
+        seen_fields[identity] = " ".join(value.split())
+        data[key] = value
 
     return email_from, data
 
