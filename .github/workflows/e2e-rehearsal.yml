@@ -88,7 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m scraper.e2e_rehearsal --mode "$E2E_MODE"
+          python -m scraper.tests.e2e_rehearsal --mode "$E2E_MODE"
 
       - name: Set up Node 24
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
