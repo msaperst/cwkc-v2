@@ -12,6 +12,7 @@ from imapclient import IMAPClient
 
 from .CalculateValues import CalculateValues
 from .EmailParser import EmailParser, determine_source
+from .affiliations import ALUMNI, CURRENT_PARENT
 from .donation_ledger import NORMALIZED_FIELDS, SubmissionLedger, fingerprint
 
 # ===== CONFIG =====
@@ -54,7 +55,7 @@ def _is_verified_legacy_vt_year(
         and not already_downgraded
         and "hillel at vt" in email_from.casefold()
         and data.get("Form title") == "CWKC 2026 Donation Form"
-        and {"Alumni", "Current Parent"} <= affiliations
+        and {ALUMNI, CURRENT_PARENT} <= affiliations
     )
 
 
@@ -166,7 +167,7 @@ def handle_message(server, uid, ledger, normalizer, reconcile_only):
                 f"LGL UID {uid}: older VT duplicate year fields; "
                 "alumni-class credit withheld for private reconciliation"
             )
-        elif ("Alumni" in normalized["status"].split(", ")
+        elif (ALUMNI in normalized["status"].split(", ")
               and not normalized["graduation year"]):
             print(
                 f"LGL UID {uid}: donor alumni year unavailable; "
