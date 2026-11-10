@@ -72,6 +72,28 @@ With `CWKC_INGESTION_ENABLED=false`:
 
 **Caution:** The workflow switch does **not** gate manually invoked Python scripts with live credentials. Such scripts can write Sheets and mark IMAP messages Seen. Do not smoke-test against the production mailbox.
 
+## Manual read-only score preview (before launch)
+
+After merging the preview workflow, use **Actions → Preview CWKC results (read-only) → Run workflow** on `main`. It parses **currently unread** LGL emails without changing Seen flags, computes the donation CSV numbers, and optionally reads the current Google Forms response Sheets (`include_forms=true`) in dry-run mode. It does **not** write a Sheet, update `cwkc-results`, or publish Pages. Exclude only verified non-payment test records using their comma-separated LGL *Submission IDs*; otherwise they will appear in provisional totals. Donor-name columns are redacted.
+
+This repository is **public**, so previews are encrypted before being uploaded and no financial amounts are logged. One-time operator setup:
+
+~~~bash
+# Install "age" locally if needed. Keep the private key OUT of Git.
+mkdir -p ~/.config/cwkc
+age-keygen -o ~/.config/cwkc/preview.key
+# Copy the printed "public key: age1..." recipient only.
+~~~
+
+In GitHub **Settings → Secrets and variables → Actions → Variables**, set `CWKC_PREVIEW_AGE_RECIPIENT` to the printed **public** `age1...` value. Never share or commit `preview.key`. After a successful manual run, download the one-day `cwkc-encrypted-preview-...` artifact and decrypt:
+
+~~~bash
+age -d -i ~/.config/cwkc/preview.key \
+  -o proposed-results.csv proposed-results.csv.age
+~~~
+
+The proposed CSV has the exact public results schema but **excludes donor names** for privacy; compare the numeric fields privately to LGL payments. Without `include_forms`, participation/football columns remain at their starter values. This is a **current unread inbox projection**, not a merged view of any already-persisted Sheet rows, not evidence of payment receipt, and **not** a full email→Sheet→Pages integration test. A separate controlled rehearsal is required before opening.
+
 ## During the event
 
 Scheduled Actions refresh roughly every five minutes; GitHub cron can be delayed or occasionally skipped. Check actual workflow executions and watchdog alerts. Use aggregate non-PII counters from Actions, but reconcile donations and totals with LGL privately. Avoid running a local poller and scheduled ingester independently without a coordinated fallback plan.
