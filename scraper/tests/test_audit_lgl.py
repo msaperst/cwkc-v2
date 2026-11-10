@@ -1,0 +1,202 @@
+"""Offline tests for the private read-only prelaunch audit command."""
+from email.message import EmailMessage
+from html import escape
+import json
+import stat
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from scraper import audit_lgl as audit
+
+
+def _mime(school, title, submission_id, amount, extra=()):
+    rows = [
+        ("Form title", title),
+        ("Submission ID", submission_id),
+        ("Submission Date", "2026-11-10 09:00:00 -0500"),
+        ("Total Amount", amount),
+        ("Name - First Name", "Example"),
+        ("Name - Last Name", "Auditor"),
+        ("Email", "auditor@example.invalid"),
+        ("Phone", "5550102026"),
+        *extra,
+    ]
+    table = "".join(
+        f"<tr><td>{escape(k)}</td><td>{escape(v)}</td></tr>"
+        for k, v in rows
+    )
+    msg = EmailMessage()
+    sender = "Brody Jewish Center" if school == "uva" else "Hillel at VT"
+    msg["From"] = f"{sender} <lglforms-submissions@littlegreenlight.com>"
+    msg["To"] = "service@example.invalid"
+    msg.set_content(
+        f"<p><table>{table}</table></p>",
+        subtype="html", charset="utf-8", cte="quoted-printable",
+    )
+    return msg.as_bytes()
+
+
+MESSAGES = {
+    11: _mime(
+        "uva", audit.FORM_TITLES["uva-front"], "synthetic-uva-front", "$5.00",
+        [
+            ("I am a/an", "Current Parent||Alum"),
+            ("Alumni Grad Year", ""),
+            ("Related Grad Year", "2026"),
+            ("Check all that apply",
+             "This is my first gift to Hillel at UVA||"
+             "Please don't list my name. I would like to remain anonymous."),
+            ("Does your workplace match charitable giving?",
+             "I'm not sure, can you look into it for me?"),
+        ],
+    ),
+    12: _mime(
+        "vt", audit.FORM_TITLES["vt-front"], "synthetic-vt-front", "$5.00",
+        [
+            ("I am a/an...", "Graduate Student||Current Parent||Alumni"),
+            ("Alumni Graduation Year", "2006"),
+            ("Intended Graduation Year", "2027"),
+            ("Related Student Graduation Year", "2028"),
+            ("Check All That Apply:",
+             "This is my first gift to Hillel at VT||"
+             "Please don't list my name. I would like to remain anonymous."),
+        ],
+    ),
+    13: _mime(
+        "uva", audit.FORM_TITLES["uva-back"], "synthetic-uva-back", "2.06",
+        [
+            ("Donor is a/n...", "Current Parent||Alum"),
+            ("Alumni Grad Year", ""),
+            ("Related Grad Year", "2026"),
+            ("Gift notes", "TEST GIFT - no payment"),
+            ("Is this a monthly gift?", "No"),
+        ],
+    ),
+    14: _mime(
+        "vt", audit.FORM_TITLES["vt-back"], "synthetic-vt-back", "20",
+        [
+            ("Donor is a/an...", "Current Parent||Alum"),
+            ("Alumni Graduation Year", "2006"),
+            ("Related Student Graduation Year", "2027"),
+            ("Is this a monthly gift?", "Yes"),
+            ("Is Recurring", "false"),
+            ("Gift Notes", "TEST GIFT - no payment"),
+        ],
+    ),
+}
+
+
+def _fake_server(messages=MESSAGES):
+    server = MagicMock()
+    server.search.return_value = list(messages)
+    server.fetch.side_effect = lambda uid, flags: {
+        uid: {b"BODY[]": messages[uid]}
+    }
+    return server
+
+
+def test_all_four_nov10_contracts_audit_without_mutations():
+    server = _fake_server()
+    report = audit.audit_unread(server)
+    assert report["unread_matching"] == 4
+    assert report["parsed"] == 4
+    assert report["failed"] == 0
+    assert report["excluded"] == 0
+    assert report["provisional_metrics"]["uva"]["total_amount"] == "7.06"
+    assert report["provisional_metrics"]["vt"]["total_amount"] == "245.00"
+    assert report["provisional_metrics"]["uva"]["most_individual_donors"] == 1
+    assert report["provisional_metrics"]["vt"]["most_individual_donors"] == 1
+    assert report["provisional_metrics"]["uva"]["most_donors_class_2026"] == 0
+    assert report["provisional_metrics"]["vt"]["most_donors_class_2026"] == 0
+    assert report["independent_score_comparison"] == "passed"
+    assert report["unreconciled_flags"] >= 3
+    assert report["errors"] == []
+    assert server.fetch.call_count == 4
+    for call in server.fetch.call_args_list:
+        assert call.args[1] == ["BODY.PEEK[]"]
+    server.add_flags.assert_not_called()
+    server.delete_messages.assert_not_called()
+
+
+def test_excluding_only_verified_backend_tests_preserves_actual_public_gifts():
+    server = _fake_server()
+    report = audit.audit_unread(server, {
+        "synthetic-vt-back", "synthetic-uva-back",
+    })
+    assert report["excluded"] == 2
+    assert report["provisional_metrics"]["uva"]["total_amount"] == "5.00"
+    assert report["provisional_metrics"]["vt"]["total_amount"] == "5.00"
+    assert report["provisional_metrics"]["uva"]["most_individual_donors"] == 1
+    assert report["provisional_metrics"]["vt"]["most_individual_donors"] == 1
+    assert report["provisional_metrics"]["uva"]["most_first_time_donors"] == 1
+    assert report["provisional_metrics"]["vt"]["most_first_time_donors"] == 1
+    assert report["provisional_metrics"]["uva"]["most_money_families"] == "5.00"
+    assert report["provisional_metrics"]["vt"]["most_money_families"] == "5.00"
+    assert "donor_names" not in report["provisional_metrics"]["uva"]
+
+
+def test_inventory_contains_no_donor_contact_data():
+    report = audit.audit_unread(_fake_server())
+    exported = json.dumps(report)
+    for private_value in ("auditor@example.invalid", "5550102026", "Example", "Auditor"):
+        assert private_value not in exported
+    assert report["inventory"][0]["submission_id"] == "synthetic-uva-front"
+    assert "unverified-alumni-year" in report["inventory"][0]["flags"]
+    assert "staff-entry-check-payment" in report["inventory"][2]["flags"]
+    assert "monthly-form-vs-recurring-flag" in report["inventory"][3]["flags"]
+
+
+def test_readonly_mode_closes_connection_and_does_not_log_donors(capsys):
+    server = _fake_server()
+    client = MagicMock()
+    client.__enter__.return_value = server
+    with patch.object(audit, "IMAPClient", return_value=client), \
+         patch.object(audit, "EMAIL_ACCOUNT", "service@example.invalid"), \
+         patch.object(audit, "EMAIL_PASSWORD", "fake-local-only"):
+        audit.main([])
+
+    server.select_folder.assert_called_once_with(
+        audit.MAILBOX, readonly=True,
+    )
+    server.add_flags.assert_not_called()
+    assert server.search.call_args.args[0] == [
+        "UNSEEN", "FROM", audit.FROM_FILTER,
+    ]
+    out = capsys.readouterr().out
+    assert "read-only audit" in out.lower()
+    assert "auditor@example.invalid" not in out
+    assert "5550102026" not in out
+    assert "synthetic-vt-back" not in out
+
+
+def test_unknown_messages_fail_without_acknowledgment():
+    server = _fake_server({
+        9: _mime("uva", "Unknown unapproved form", "unknown-id", "$12"),
+    })
+    report = audit.audit_unread(server)
+    assert report["parsed"] == 0
+    assert report["failed"] == 1
+    assert report["errors"] == [{"uid": 9, "error_type": "ValueError"}]
+    assert report["provisional_metrics"]["uva"]["total_amount"] == "0.00"
+    server.add_flags.assert_not_called()
+
+
+def test_owner_only_inventory_file_and_no_overwrite(tmp_path):
+    report = audit.audit_unread(_fake_server())
+    path = tmp_path / "private-audit.json"
+    audit._write_private_json(path, report)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert json.loads(path.read_text())["unread_matching"] == 4
+    with pytest.raises(FileExistsError):
+        audit._write_private_json(path, report)
+
+
+def test_independent_comparison_catches_a_regression(monkeypatch):
+    from scraper.CalculateValues import CalculateValues
+
+    monkeypatch.setattr(
+        CalculateValues, "_total_raised", lambda self, df: 9999,
+    )
+    with pytest.raises(AssertionError, match="score mismatch"):
+        audit.audit_unread(_fake_server())
