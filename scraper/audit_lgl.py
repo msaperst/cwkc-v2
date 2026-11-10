@@ -13,7 +13,10 @@ from pathlib import Path
 import pandas as pd
 
 from .CalculateValues import CalculateValues
-from .EmailParser import EmailParser, determine_source
+from .EmailParser import (
+    EmailParser, FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
+    determine_source,
+)
 from .donation_ledger import NORMALIZED_FIELDS, fingerprint
 from .getLglFormData import (
     EMAIL_ACCOUNT, EMAIL_PASSWORD, FROM_FILTER, IMAP_SERVER, MAILBOX,
@@ -33,6 +36,7 @@ MONEY_METRICS = {
 FAMILY = {
     "Current Parent", "Current Grandparent",
     "Parent of Alumni", "Grandparent of Alumni",
+    FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
 }
 
 
