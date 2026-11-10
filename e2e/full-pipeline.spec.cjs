@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
+const Papa = require('papaparse');
 
 const root = path.resolve(__dirname, '..');
 const filename = path.join(root, '.cwkc-e2e-results.csv');
@@ -13,10 +14,11 @@ test.skip(!fs.existsSync(filename),
 
 test('synthetic LGL → Sheet → CSV is consumed by real HTML and scores correctly', async ({ page }) => {
   const csv = fs.readFileSync(filename, 'utf8');
-  const [header, row] = csv.trim().split(/\r?\n/);
-  const fields = header.split(',');
-  const values = row.split(',');
-  const expected = Object.fromEntries(fields.map((key, i) => [key, values[i]]));
+  const parsed = Papa.parse(csv, { header: true, skipEmptyLines: true });
+  expect(parsed.errors).toHaveLength(0);
+  expect(parsed.data).toHaveLength(1);
+  const fields = parsed.meta.fields;
+  const expected = parsed.data[0];
   expect(fields).toHaveLength(26);
   expect(expected.uva_total_amount).toBe('269.68');
   expect(expected.vt_total_amount).toBe('373.0');
