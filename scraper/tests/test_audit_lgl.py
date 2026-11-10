@@ -370,3 +370,57 @@ def test_unknown_affiliation_is_flagged_without_changing_mailbox(tmp_path):
         audit.build_preview_csv(report, tmp_path / "preview.csv")
     server.add_flags.assert_not_called()
     server.delete_messages.assert_not_called()
+
+
+
+@pytest.mark.parametrize("school,full_amount,details,expected_family", [
+    (
+        "uva", "$257.50",
+        "- Sponsor a program planned by our Hillel Jewish Leadership "
+        "Institute students: $250.00",
+        "257.50",
+    ),
+    ("vt", "$103.00", "Amount: $100.00", "103.00"),
+    ("vt", "$100.00", "Amount: $100.00", "100.00"),
+])
+def test_readonly_csv_includes_full_reported_donation_with_fee_if_present(
+    school, full_amount, details, expected_family,
+):
+    """The full LGL charge is the score, even if it includes a 3% add-on."""
+    raw = _mime(
+        school, audit.FORM_TITLES[f"{school}-front"],
+        "synthetic-fee-example", full_amount,
+        [
+            ("Amount - Details", details),
+            (
+                "I am a/an" if school == "uva" else "I am a/an...",
+                "Current Parent",
+            ),
+            ("Is Recurring", "false"),
+        ],
+    )
+    server = _fake_server({204: raw})
+    report = audit.audit_unread(server)
+    assert report["failed"] == 0
+    assert report["independent_score_comparison"] == "passed"
+    assert report["provisional_metrics"][school]["total_amount"] == expected_family
+    assert report["provisional_metrics"][school]["most_money_families"] == expected_family
+    assert report["provisional_metrics"][school]["most_individual_donors"] == 1
+    server.add_flags.assert_not_called()
+
+
+def test_fee_included_in_recurring_annualization_without_extra_multiplier():
+    """A $10 monthly amount plus optional 3% becomes $10.30 x 12."""
+    raw = _mime(
+        "vt", audit.FORM_TITLES["vt-front"],
+        "synthetic-monthly-fee", "$10.30",
+        [
+            ("Amount - Details", "Amount: $10.00"),
+            ("I am a/an...", "Alumni"),
+            ("Is Recurring", "true"),
+        ],
+    )
+    report = audit.audit_unread(_fake_server({205: raw}))
+    assert report["failed"] == 0
+    assert report["provisional_metrics"]["vt"]["total_amount"] == "123.60"
+    assert report["provisional_metrics"]["vt"]["most_alum_monthly_10_plus"] == 1
