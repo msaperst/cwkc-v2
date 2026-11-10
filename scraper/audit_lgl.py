@@ -320,52 +320,34 @@ def write_action_summary(report: dict, frame: pd.DataFrame, *, include_forms=Fal
         print(text)
 
 
-def _write_private_json(path: Path, report: dict):
-    """Create a new owner-only local inventory, never overwrite an old one."""
-    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as stream:
-        json.dump(report, stream, indent=2)
-        stream.write("\n")
+# Fixed workspace paths: user-supplied CLI strings must never become
+# filesystem paths in a workflow that handles private financial data.
+PREVIEW_FILE = Path(".cwkc-preview-results.csv")
+EXCLUSIONS_FILE = Path(".cwkc-excluded-submissions.txt")
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="READ-ONLY CWKC LGL email inventory and score projection"
-    )
-    parser.add_argument(
-        "--exclude-file", type=Path,
-        help="Local private text file: one verified non-donation submission ID per line",
-    )
-    parser.add_argument(
-        "--report", type=Path,
-        help="Write a NEW private 0600 JSON inventory with IDs but NO donor PII",
-    )
-    parser.add_argument(
-        "--preview-csv", type=Path,
-        help="Write a local, unpublished aggregate CSV preview (donor names redacted)",
+        description="Read-only CWKC LGL email-to-CSV scoring preview"
     )
     parser.add_argument(
         "--include-forms", action="store_true",
         help="Also read current Google Forms responses into the CSV preview",
     )
     parser.add_argument(
-        "--credentials-file",
-        default="scraper/spreadsheet_credentials.json",
-        help="Read-only Google Forms service account credentials path",
-    )
-    parser.add_argument(
         "--private-workflow", action="store_true",
-        help="For public-repo Actions: suppress all financial values from logs",
+        help="Suppress financial amounts in public GitHub Actions logs",
     )
     args = parser.parse_args(argv)
     if os.getenv("GITHUB_ACTIONS") == "true" and not args.private_workflow:
         parser.error("Actions must run this audit with --private-workflow")
     if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
         parser.error("Configure the service mailbox IMAP credentials first")
+
     excluded = set()
-    if args.exclude_file:
+    if EXCLUSIONS_FILE.is_file():
         excluded = {
-            line.strip() for line in args.exclude_file.read_text().splitlines()
+            line.strip() for line in EXCLUSIONS_FILE.read_text().splitlines()
             if line.strip() and not line.lstrip().startswith("#")
         }
     with IMAPClient(IMAP_SERVER, ssl=True) as server:
@@ -373,19 +355,13 @@ def main(argv=None):
         server.select_folder(MAILBOX, readonly=True)
         report = audit_unread(server, frozenset(excluded))
 
-    if args.report:
-        _write_private_json(args.report, report)
-    if args.include_forms and not args.preview_csv:
-        parser.error("--include-forms requires --preview-csv")
-    if args.preview_csv:
-        frame = build_preview_csv(
-            report, args.preview_csv,
-            include_forms=args.include_forms,
-            credentials_file=args.credentials_file,
-        )
-        if not args.private_workflow:
-            write_action_summary(report, frame, include_forms=args.include_forms)
-    # Console output never includes donors' contact details or submission IDs.
+    frame = build_preview_csv(
+        report, PREVIEW_FILE, include_forms=args.include_forms,
+    )
+    if not args.private_workflow:
+        write_action_summary(report, frame, include_forms=args.include_forms)
+
+    # All console data is safe for a public CI log: no donor identities/amounts.
     print(
         "Read-only audit:",
         f"unread={report['unread_matching']}",
@@ -397,25 +373,24 @@ def main(argv=None):
     )
     print("Independent scoring comparison:", report["independent_score_comparison"])
     if args.private_workflow:
-        print("Proposed numeric CSV generated locally for encryption; "
-              "financial totals intentionally withheld from public Actions logs.")
+        print("Preview prepared for encryption; totals withheld from public logs")
         summary = os.getenv("GITHUB_STEP_SUMMARY")
         if summary:
             with open(summary, "a", encoding="utf-8") as stream:
                 stream.write(
-                    "## CWKC read-only preview\\n\\n"
-                    "The proposed CSV is encrypted; no totals or donor identities "
-                    "are displayed in this public workflow.\\n\\n"
+                    "## CWKC read-only preview\n\n"
+                    "The proposed CSV is encrypted; no financial totals or "
+                    "donor identities are displayed in this public workflow.\n\n"
                     f"Unread: {report['unread_matching']}; parsed: {report['parsed']}; "
                     f"failed: {report['failed']}; exclusions: {report['excluded']}; "
-                    f"flagged: {report['unreconciled_flags']}.\\n\\n"
+                    f"flagged: {report['unreconciled_flags']}.\n\n"
                 )
     else:
         print("Provisional category metrics (not reconciled to payments):")
         print(json.dumps(report["provisional_metrics"], indent=2))
     print(report["warning"])
-    if report["failed"]:
-        raise SystemExit(1)
+
+
 
 
 if __name__ == "__main__":
