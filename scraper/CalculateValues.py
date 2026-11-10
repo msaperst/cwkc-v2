@@ -1,9 +1,11 @@
-from typing import Dict, Any
+from typing import Any, Collection, Dict
 
 import gspread
 import pandas as pd
 
-from .EmailParser import FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE
+from .affiliations import (
+    ALUMNI, CURRENT_STUDENT_GRANDPARENT_AFFILIATIONS, FAMILY_AFFILIATIONS,
+)
 
 PHONE_NUMBER = 'phone number'
 TOTAL_AMOUNT = 'total amount'
@@ -15,12 +17,10 @@ class CalculateValues:
     Pulls normalized donation data from Google Sheets and calculates metrics per school.
     """
 
-    FAMILY_STATUSES = [
-        'Current Parent', 'Current Grandparent',
-        'Parent of Alumni', 'Grandparent of Alumni',
-        FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
-    ]
-    GRANDPARENT_STATUS = ['Current Grandparent']
+    # Compatibility names for existing callers/tests; these are references
+    # to the single canonical grouping, not independent definitions.
+    FAMILY_STATUSES = FAMILY_AFFILIATIONS
+    GRANDPARENT_STATUS = CURRENT_STUDENT_GRANDPARENT_AFFILIATIONS
 
     def __init__(self, spreadsheet_key: str, worksheet_name: str = "entries",
                  creds_file: str = "spreadsheet_credentials.json"):
@@ -127,7 +127,7 @@ class CalculateValues:
         donor's own graduation year; they cannot earn this category.
         The final LGL adapter must identify the donor's alumni year.
         """
-        alumni = df[df['status_list'].apply(lambda statuses: 'Alumni' in statuses)]
+        alumni = df[df['status_list'].apply(lambda statuses: ALUMNI in statuses)]
         graduation_years = pd.to_numeric(alumni['graduation year'], errors='coerce')
         return alumni.loc[graduation_years.eq(year), PHONE_NUMBER].nunique()
 
@@ -136,15 +136,15 @@ class CalculateValues:
         return amounts[amounts >= 1000].count()
 
     def _alumni_monthly_10_plus(self, df: pd.DataFrame) -> int:
-        return df[df['status_list'].apply(lambda lst: 'Alumni' in lst) & (df[RECURRING_PAYMENT]) & (
+        return df[df['status_list'].apply(lambda lst: ALUMNI in lst) & (df[RECURRING_PAYMENT]) & (
                 df[TOTAL_AMOUNT] >= 10)].shape[0]
 
     def _alumni_work_matched(self, df: pd.DataFrame) -> int:
         return \
-            df[df['status_list'].apply(lambda lst: 'Alumni' in lst) & (
+            df[df['status_list'].apply(lambda lst: ALUMNI in lst) & (
                     df['work referral'].str.lower() == 'true')].shape[0]
 
-    def _money_by_statuses(self, df: pd.DataFrame, statuses: list) -> float:
+    def _money_by_statuses(self, df: pd.DataFrame, statuses: Collection[str]) -> float:
         filtered = df[df['status_list'].apply(lambda lst: any(s in lst for s in statuses))]
         return filtered.apply(lambda r: r[TOTAL_AMOUNT] * 12 if r[RECURRING_PAYMENT] else r[TOTAL_AMOUNT],
                               axis=1).sum()
