@@ -100,6 +100,10 @@ class EmailParser:
         last_name = fields.get("name - last name", "")
         phone = fields.get("phone", "") or self.generate_fallback_phone()
 
+        # 2026 organizer decision: count the full LGL-reported amount,
+        # including any optional 3% donor-paid processing fee. Do not
+        # substitute the smaller gift selection in "Amount - Details".
+        # Backend forms use "Gift amount" rather than "Total Amount".
         raw_amount = fields.get("total amount", fields.get("gift amount", "0"))
         clean_amount = raw_amount.replace("$", "").replace(",", "").strip()
         total_amount = str(float(clean_amount))
