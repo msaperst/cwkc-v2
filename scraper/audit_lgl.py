@@ -19,8 +19,8 @@ from .affiliations import (
 )
 from .donation_ledger import NORMALIZED_FIELDS, fingerprint
 from .getLglFormData import (
-    EMAIL_ACCOUNT, EMAIL_PASSWORD, FROM_FILTER, IMAP_SERVER, MAILBOX,
-    IMAPClient, parse_lgl_email, validate_submission,
+    EMAIL_ACCOUNT, EMAIL_PASSWORD, FROM_FILTER, GRADUATION_YEAR_FIELD,
+    IMAP_SERVER, MAILBOX, IMAPClient, parse_lgl_email, validate_submission,
 )
 
 FORM_TITLES = {
@@ -68,7 +68,7 @@ def _reference(rows, school):
         }),
         "most_donors_class_2026": len({
             r["phone number"] for r, tags in zip(school_rows, statuses)
-            if ALUMNI in tags and r["graduation year"] == "2026"
+            if ALUMNI in tags and r[GRADUATION_YEAR_FIELD] == "2026"
         }),
         "most_gifts_over_1000": sum(
             _annualized(r) >= 1000 for r in school_rows
@@ -146,7 +146,7 @@ def _parse_one(raw, uid):
         flags.append("staff-entry-check-payment")
     if "test" in notes.casefold():
         flags.append("test-note")
-    if ALUMNI in row["status"].split(", ") and not row["graduation year"]:
+    if ALUMNI in row["status"].split(", ") and not row[GRADUATION_YEAR_FIELD]:
         flags.append("unverified-alumni-year")
     if data.get("__ambiguous_alumni_year__") == "true":
         flags.append("old-ambiguous-vt-years")
@@ -167,7 +167,7 @@ def _parse_one(raw, uid):
         "amount": row["total amount"],
         "annualized_amount": str(_annualized(row)),
         "status": row["status"],
-        "donor_alumni_year": row["graduation year"],
+        "donor_alumni_year": row[GRADUATION_YEAR_FIELD],
         "flags": flags,
         "_row": row,  # in-memory only: includes donor identity; never serialize
     }
