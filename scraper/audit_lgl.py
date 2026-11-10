@@ -7,7 +7,6 @@ anyone. Reports intentionally omit donor names, addresses, email and phone.
 import argparse
 import json
 import os
-from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
 
