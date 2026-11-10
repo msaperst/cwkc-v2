@@ -79,16 +79,16 @@ jobs:
           file.chmod(0o600)
           PY
 
-      - name: Run ten synthetic emails through Sheet and CSV calculations
+      - name: Rehearse offline using fake Google Sheets (no secrets)
+        if: inputs.mode == 'offline'
+        run: python -m scraper.tests.e2e_rehearsal --mode offline
+
+      - name: Rehearse writes to designated sandbox Google Sheet
+        if: inputs.mode == 'sandbox'
         env:
-          E2E_MODE: ${{ inputs.mode }}
-          # Used ONLY for the selected sandbox mode; never for offline rehearsal.
           CWKC_E2E_SPREADSHEET_KEY: ${{ secrets.CWKC_E2E_SPREADSHEET_KEY }}
           SPREADSHEET_KEY: ${{ secrets.SPREADSHEET_KEY }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m scraper.tests.e2e_rehearsal --mode "$E2E_MODE"
+        run: python -m scraper.tests.e2e_rehearsal --mode sandbox
 
       - name: Set up Node 24
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
