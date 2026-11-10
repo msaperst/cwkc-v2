@@ -323,3 +323,14 @@ def test_private_workflow_logs_no_amounts_or_names(tmp_path, monkeypatch, capsys
     assert "Preview" in summary or "preview" in summary
     assert "encrypted" in summary
     server.add_flags.assert_not_called()
+
+
+
+def test_identical_mime_notifications_are_projected_once():
+    raw = MESSAGES[11]
+    report = audit.audit_unread(_fake_server({51: raw, 52: raw}))
+    assert report["unread_matching"] == 2
+    assert report["parsed"] == 1
+    assert report["identical_mime_skipped"] == 1
+    assert report["provisional_metrics"]["uva"]["total_amount"] == "5.00"
+    assert report["provisional_metrics"]["uva"]["most_individual_donors"] == 1
