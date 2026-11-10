@@ -57,6 +57,7 @@ def parse_lgl_email(raw_msg):
 
     data = {}
     seen_fields = {}
+    downgraded_legacy_vt_year = False
     # Find the first table (assuming the form submission table is the first)
     table = soup.find("table")
     if not table:
@@ -73,8 +74,30 @@ def parse_lgl_email(raw_msg):
         identity = _field_identity(key)
 
         if identity in seen_fields:
-            # Same-label graduation questions may refer to *different people*,
-            # even if the year coincidentally matches.
+            # The *verified* older VT 2026 public form used "Graduation
+            # Year" twice for a donor who was both Alumni and Current
+            # Parent. Preserve the actual donation but explicitly discard
+            # the unidentified years; the donor's class is unverified.
+            affiliations = {
+                value.strip() for value in
+                data.get("I am a/an...", "").split("||")
+            }
+            older_vt_parent_alum = (
+                identity == "graduation year"
+                and not downgraded_legacy_vt_year
+                and "hillel at vt" in email_from.casefold()
+                and data.get("Form title") == "CWKC 2026 Donation Form"
+                and "Alumni" in affiliations
+                and "Current Parent" in affiliations
+            )
+            if older_vt_parent_alum:
+                for existing_key in list(data):
+                    if _field_identity(existing_key) == identity:
+                        del data[existing_key]
+                downgraded_legacy_vt_year = True
+                # Internal marker: not persisted in the public score schema.
+                data["__ambiguous_alumni_year__"] = "true"
+                continue
             if identity in AMBIGUOUS_YEAR_FIELDS:
                 raise ValueError("Repeated graduation-year field is ambiguous")
             if seen_fields[identity] != " ".join(val.split()):
@@ -121,6 +144,17 @@ def handle_message(server, uid, ledger, normalizer, reconcile_only):
         validate_submission(data, normalized)
         if tuple(normalized) != NORMALIZED_FIELDS:
             raise ValueError("Normalized donation column contract changed")
+        if data.get("__ambiguous_alumni_year__") == "true":
+            print(
+                f"LGL UID {uid}: older VT duplicate year fields; "
+                "alumni-class credit withheld for private reconciliation"
+            )
+        elif ("Alumni" in normalized["status"].split(", ")
+              and not normalized["graduation year"]):
+            print(
+                f"LGL UID {uid}: donor alumni year unavailable; "
+                "other categories can score, class-year credit withheld"
+            )
         was_inserted = update_google_sheet(ledger, normalized, submission_id)
         category = "new" if was_inserted else "already_stored"
     # Only acknowledge an email after the normalized row is durable.
