@@ -104,7 +104,7 @@ jobs:
       - name: Render exact Python-generated CSV in desktop and mobile browsers
         env:
           CI: 'true'
-        run: npx playwright test e2e/full-pipeline.spec.cjs
+        run: ./node_modules/.bin/playwright test e2e/full-pipeline.spec.cjs
 
       # All artifacts are synthetic and unrelated to actual donors.
       - name: Upload synthetic CSV and rehearsal summary
