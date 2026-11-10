@@ -132,11 +132,16 @@ class EmailParser:
         raw_generic_year = fields.get(
             "grad year", fields.get("graduation year", ""),
         )
-        has_named_years = any(label in fields for label in (
-            *donor_year_labels, "related grad year",
-            "related student graduation year", "intended grad year",
-            "intended graduation year",
-        ))
+        # An empty Intended Graduation Year accompanies some legacy alumni-
+        # only submissions. It does not make their one generic year ambiguous.
+        has_named_years = (
+            any(label in fields for label in (
+                *donor_year_labels, "related grad year",
+                "related student graduation year",
+            ))
+            or bool(fields.get("intended grad year")
+                    or fields.get("intended graduation year"))
+        )
         if not is_alumni:
             # A relative's year must never be the donor's alumni year.
             grad_year = ""
