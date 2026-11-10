@@ -229,6 +229,81 @@ def audit_unread(server, excluded_ids=frozenset()):
     }
 
 
+def build_preview_csv(report: dict, output_path: Path, *, include_forms=False,
+                      credentials_file="scraper/spreadsheet_credentials.json"):
+    """Render the standard public CSV columns from read-only computed scores.
+
+    Intentionally redact donor_names: workflow logs and artifacts may be
+    readable by people who should not see prelaunch donor identities.
+    """
+    if report["failed"] or report["missing_exclusion_ids"]:
+        raise ValueError("Incomplete audit: cannot generate a score preview")
+    template = Path(__file__).resolve().parent.parent / "public/assets/csv/results.csv"
+    frame = pd.read_csv(template).astype(object)
+    if len(frame) != 1:
+        raise ValueError("Unexpected score CSV row count")
+    for school in ("uva", "vt"):
+        for metric, value in report["provisional_metrics"][school].items():
+            column = f"{school}_{metric}"
+            if column not in frame.columns:
+                raise ValueError("Unexpected score CSV column")
+            frame.at[0, column] = value
+
+    if include_forms:
+        # The existing Sheets updater mutates only its *in-memory DataFrame*
+        # when dry_run=True. It never writes or publishes a file.
+        from .getGoogleFormData import SubmissionUpdater
+        updater = SubmissionUpdater(credentials_file, str(template))
+        updater.update_results(dry_run=True)
+        for column in (
+            "uva_alumni_gatherings", "vt_alumni_gatherings",
+            "uva_hanukkah_photos", "vt_hanukkah_photos",
+        ):
+            if column not in frame.columns or column not in updater.df.columns:
+                raise ValueError("Participation CSV schema mismatch")
+            frame.at[0, column] = updater.df.at[0, column]
+
+    # A private, unpublished preview is still not clearance to expose names.
+    frame.at[0, "uva_donor_names"] = ""
+    frame.at[0, "vt_donor_names"] = ""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output_path, index=False)
+    return frame
+
+
+def write_action_summary(report: dict, frame: pd.DataFrame, *, include_forms=False):
+    """Print the proposed CSV as GitHub Actions job output without PII."""
+    summary = [
+        "## CWKC read-only results preview",
+        "",
+        f"Unread notifications: **{report['unread_matching']}**; "
+        f"parsed: **{report['parsed']}**; failed: **{report['failed']}**; "
+        f"excluded: **{report['excluded']}**; "
+        f"unreconciled flagged: **{report['unreconciled_flags']}**.",
+        "",
+        "### Proposed public results.csv (donor-name columns redacted)",
+        "",
+        "```csv",
+        frame.to_csv(index=False).strip(),
+        "```",
+        "",
+        ("Participation: read-only current Google Forms data."
+         if include_forms else
+         "Participation/football: unchanged starter CSV values; NOT live-verified."),
+        "",
+        "**PREVIEW ONLY:** Unreconciled staff/test notifications and duplicate "
+        "transactions may inflate this estimate. This is not financial sign-off.",
+        "",
+    ]
+    text = "\n".join(summary)
+    path = os.getenv("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as stream:
+            stream.write(text)
+    else:
+        print(text)
+
+
 def _write_private_json(path: Path, report: dict):
     """Create a new owner-only local inventory, never overwrite an old one."""
     fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -249,6 +324,19 @@ def main(argv=None):
         "--report", type=Path,
         help="Write a NEW private 0600 JSON inventory with IDs but NO donor PII",
     )
+    parser.add_argument(
+        "--preview-csv", type=Path,
+        help="Write a local, unpublished aggregate CSV preview (donor names redacted)",
+    )
+    parser.add_argument(
+        "--include-forms", action="store_true",
+        help="Also read current Google Forms responses into the CSV preview",
+    )
+    parser.add_argument(
+        "--credentials-file",
+        default="scraper/spreadsheet_credentials.json",
+        help="Read-only Google Forms service account credentials path",
+    )
     args = parser.parse_args(argv)
     if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
         parser.error("Configure the service mailbox IMAP credentials first")
@@ -265,6 +353,15 @@ def main(argv=None):
 
     if args.report:
         _write_private_json(args.report, report)
+    if args.include_forms and not args.preview_csv:
+        parser.error("--include-forms requires --preview-csv")
+    if args.preview_csv:
+        frame = build_preview_csv(
+            report, args.preview_csv,
+            include_forms=args.include_forms,
+            credentials_file=args.credentials_file,
+        )
+        write_action_summary(report, frame, include_forms=args.include_forms)
     # Console output never includes donors' contact details or submission IDs.
     print(
         "Read-only audit:",
