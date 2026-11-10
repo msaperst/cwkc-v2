@@ -92,7 +92,8 @@ def test_uva_backend_2026_real_mime_shape_and_normalized_fields():
     assert normalized["source"] == "uva-back"
     assert normalized["total amount"] == "0.01"
     assert normalized["status"] == "Parent of Alumni"
-    assert normalized["graduation year"] == "2016"
+    # The legacy "Grad Year" belongs to a related person, not an alumnus.
+    assert normalized["graduation year"] == ""
     assert normalized["recurring payment"] == "true"
     assert normalized["first time giver"] == "false"
     assert normalized["anonymous donation"] == "false"
