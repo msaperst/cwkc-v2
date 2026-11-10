@@ -207,3 +207,32 @@ def test_legacy_generic_year_cannot_prove_class_when_alum_is_also_relative(
     }, source="uva-front")
     assert "Alumni" in record["status"]
     assert record["graduation year"] == ""
+
+
+
+@pytest.mark.parametrize("school,total,details,expected", [
+    (
+        "uva",
+        "$257.50",
+        "- Sponsor a program planned by our Hillel Jewish Leadership "
+        "Institute students: $250.00",
+        "257.5",
+    ),
+    ("vt", "$103.00", "Amount: $100.00", "103.0"),
+])
+def test_optional_processing_fee_counts_full_lgl_total(
+    parser, school, total, details, expected,
+):
+    """Organizer decision: never subtract the optional 3% fee contribution.
+
+    Amount - Details describes the underlying donation selection, while
+    Total Amount is the full charged amount used for CWKC scoring.
+    """
+    parsed = {
+        "Total Amount": total,
+        "Amount - Details": details,
+        "I am a/an": "Current Parent",
+        "Is Recurring": "false",
+    }
+    row = parser.normalize(parsed, source=f"{school}-front")
+    assert row["total amount"] == expected
