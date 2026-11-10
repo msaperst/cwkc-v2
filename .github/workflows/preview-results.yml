@@ -118,14 +118,34 @@ jobs:
           if [ "$INCLUDE_FORMS" = "true" ]; then
             args+=(--include-forms --credentials-file scraper/spreadsheet_credentials.json)
           fi
-          python -m scraper.audit_lgl "${args[@]}"
+          python -m scraper.audit_lgl --private-workflow "${args[@]}"
 
-      # This contains only aggregate scoring columns (no donor names, addresses,
-      # full emails, IDs, or raw MIME). Artifacts can be visible in public repos.
-      - name: Downloadable proposed results.csv (NOT published)
+      # The repository is PUBLIC. Never upload the plaintext projected CSV,
+      # and never print financial totals in a public Actions step summary.
+      # Owner creates a local age keypair and configures its PUBLIC recipient
+      # as a repository Actions variable (no private key in GitHub).
+      - name: Encrypt the proposed CSV before upload
+        env:
+          AGE_RECIPIENT: ${{ vars.CWKC_PREVIEW_AGE_RECIPIENT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$AGE_RECIPIENT" =~ ^age1[a-z0-9]{20,}$ ]]; then
+            echo "Set Actions variable CWKC_PREVIEW_AGE_RECIPIENT to an age public recipient."
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age >/dev/null
+          age -r "$AGE_RECIPIENT" \
+            -o "$RUNNER_TEMP/proposed-results.csv.age" \
+            "$RUNNER_TEMP/proposed-results.csv"
+          rm -f "$RUNNER_TEMP/proposed-results.csv"
+          test -s "$RUNNER_TEMP/proposed-results.csv.age"
+
+      - name: Download encrypted preview only (NOT published)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: cwkc-preview-results-${{ github.run_id }}
-          path: ${{ runner.temp }}/proposed-results.csv
+          name: cwkc-encrypted-preview-${{ github.run_id }}
+          path: ${{ runner.temp }}/proposed-results.csv.age
           if-no-files-found: error
           retention-days: 1
