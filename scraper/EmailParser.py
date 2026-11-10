@@ -75,10 +75,8 @@ class EmailParser:
             fields[key] = cleaned
         return fields
 
-    def normalize(self, parsed_email: Dict[str, str], source: str) -> Dict[str, str]:
-        """Convert parsed email values into the fixed Google Sheets schema."""
-        fields = self._canonical_fields(parsed_email)
-
+    def _normalize_affiliations(self, fields: Dict[str, str]) -> tuple[list[str], str]:
+        """Normalize known LGL affiliations without guessing unfamiliar labels."""
         raw_status = fields.get(
             "i am a/an",
             fields.get("i am a/an...",
@@ -95,6 +93,12 @@ class EmailParser:
             # family or other scoring categories.
             raise ValueError("Unrecognized donor affiliation") from None
         status = ", ".join(sorted(set(statuses))) if statuses else COMMUNITY_MEMBER
+        return statuses, status
+
+    def normalize(self, parsed_email: Dict[str, str], source: str) -> Dict[str, str]:
+        """Convert parsed email values into the fixed Google Sheets schema."""
+        fields = self._canonical_fields(parsed_email)
+        statuses, status = self._normalize_affiliations(fields)
 
         first_name = fields.get("name - first name", "")
         last_name = fields.get("name - last name", "")
