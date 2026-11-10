@@ -82,6 +82,23 @@ After the run succeeds, open its **Artifacts** section, download `cwkc-preview-r
 
 The proposed CSV has the exact public results schema but **excludes donor names** for privacy; compare the numeric fields with LGL payments. Without `include_forms`, participation/football columns remain at their starter values. This is a **current unread inbox projection**, not a merged view of any already-persisted Sheet rows, not evidence of payment receipt, and **not** a full email→Sheet→Pages integration test. A separate controlled rehearsal is required before opening.
 
+## End-to-end rehearsal: email → Sheet → CSV → HTML
+
+After merging the isolated integration workflow, open **Actions → Rehearse CWKC email to website (sandbox) → Run workflow** on `main`. Start with **mode: offline**; it uses ten **synthetic** quoted-printable LGL notifications covering both schools' front/back forms, the old VT repeated graduation-year labels, missing donor alumni years, monthly ×12, family giving, and fee-inclusive gifts. This exercises the actual `process_messages`, `SubmissionLedger`, `CalculateValues`, `update_local_csv`, Google Forms response reader, and final CSV writer against an in-memory spreadsheet. Playwright then serves the real site locally and feeds the **same generated CSV** into its actual AJAX/PapaParse/scoreboard code on desktop and mobile.
+
+The workflow checks that ten rows are inserted once, the same ten messages replay without extra rows, every persisted column matches the 2026 worksheet contract, and the resulting 26-column CSV matches the verified totals ($269.68 UVA, $373 VT; $264.68 UVA family, $373 VT family) plus synthetic participation counts. It creates a downloadable **one-day synthetic fixture artifact** and never reads the real IMAP mailbox, changes its Seen flags, writes real donor rows, commits the results branch or deploys Pages. Local shortcut: `python -m scraper.e2e_rehearsal --mode offline`, then `npx playwright test e2e/full-pipeline.spec.cjs`.
+
+### Optional real Google Sheets sandbox write verification
+
+To test Google Sheets API row insertion and subsequent reading **without touching production**:
+
+1. Create a new, otherwise empty Google spreadsheet, name it **exactly** `CWKC-E2E-SANDBOX`, and share it with the existing CWKC Google service-account email as **Editor**. Do not use an existing donation or form-responses spreadsheet.
+2. Store its spreadsheet **ID** in the GitHub Actions **secret** `CWKC_E2E_SPREADSHEET_KEY` (not the production `SPREADSHEET_KEY`). Keep the existing service-account secrets unchanged.
+3. Run the same workflow on `main` with **mode: sandbox**. It refuses an unset/matching production ID or incorrect spreadsheet title, creates a **new** `E2E_<run>_<attempt>` worksheet with only invented donors, writes and rereads ten rows through the real Sheets API, verifies duplicate replay, computes the real CSV, then checks local HTML with Playwright.
+4. Privately inspect that new test worksheet and the synthetic CSV artifact. Delete the test worksheet or sandbox spreadsheet when satisfied.
+
+Real participation Forms sheets are **not** touched: both modes feed synthetic responses through the existing form-response parser, verifying that those aggregate counts update the CSV. This isolates the integration from donor payments, actual forms, mail, and publication. A final operator-approved launch reconciliation against LGL and the real `entries_2026` worksheet remains a separate gate. Running this rehearsal **never** enables production ingestion.
+
 ## During the event
 
 Scheduled Actions refresh roughly every five minutes; GitHub cron can be delayed or occasionally skipped. Check actual workflow executions and watchdog alerts. Use aggregate non-PII counters from Actions, but reconcile donations and totals with LGL privately. Avoid running a local poller and scheduled ingester independently without a coordinated fallback plan.
