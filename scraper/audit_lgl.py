@@ -13,9 +13,9 @@ from pathlib import Path
 import pandas as pd
 
 from .CalculateValues import CalculateValues
-from .EmailParser import (
-    EmailParser, FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
-    determine_source,
+from .EmailParser import EmailParser, determine_source
+from .affiliations import (
+    ALUMNI, CURRENT_STUDENT_GRANDPARENT_AFFILIATIONS, FAMILY_AFFILIATIONS,
 )
 from .donation_ledger import NORMALIZED_FIELDS, fingerprint
 from .getLglFormData import (
@@ -33,12 +33,6 @@ MONEY_METRICS = {
     "total_amount", "most_money_families",
     "most_money_grandparents_current_students",
 }
-FAMILY = {
-    "Current Parent", "Current Grandparent",
-    "Parent of Alumni", "Grandparent of Alumni",
-    FAMILY_MEMBER_OF_ALUMNI, OTHER_STUDENT_RELATIVE,
-}
-
 
 def _is_true(value):
     return str(value).casefold() == "true"
@@ -74,27 +68,27 @@ def _reference(rows, school):
         }),
         "most_donors_class_2026": len({
             r["phone number"] for r, tags in zip(school_rows, statuses)
-            if "Alumni" in tags and r["graduation year"] == "2026"
+            if ALUMNI in tags and r["graduation year"] == "2026"
         }),
         "most_gifts_over_1000": sum(
             _annualized(r) >= 1000 for r in school_rows
         ),
         "most_alum_monthly_10_plus": sum(
-            "Alumni" in tags and _is_true(r["recurring payment"])
+            ALUMNI in tags and _is_true(r["recurring payment"])
             and Decimal(r["total amount"]) >= 10
             for r, tags in zip(school_rows, statuses)
         ),
         "most_alum_work_matched": sum(
-            "Alumni" in tags and _is_true(r["work referral"])
+            ALUMNI in tags and _is_true(r["work referral"])
             for r, tags in zip(school_rows, statuses)
         ),
         "most_money_families": sum((
             _annualized(r) for r, tags in zip(school_rows, statuses)
-            if FAMILY.intersection(tags)
+            if FAMILY_AFFILIATIONS.intersection(tags)
         ), Decimal(0)),
         "most_money_grandparents_current_students": sum((
             _annualized(r) for r, tags in zip(school_rows, statuses)
-            if "Current Grandparent" in tags
+            if CURRENT_STUDENT_GRANDPARENT_AFFILIATIONS.intersection(tags)
         ), Decimal(0)),
     }
 
@@ -152,7 +146,7 @@ def _parse_one(raw, uid):
         flags.append("staff-entry-check-payment")
     if "test" in notes.casefold():
         flags.append("test-note")
-    if "Alumni" in row["status"].split(", ") and not row["graduation year"]:
+    if ALUMNI in row["status"].split(", ") and not row["graduation year"]:
         flags.append("unverified-alumni-year")
     if data.get("__ambiguous_alumni_year__") == "true":
         flags.append("old-ambiguous-vt-years")
