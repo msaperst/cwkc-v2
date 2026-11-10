@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scraper import e2e_rehearsal as e2e
+from scraper.tests import e2e_rehearsal as e2e
 from scraper.donation_ledger import NORMALIZED_FIELDS, SubmissionLedger
 from scraper.getLglFormData import process_messages
 
