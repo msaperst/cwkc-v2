@@ -244,3 +244,37 @@ def test_zero_and_populated_scores_have_identical_keys(calc):
     assert scores["uva"].keys() == scores["vt"].keys()
     assert "most_donors_class_2026" in scores["uva"]
     assert "most_undergraduates" not in scores["uva"]
+
+
+
+@pytest.mark.parametrize("school,raw_affiliation,expected_status", [
+    ("uva", "Family member of an Alum", "Family Member of Alumni"),
+    ("vt", "Other Student Relative", "Other Student Relative"),
+    ("uva", "Current Parent||Family member of an Alum",
+     "Current Parent, Family Member of Alumni"),
+])
+def test_family_relatives_count_full_gift_once_for_family_category(
+    calc, school, raw_affiliation, expected_status,
+):
+    from scraper.EmailParser import EmailParser
+
+    row = EmailParser().normalize({
+        "I am a/an": raw_affiliation,
+        "Name - First Name": "Example",
+        "Name - Last Name": "Supporter",
+        "Phone": "5550001234",
+        "Total Amount": "$257.50",
+        "Is Recurring": "false",
+    }, source=f"{school}-front")
+    assert row["status"] == expected_status
+    calc.df = pd.DataFrame([{
+        **row,
+        "total amount": float(row["total amount"]),
+        "recurring payment": False,
+    }])
+    score = calc.calculate_all()[school]
+    assert score["total_amount"] == pytest.approx(257.50)
+    assert score["most_money_families"] == pytest.approx(257.50)
+    assert score["most_individual_donors"] == 1
+    assert score["most_money_grandparents_current_students"] == 0
+    assert score["most_donors_class_2026"] == 0
