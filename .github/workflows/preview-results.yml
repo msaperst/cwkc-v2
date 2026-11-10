@@ -123,11 +123,17 @@ jobs:
       # redacted. GitHub artifacts are accessible to people who can view the run.
       # Keep the CSV out of persistent logs; the operator can download and
       # inspect/delete the one-day artifact after verification.
+      - name: Prepare downloadable proposed-results.csv
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -- .cwkc-preview-results.csv "$RUNNER_TEMP/proposed-results.csv"
+          test -s "$RUNNER_TEMP/proposed-results.csv"
+
       - name: Upload unencrypted proposed results.csv (read-only)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cwkc-preview-results-${{ github.run_id }}
-          path: .cwkc-preview-results.csv
+          path: ${{ runner.temp }}/proposed-results.csv
           if-no-files-found: error
-          include-hidden-files: true
           retention-days: 1
