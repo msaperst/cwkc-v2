@@ -1,0 +1,161 @@
+# Operator-only diagnostic. No production importer, Sheet updates, commits or Pages deployment.
+name: Preview CWKC results (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_forms:
+        description: 'Include current Google Forms responses in preview?'
+        type: boolean
+        required: true
+        default: false
+      exclude_submission_ids:
+        description: 'Comma-separated verified non-donation LGL IDs (optional; no PII)'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: read-only-score-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    # Credentials never run from a manually selected, unreviewed branch.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install hash-verified Python dependencies
+        env:
+          PIP_NO_DEPS: 'true'
+          PIP_ONLY_BINARY: ':all:'
+        run: python -m pip install --require-hashes -r scraper/requirements-ci.lock
+
+      - name: Require encrypted reporting before connecting to mailbox
+        env:
+          AGE_RECIPIENT: ${{ vars.CWKC_PREVIEW_AGE_RECIPIENT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$AGE_RECIPIENT" =~ ^age1[a-z0-9]{20,}$ ]]; then
+            echo "Configure Actions variable CWKC_PREVIEW_AGE_RECIPIENT (public age key)."
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age >/dev/null
+
+      - name: Prepare optional exclusion list (runner-local only)
+        env:
+          EXCLUDE_IDS: ${{ inputs.exclude_submission_ids }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          identifiers = [
+              value.strip() for value in os.environ.get("EXCLUDE_IDS", "").split(",")
+              if value.strip()
+          ]
+          if any(not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", item)
+                 for item in identifiers):
+              raise SystemExit("Invalid exclusion format; no processing performed")
+          path = Path(".cwkc-excluded-submissions.txt")
+          path.write_text("\n".join(identifiers) + "\n", encoding="utf-8")
+          path.chmod(0o600)
+          print(f"Number of verified exclusions requested: {len(identifiers)}")
+          PY
+
+      - name: Configure read-only Google Forms access when requested
+        if: inputs.include_forms == true
+        env:
+          GOOGLE_TYPE: ${{ secrets.TYPE }}
+          GOOGLE_PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          GOOGLE_PRIVATE_KEY_ID: ${{ secrets.PRIVATE_KEY_ID }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          GOOGLE_CLIENT_EMAIL: ${{ secrets.CLIENT_EMAIL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GOOGLE_AUTH_URI: ${{ secrets.AUTH_URI }}
+          GOOGLE_TOKEN_URI: ${{ secrets.TOKEN_URI }}
+          GOOGLE_AUTH_PROVIDER_X509_CERT_URL: ${{ secrets.AUTH_PROVIDER_X509_CERT_URL }}
+          GOOGLE_CLIENT_X509_CERT_URL: ${{ secrets.CLIENT_X509_CERT_URL }}
+          GOOGLE_UNIVERSE_DOMAIN: ${{ secrets.UNIVERSE_DOMAIN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          fields = ("type", "project_id", "private_key_id", "private_key",
+                    "client_email", "client_id", "auth_uri", "token_uri",
+                    "auth_provider_x509_cert_url", "client_x509_cert_url")
+          if any(not os.getenv("GOOGLE_" + name.upper()) for name in fields):
+              raise SystemExit("Google Forms access unavailable; no processing performed")
+          credentials = {
+              name: os.environ["GOOGLE_" + name.upper()] for name in fields
+          }
+          credentials["private_key"] = credentials["private_key"].replace("\\n", "\n")
+          if os.getenv("GOOGLE_UNIVERSE_DOMAIN"):
+              credentials["universe_domain"] = os.environ["GOOGLE_UNIVERSE_DOMAIN"]
+          path = Path("scraper/spreadsheet_credentials.json")
+          path.write_text(json.dumps(credentials), encoding="utf-8")
+          path.chmod(0o600)
+          PY
+
+      - name: Audit unread email and generate unpublished CSV preview
+        env:
+          EMAIL_ACCOUNT: ${{ secrets.EMAIL_ACCOUNT }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          INCLUDE_FORMS: ${{ inputs.include_forms }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$INCLUDE_FORMS" = "true" ]; then
+            python -m scraper.audit_lgl --private-workflow --include-forms
+          else
+            python -m scraper.audit_lgl --private-workflow
+          fi
+
+      # The repository is PUBLIC. Never upload the plaintext projected CSV,
+      # and never print financial totals in a public Actions step summary.
+      # Owner creates a local age keypair and configures its PUBLIC recipient
+      # as a repository Actions variable (no private key in GitHub).
+      - name: Encrypt the proposed CSV before upload
+        env:
+          AGE_RECIPIENT: ${{ vars.CWKC_PREVIEW_AGE_RECIPIENT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$AGE_RECIPIENT" =~ ^age1[a-z0-9]{20,}$ ]]; then
+            echo "Set Actions variable CWKC_PREVIEW_AGE_RECIPIENT to an age public recipient."
+            exit 1
+          fi
+          age -r "$AGE_RECIPIENT" \
+            -o "$RUNNER_TEMP/proposed-results.csv.age" \
+            ".cwkc-preview-results.csv"
+          rm -f ".cwkc-preview-results.csv" ".cwkc-excluded-submissions.txt"
+          test -s "$RUNNER_TEMP/proposed-results.csv.age"
+
+      - name: Download encrypted preview only (NOT published)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cwkc-encrypted-preview-${{ github.run_id }}
+          path: ${{ runner.temp }}/proposed-results.csv.age
+          if-no-files-found: error
+          retention-days: 1
