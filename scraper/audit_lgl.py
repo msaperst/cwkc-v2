@@ -254,7 +254,12 @@ def build_preview_csv(report: dict, output_path: Path, *, include_forms=False,
         # when dry_run=True. It never writes or publishes a file.
         from .getGoogleFormData import SubmissionUpdater
         updater = SubmissionUpdater(credentials_file, str(template))
-        updater.update_results(dry_run=True)
+        # Reading participation Sheets produces informational stdout; retain
+        # its in-memory result without printing prelaunch participation totals.
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            updater.update_results(dry_run=True)
         for column in (
             "uva_alumni_gatherings", "vt_alumni_gatherings",
             "uva_hanukkah_photos", "vt_hanukkah_photos",
@@ -337,7 +342,13 @@ def main(argv=None):
         default="scraper/spreadsheet_credentials.json",
         help="Read-only Google Forms service account credentials path",
     )
+    parser.add_argument(
+        "--private-workflow", action="store_true",
+        help="For public-repo Actions: suppress all financial values from logs",
+    )
     args = parser.parse_args(argv)
+    if os.getenv("GITHUB_ACTIONS") == "true" and not args.private_workflow:
+        parser.error("Actions must run this audit with --private-workflow")
     if not EMAIL_ACCOUNT or not EMAIL_PASSWORD:
         parser.error("Configure the service mailbox IMAP credentials first")
     excluded = set()
@@ -361,7 +372,8 @@ def main(argv=None):
             include_forms=args.include_forms,
             credentials_file=args.credentials_file,
         )
-        write_action_summary(report, frame, include_forms=args.include_forms)
+        if not args.private_workflow:
+            write_action_summary(report, frame, include_forms=args.include_forms)
     # Console output never includes donors' contact details or submission IDs.
     print(
         "Read-only audit:",
@@ -372,8 +384,23 @@ def main(argv=None):
         f"flagged={report['unreconciled_flags']}",
     )
     print("Independent scoring comparison:", report["independent_score_comparison"])
-    print("Provisional category metrics (not reconciled to payments):")
-    print(json.dumps(report["provisional_metrics"], indent=2))
+    if args.private_workflow:
+        print("Proposed numeric CSV generated locally for encryption; "
+              "financial totals intentionally withheld from public Actions logs.")
+        summary = os.getenv("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as stream:
+                stream.write(
+                    "## CWKC read-only preview\\n\\n"
+                    "The proposed CSV is encrypted; no totals or donor identities "
+                    "are displayed in this public workflow.\\n\\n"
+                    f"Unread: {report['unread_matching']}; parsed: {report['parsed']}; "
+                    f"failed: {report['failed']}; exclusions: {report['excluded']}; "
+                    f"flagged: {report['unreconciled_flags']}.\\n\\n"
+                )
+    else:
+        print("Provisional category metrics (not reconciled to payments):")
+        print(json.dumps(report["provisional_metrics"], indent=2))
     print(report["warning"])
     if report["failed"]:
         raise SystemExit(1)
