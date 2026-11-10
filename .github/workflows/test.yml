@@ -268,35 +268,3 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 
-      # Diagnostic only: show rule IDs and paths for a failed PR quality gate.
-      - name: Print outstanding SonarCloud findings after gate failure
-        if: failure() && github.event_name == 'pull_request'
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          python - <<'PY'
-          import base64
-          import json
-          import os
-          from urllib.parse import urlencode
-          from urllib.request import Request, urlopen
-
-          params = urlencode({
-              "componentKeys": "msaperst_cwkc-v2",
-              "pullRequest": os.environ["PR_NUMBER"],
-              "resolved": "false", "ps": 100,
-          })
-          url = "https://sonarcloud.io/api/issues/search?" + params
-          credential = base64.b64encode(
-              (os.environ["SONAR_TOKEN"] + ":").encode()
-          ).decode()
-          request = Request(url, headers={"Authorization": "Basic " + credential})
-          with urlopen(request, timeout=20) as response:
-              issues = json.load(response).get("issues", [])
-          for issue in issues:
-              location = issue.get("component", "").split(":")[-1]
-              print(f"{location}:{issue.get('line', '?')} "
-                    f"{issue.get('rule', '')}: {issue.get('message', '')}")
-          print(f"Total open PR findings: {len(issues)}")
-          PY
