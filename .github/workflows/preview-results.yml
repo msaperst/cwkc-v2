@@ -46,19 +46,6 @@ jobs:
           PIP_ONLY_BINARY: ':all:'
         run: python -m pip install --require-hashes -r scraper/requirements-ci.lock
 
-      - name: Require encrypted reporting before connecting to mailbox
-        env:
-          AGE_RECIPIENT: ${{ vars.CWKC_PREVIEW_AGE_RECIPIENT }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ ! "$AGE_RECIPIENT" =~ ^age1[a-z0-9]{20,}$ ]]; then
-            echo "Configure Actions variable CWKC_PREVIEW_AGE_RECIPIENT (public age key)."
-            exit 1
-          fi
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq age >/dev/null
-
       - name: Prepare optional exclusion list (runner-local only)
         env:
           EXCLUDE_IDS: ${{ inputs.exclude_submission_ids }}
@@ -132,30 +119,21 @@ jobs:
             python -m scraper.audit_lgl --private-workflow
           fi
 
-      # The repository is PUBLIC. Never upload the plaintext projected CSV,
-      # and never print financial totals in a public Actions step summary.
-      # Owner creates a local age keypair and configures its PUBLIC recipient
-      # as a repository Actions variable (no private key in GitHub).
-      - name: Encrypt the proposed CSV before upload
-        env:
-          AGE_RECIPIENT: ${{ vars.CWKC_PREVIEW_AGE_RECIPIENT }}
+      # Public-repo artifact: only aggregate CSV scores, with donor-name columns
+      # redacted. GitHub artifacts are accessible to people who can view the run.
+      # Keep the CSV out of persistent logs; the operator can download and
+      # inspect/delete the one-day artifact after verification.
+      - name: Prepare downloadable proposed-results.csv
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! "$AGE_RECIPIENT" =~ ^age1[a-z0-9]{20,}$ ]]; then
-            echo "Set Actions variable CWKC_PREVIEW_AGE_RECIPIENT to an age public recipient."
-            exit 1
-          fi
-          age -r "$AGE_RECIPIENT" \
-            -o "$RUNNER_TEMP/proposed-results.csv.age" \
-            ".cwkc-preview-results.csv"
-          rm -f ".cwkc-preview-results.csv" ".cwkc-excluded-submissions.txt"
-          test -s "$RUNNER_TEMP/proposed-results.csv.age"
+          cp -- .cwkc-preview-results.csv "$RUNNER_TEMP/proposed-results.csv"
+          test -s "$RUNNER_TEMP/proposed-results.csv"
 
-      - name: Download encrypted preview only (NOT published)
+      - name: Upload unencrypted proposed results.csv (read-only)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: cwkc-encrypted-preview-${{ github.run_id }}
-          path: ${{ runner.temp }}/proposed-results.csv.age
+          name: cwkc-preview-results-${{ github.run_id }}
+          path: ${{ runner.temp }}/proposed-results.csv
           if-no-files-found: error
           retention-days: 1

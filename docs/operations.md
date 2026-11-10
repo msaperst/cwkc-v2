@@ -76,23 +76,11 @@ With `CWKC_INGESTION_ENABLED=false`:
 
 After merging the preview workflow, use **Actions → Preview CWKC results (read-only) → Run workflow** on `main`. It parses **currently unread** LGL emails without changing Seen flags, computes the donation CSV numbers, and optionally reads the current Google Forms response Sheets (`include_forms=true`) in dry-run mode. It does **not** write a Sheet, update `cwkc-results`, or publish Pages. Exclude only verified non-payment test records using their comma-separated LGL *Submission IDs*; otherwise they will appear in provisional totals. Donor-name columns are redacted.
 
-This repository is **public**, so previews are encrypted before being uploaded and no financial amounts are logged. One-time operator setup:
+This repository is **public**. The manual workflow uploads an **unencrypted, redacted aggregate score CSV** as a short-lived GitHub Actions artifact. No names, phone numbers, addresses, email addresses, raw notifications, or LGL submission IDs appear in the uploaded CSV or logs. No encryption keys or repository variables are required.
 
-~~~bash
-# Install "age" locally if needed. Keep the private key OUT of Git.
-mkdir -p ~/.config/cwkc
-age-keygen -o ~/.config/cwkc/preview.key
-# Copy the printed "public key: age1..." recipient only.
-~~~
+After the run succeeds, open its **Artifacts** section, download `cwkc-preview-results-<run number>`, and extract `proposed-results.csv`. The artifact expires after **1 day**; you can also delete it after reviewing. Anyone who can access the public workflow artifact may copy its aggregate totals before deletion, so deletion is not a confidentiality guarantee. The numeric CSV totals are intentionally kept **out of the permanent workflow logs**.
 
-In GitHub **Settings → Secrets and variables → Actions → Variables**, set `CWKC_PREVIEW_AGE_RECIPIENT` to the printed **public** `age1...` value. Never share or commit `preview.key`. After a successful manual run, download the one-day `cwkc-encrypted-preview-...` artifact and decrypt:
-
-~~~bash
-age -d -i ~/.config/cwkc/preview.key \
-  -o proposed-results.csv proposed-results.csv.age
-~~~
-
-The proposed CSV has the exact public results schema but **excludes donor names** for privacy; compare the numeric fields privately to LGL payments. Without `include_forms`, participation/football columns remain at their starter values. This is a **current unread inbox projection**, not a merged view of any already-persisted Sheet rows, not evidence of payment receipt, and **not** a full email→Sheet→Pages integration test. A separate controlled rehearsal is required before opening.
+The proposed CSV has the exact public results schema but **excludes donor names** for privacy; compare the numeric fields with LGL payments. Without `include_forms`, participation/football columns remain at their starter values. This is a **current unread inbox projection**, not a merged view of any already-persisted Sheet rows, not evidence of payment receipt, and **not** a full email→Sheet→Pages integration test. A separate controlled rehearsal is required before opening.
 
 ## During the event
 

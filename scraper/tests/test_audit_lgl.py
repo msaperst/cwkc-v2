@@ -312,7 +312,10 @@ def test_private_workflow_logs_no_amounts_or_names(tmp_path, monkeypatch, capsys
     assert "7.06" not in output + summary
     assert "auditor@example.invalid" not in output + summary
     assert "Preview" in summary or "preview" in summary
-    assert "encrypted" in summary
+    assert "one-day downloadable artifact" in summary
+    assert "encrypted" not in summary
+    assert "245.00" in (tmp_path / ".cwkc-preview-results.csv").read_text()
+    assert "7.06" in (tmp_path / ".cwkc-preview-results.csv").read_text()
     server.add_flags.assert_not_called()
 
 
