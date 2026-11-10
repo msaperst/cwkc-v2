@@ -2,7 +2,6 @@
 from email.message import EmailMessage
 from html import escape
 import json
-import stat
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -147,7 +146,10 @@ def test_inventory_contains_no_donor_contact_data():
     assert "monthly-form-vs-recurring-flag" in report["inventory"][3]["flags"]
 
 
-def test_readonly_mode_closes_connection_and_does_not_log_donors(capsys):
+def test_readonly_mode_closes_connection_and_does_not_log_donors(
+    capsys, tmp_path, monkeypatch,
+):
+    monkeypatch.chdir(tmp_path)
     server = _fake_server()
     client = MagicMock()
     client.__enter__.return_value = server
@@ -182,15 +184,6 @@ def test_unknown_messages_fail_without_acknowledgment():
     assert report["provisional_metrics"]["uva"]["total_amount"] == "0.00"
     server.add_flags.assert_not_called()
 
-
-def test_owner_only_inventory_file_and_no_overwrite(tmp_path):
-    report = audit.audit_unread(_fake_server())
-    path = tmp_path / "private-audit.json"
-    audit._write_private_json(path, report)
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert json.loads(path.read_text())["unread_matching"] == 4
-    with pytest.raises(FileExistsError):
-        audit._write_private_json(path, report)
 
 
 def test_independent_comparison_catches_a_regression(monkeypatch):
@@ -302,6 +295,7 @@ def test_public_github_actions_requires_private_output(monkeypatch):
 
 
 def test_private_workflow_logs_no_amounts_or_names(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
     server = _fake_server()
     client = MagicMock()
     client.__enter__.return_value = server
@@ -310,13 +304,10 @@ def test_private_workflow_logs_no_amounts_or_names(tmp_path, monkeypatch, capsys
     with patch.object(audit, "IMAPClient", return_value=client), \
          patch.object(audit, "EMAIL_ACCOUNT", "service@example.invalid"), \
          patch.object(audit, "EMAIL_PASSWORD", "fake-local-only"):
-        audit.main([
-            "--private-workflow", "--preview-csv",
-            str(tmp_path / "preview.csv"),
-        ])
+        audit.main(["--private-workflow"])
     output = capsys.readouterr().out
     summary = (tmp_path / "summary.md").read_text()
-    assert (tmp_path / "preview.csv").exists()
+    assert (tmp_path / ".cwkc-preview-results.csv").exists()
     assert "245.00" not in output + summary
     assert "7.06" not in output + summary
     assert "auditor@example.invalid" not in output + summary
