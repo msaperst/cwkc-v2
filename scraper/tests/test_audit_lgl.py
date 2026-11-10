@@ -200,3 +200,94 @@ def test_independent_comparison_catches_a_regression(monkeypatch):
     )
     with pytest.raises(AssertionError, match="score mismatch"):
         audit.audit_unread(_fake_server())
+
+
+
+def test_proposed_csv_preserves_schema_and_redacts_donor_names(tmp_path):
+    import pandas as pd
+
+    report = audit.audit_unread(_fake_server(), {
+        "synthetic-uva-back", "synthetic-vt-back",
+    })
+    output = tmp_path / "proposed-results.csv"
+    frame = audit.build_preview_csv(report, output)
+    original = pd.read_csv("public/assets/csv/results.csv")
+    assert output.exists()
+    assert list(frame.columns) == list(original.columns)
+    assert len(frame) == 1
+    assert float(frame.at[0, "uva_total_amount"]) == 5.0
+    assert float(frame.at[0, "vt_total_amount"]) == 5.0
+    assert int(frame.at[0, "uva_most_individual_donors"]) == 1
+    assert int(frame.at[0, "vt_most_first_time_donors"]) == 1
+    assert int(frame.at[0, "uva_most_donors_class_2026"]) == 0
+    assert int(frame.at[0, "uva_hanukkah_photos"]) == 0
+    assert frame.at[0, "uva_donor_names"] == ""
+    assert frame.at[0, "vt_donor_names"] == ""
+    contents = output.read_text()
+    assert "auditor@example.invalid" not in contents
+    assert "5550102026" not in contents
+    assert "Example" not in contents
+
+
+def test_failing_audit_cannot_publish_even_a_preview(tmp_path):
+    report = audit.audit_unread(_fake_server({
+        5: _mime("uva", "Invalid form title", "wrong-form", "$3"),
+    }))
+    output = tmp_path / "preview.csv"
+    with pytest.raises(ValueError, match="Incomplete audit"):
+        audit.build_preview_csv(report, output)
+    assert not output.exists()
+
+
+def test_unmatched_exclusion_rejects_inaccurate_projection(tmp_path):
+    report = audit.audit_unread(_fake_server(), {"not-in-inbox"})
+    with pytest.raises(ValueError, match="Incomplete audit"):
+        audit.build_preview_csv(report, tmp_path / "preview.csv")
+
+
+def test_read_only_forms_option_uses_existing_updater_without_writing(
+    tmp_path, monkeypatch,
+):
+    from scraper.getGoogleFormData import SubmissionUpdater
+
+    report = audit.audit_unread(_fake_server(), {
+        "synthetic-uva-back", "synthetic-vt-back",
+    })
+    called = []
+
+    def fake_init(self, creds, results_csv_path):
+        called.append(("init", creds, results_csv_path))
+        import pandas as pd
+        self.df = pd.read_csv("public/assets/csv/results.csv").astype(object)
+
+    def fake_update(self, dry_run=False):
+        called.append(("update", dry_run))
+        assert dry_run is True
+        self.df.at[0, "uva_alumni_gatherings"] = 4
+        self.df.at[0, "vt_hanukkah_photos"] = 7
+
+    monkeypatch.setattr(SubmissionUpdater, "__init__", fake_init)
+    monkeypatch.setattr(SubmissionUpdater, "update_results", fake_update)
+    frame = audit.build_preview_csv(
+        report, tmp_path / "preview.csv",
+        include_forms=True, credentials_file="synthetic-credentials",
+    )
+    assert frame.at[0, "uva_alumni_gatherings"] == 4
+    assert frame.at[0, "vt_hanukkah_photos"] == 7
+    assert frame.at[0, "uva_total_amount"] == "5.00"
+    assert called[0][1] == "synthetic-credentials"
+    assert called[1] == ("update", True)
+
+
+def test_actions_summary_is_redacted(tmp_path, monkeypatch):
+    report = audit.audit_unread(_fake_server())
+    frame = audit.build_preview_csv(report, tmp_path / "preview.csv")
+    summary_path = tmp_path / "step-summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
+    audit.write_action_summary(report, frame)
+    contents = summary_path.read_text()
+    assert "proposed" in contents.lower()
+    assert "csv" in contents
+    assert "auditor@example.invalid" not in contents
+    assert "Example" not in contents
+    assert "unreconciled" in contents
