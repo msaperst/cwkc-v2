@@ -4,6 +4,8 @@ from typing import Dict, Set
 COMMUNITY_MEMBER = 'Community Member'
 GRANDPARENT_OF_ALUMNI = 'Grandparent of Alumni'
 PARENT_OF_ALUMNI = 'Parent of Alumni'
+FAMILY_MEMBER_OF_ALUMNI = 'Family Member of Alumni'
+OTHER_STUDENT_RELATIVE = 'Other Student Relative'
 
 
 def determine_source(email_from: str, form_title: str) -> str:
@@ -47,6 +49,10 @@ class EmailParser:
         'Parent of an Alum': PARENT_OF_ALUMNI,
         GRANDPARENT_OF_ALUMNI: GRANDPARENT_OF_ALUMNI,
         'Grandparent of an Alum': GRANDPARENT_OF_ALUMNI,
+        FAMILY_MEMBER_OF_ALUMNI: FAMILY_MEMBER_OF_ALUMNI,
+        'Family member of an Alum': FAMILY_MEMBER_OF_ALUMNI,
+        'Family member of Alumni': FAMILY_MEMBER_OF_ALUMNI,
+        OTHER_STUDENT_RELATIVE: OTHER_STUDENT_RELATIVE,
         COMMUNITY_MEMBER: COMMUNITY_MEMBER
     }
 
