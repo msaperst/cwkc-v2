@@ -178,7 +178,7 @@ jobs:
         run: python -m pip install --require-hashes -r scraper/requirements-ci.lock
 
       - name: Generate isolated email-to-Sheet-to-CSV fixture
-        run: python -m scraper.e2e_rehearsal --mode offline
+        run: python -m scraper.tests.e2e_rehearsal --mode offline
 
       # Ubuntu 24.04 hosted runners already ship the system libraries needed by
       # Chromium; don't rerun slow/flaky apt installation on every PR.
