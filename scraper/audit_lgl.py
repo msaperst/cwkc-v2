@@ -336,7 +336,7 @@ def main(argv=None):
     )
     parser.add_argument(
         "--private-workflow", action="store_true",
-        help="Suppress financial amounts in public GitHub Actions logs",
+        help="Keep financial totals out of public GitHub Actions logs",
     )
     args = parser.parse_args(argv)
     if os.getenv("GITHUB_ACTIONS") == "true" and not args.private_workflow:
@@ -373,13 +373,13 @@ def main(argv=None):
     )
     print("Independent scoring comparison:", report["independent_score_comparison"])
     if args.private_workflow:
-        print("Preview prepared for encryption; totals withheld from public logs")
+        print("Plaintext aggregate CSV prepared for artifact download; totals withheld from logs")
         summary = os.getenv("GITHUB_STEP_SUMMARY")
         if summary:
             with open(summary, "a", encoding="utf-8") as stream:
                 stream.write(
                     "## CWKC read-only preview\n\n"
-                    "The proposed CSV is encrypted; no financial totals or "
+                     "The proposed CSV is available as a one-day downloadable artifact; no financial totals or "
                     "donor identities are displayed in this public workflow.\n\n"
                     f"Unread: {report['unread_matching']}; parsed: {report['parsed']}; "
                     f"failed: {report['failed']}; exclusions: {report['excluded']}; "
