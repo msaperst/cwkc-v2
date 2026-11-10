@@ -379,7 +379,8 @@ def main(argv=None):
             with open(summary, "a", encoding="utf-8") as stream:
                 stream.write(
                     "## CWKC read-only preview\n\n"
-                     "The proposed CSV is available as a one-day downloadable artifact; no financial totals or "
+                    "The proposed CSV is available as a one-day downloadable artifact; "
+                    "no financial totals or "
                     "donor identities are displayed in this public workflow.\n\n"
                     f"Unread: {report['unread_matching']}; parsed: {report['parsed']}; "
                     f"failed: {report['failed']}; exclusions: {report['excluded']}; "
