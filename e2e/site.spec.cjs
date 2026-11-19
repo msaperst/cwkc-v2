@@ -52,6 +52,17 @@ test('prelaunch page renders without requesting previous results', async ({ page
   await expect(page.locator('#countdown-text')).toHaveText('The Cup Starts In');
   await expect(page.locator('#hooTotal')).toHaveText('0');
   await expect(page.locator('#hokieTotal')).toHaveText('0');
+  // Category weights are public rules even while donation totals stay hidden.
+  const categories = await page.locator('#score-areas [data-points]').evaluateAll(rows =>
+    rows.map(row => ({
+      points: Number(row.dataset.points),
+      label: row.querySelector('span.points')?.textContent?.trim(),
+    }))
+  );
+  expect(categories).toHaveLength(12);
+  for (const { points, label } of categories) {
+    expect(label).toBe(`(${points} Point${points === 1 ? '' : 's'})`);
+  }
   await expect(page.locator('.enable-during-contest').first()).toHaveCSS('pointer-events', 'none');
   await page.waitForTimeout(250);
   expect(requests).toHaveLength(0);
@@ -73,6 +84,7 @@ test('active phase displays synthetic scores, winners and donor text', async ({ 
   await expect(page.locator('#countdown-text')).toHaveText('The Cup Ends In');
   await expect(page.locator('#uva_total_amount')).toHaveText('1,234.50');
   await expect(page.locator('#vt_total_amount')).toHaveText('1,000.00');
+  await expect(page.locator('#total_amount span.points')).toHaveText('(3 Points)');
   // Derive point weights from the rendered HTML, never from an
   // unapproved future scoring rubric.
   const totalPoints = await page.locator('[data-points]').filter({
@@ -114,6 +126,7 @@ test('ended phase loads final synthetic scores once and announces the winner', a
   await expect(page.locator('#hooTotal')).toHaveText(points);
   await page.clock.runFor(6_000);
   await expect(page.locator('#countdown')).toContainText('Hoos win');
+  await expect(page.locator('#hanukkah_photos span.points')).toHaveText('(1 Point)');
   expect(requests).toHaveLength(1);
   await expect(page.locator('.enable-during-contest').first()).toHaveCSS('pointer-events', 'none');
 });

@@ -52,6 +52,17 @@ function getResultsData() {
 }
 
 /**
+ * Render category weights independently of results. These are public rules,
+ * so they must be visible even when the prelaunch CSV fetch is disabled.
+ */
+function renderCategoryPointLabels() {
+    $('[data-points]').each(function() {
+        const points = Number.parseInt($(this).attr('data-points'), 10);
+        $(this).find('span.points').text(`(${points} Point${points === 1 ? '' : 's'})`);
+    });
+}
+
+/**
  * Loads in CSV data (not a file itself, raw data from one), and processes it. We are
  * expecting a list of key-values where each key is the score area (with indicated school)
  * of the field, and the value is the score. Each value will be placed in the appropriate
@@ -107,6 +118,9 @@ function loadScores(data) {
                 }
             });
 
+            // Keep category labels synchronized using the same renderer as prelaunch.
+            renderCategoryPointLabels();
+
             // clear out any winners
             $('[data-points] .bg-hoo-blue\\/100').removeClass('bg-hoo-blue/100').addClass('bg-white/5');
             $('[data-points] .bg-hokie-maroon\\/50').removeClass('bg-hokie-maroon/50').addClass('bg-white/5');
@@ -119,7 +133,6 @@ function loadScores(data) {
             $('[data-points]').each(function() {
                 // determine how many points for the area
                 const points = Number.parseInt($(this).attr('data-points'));
-                $(this).find('span.points').html(`(${points} Point${points > 1 ? 's' : ''})`);
 
                 // determine who is winning in each area
                 const values = $(this).find('.rounded-xl span');
@@ -287,6 +300,7 @@ function setTimes() {
 }
 
 $(document).ready(() => {
+    renderCategoryPointLabels();
     const phase = getContestPhase();
     countdownUntil = phase === 'upcoming' ? startTime : deadline;
 
@@ -319,6 +333,7 @@ $(document).ready(() => {
 /* istanbul ignore next */
 if (typeof module !== 'undefined') {
     module.exports = {
+        renderCategoryPointLabels,
         getContestPhase,
         setContestLinksEnabled,
         startScoreUpdates,
