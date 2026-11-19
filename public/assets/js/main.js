@@ -118,6 +118,9 @@ function loadScores(data) {
                 }
             });
 
+            // Keep category labels synchronized using the same renderer as prelaunch.
+            renderCategoryPointLabels();
+
             // clear out any winners
             $('[data-points] .bg-hoo-blue\\/100').removeClass('bg-hoo-blue/100').addClass('bg-white/5');
             $('[data-points] .bg-hokie-maroon\\/50').removeClass('bg-hokie-maroon/50').addClass('bg-white/5');
