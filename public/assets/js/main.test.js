@@ -133,13 +133,26 @@ describe('Main', () => {
             clearInterval(global.refreshInterval);
         });
 
+        test('category point labels render without fetching results', () => {
+            const fetchSpy = jest.spyOn($, 'ajax');
+            expect($('#hooHigher span.points').text().trim()).toBe('');
+            expect($('#hokieHigher span.points').text().trim()).toBe('');
+
+            main.renderCategoryPointLabels();
+
+            expect($('#hooHigher span.points').text()).toBe('(5 Points)');
+            expect($('#hokieHigher span.points').text()).toBe('(1 Point)');
+            expect(fetchSpy).not.toHaveBeenCalled();
+        });
+
         test('loadScores parses CSV data and updates DOM', () => {
             main.loadScores('mock CSV');
             expect($('#score1').text()).toBe('1,000');
             expect($('#score2').text()).toBe('2,000');
         });
 
-        test('loadScores property states points', () => {
+        test('loadScores preserves category point labels', () => {
+            main.renderCategoryPointLabels();
             main.loadScores('mock CSV');
             expect($('#hooHigher span.points').text()).toBe('(5 Points)');
             expect($('#hokieHigher span.points').text()).toBe('(1 Point)');
