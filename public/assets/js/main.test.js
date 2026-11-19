@@ -151,9 +151,12 @@ describe('Main', () => {
             expect($('#score2').text()).toBe('2,000');
         });
 
-        test('loadScores preserves category point labels', () => {
-            main.renderCategoryPointLabels();
+        test('loadScores renders category point labels using the shared helper', () => {
+            expect($('#hooHigher span.points').text().trim()).toBe('');
+            expect($('#hokieHigher span.points').text().trim()).toBe('');
+
             main.loadScores('mock CSV');
+
             expect($('#hooHigher span.points').text()).toBe('(5 Points)');
             expect($('#hokieHigher span.points').text()).toBe('(1 Point)');
         });
