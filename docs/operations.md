@@ -132,6 +132,41 @@ After the run succeeds, open its **Artifacts** section, download `cwkc-preview-r
 
 The proposed CSV has the exact public results schema but **excludes donor names** for privacy; compare the numeric fields with LGL payments. Without `include_forms`, participation/football columns remain at their starter values. This is a **current unread inbox projection**, not a merged view of any already-persisted Sheet rows, not evidence of payment receipt, and **not** a full email→Sheet→Pages integration test. A separate controlled rehearsal is required before opening.
 
+## Test the optional live IMAP poller without manual GitHub dispatch
+
+The production update workflow has a **built-in five-minute GitHub cron**. It
+does not require the older `scraper/pollEmail.py` process to be running.
+The optional poller is a separate process on an operator-managed machine;
+GitHub does not host it. It sends `repository_dispatch` with event type
+`lgl-form-submission`. Google Forms sends the distinct `sheet-change`
+event. A repository-dispatch **accepted** by GitHub is not evidence that
+donations were ingested; the date/kill-switch gate remains authoritative.
+
+To test the *actual* optional poller's IMAP → GitHub delivery before kickoff:
+
+1. On the machine that has the live poller's `EMAIL_ACCOUNT`,
+   `EMAIL_APP_PASSWORD` and `GITHUB_TOKEN` configured, update to reviewed
+   `main` and mark **one** actual direct or approved forwarded LGL message
+   unread. The poller's mail search is read-only; no donor data is logged.
+2. Run once: `python -m scraper.pollEmail --once`. Expected output includes
+   `GitHub Action triggered successfully` (the dispatch returned HTTP 204).
+   If it reports an HTTP error, inspect the token's repository access.
+3. In GitHub Actions, find the new `Update results from multiple locations`
+   event with display title `lgl-form-submission`. It must be a
+   `repository_dispatch` run with `check-window` successful.
+4. **Before Nov 30**, `recompute` and `deploy-results` must be **skipped**
+   while `CWKC_INGESTION_ENABLED=false` and the season hasn't started.
+   That is a successful trigger + gate test, *not* a full data-write rehearsal.
+5. Confirm the chosen email is still unread and Sheets/CSV are unchanged.
+   Repeated dispatches from an always-on poller are unnecessary before
+   kickoff; don't leave one running against an unread backlog while the
+   date gate is closed.
+
+The real importer, calculation and Pages jobs were tested separately in a
+confirmed manual rehearsal. A scheduled `schedule` job cannot be forged by
+pressing `Run workflow`: verify a real scheduled run after opening on Nov 30.
+A source event arriving before that date must never bypass the date gate.
+
 ## During the event
 
 Scheduled Actions refresh roughly every five minutes; GitHub cron can be delayed or occasionally skipped. Check actual workflow executions and watchdog alerts. Use aggregate non-PII counters from Actions, but reconcile donations and totals with LGL privately. Avoid running a local poller and scheduled ingester independently without a coordinated fallback plan.
