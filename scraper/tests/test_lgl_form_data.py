@@ -192,7 +192,7 @@ def test_lgl_step_summary_contains_only_synthetic_counts(monkeypatch, capsys):
     assert "### CWKC LGL processing\n" in body
     assert "| Matching unread notifications at start | 4 |" in body
     assert "| New donation rows persisted | 1 |" in body
-    assert "| Failed notifications (left unread) | 1 |" in body
+    assert "| Failed notifications (acknowledgement not confirmed) | 1 |" in body
     assert "| Highest matched mailbox UID (not a processed watermark) | 11 |" in body
     assert "| Identified normalized Sheet rows | 1 |" in body
     assert "synthetic-hash" not in body

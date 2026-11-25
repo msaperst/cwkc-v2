@@ -163,6 +163,33 @@ def validate_submission(data: dict, normalized_row: dict) -> None:
         raise ValueError("Unrecognized 2026 LGL form title")
 
 
+def acknowledge_persisted(server, uid):
+    """Confirm a durable gift was marked Seen, even if the IMAP reply fails.
+
+    Gmail may apply STORE +FLAGS then return an IMAP error. The ledger is
+    already durable at this point, so check the server's actual flags before
+    treating this as an unprocessed notification.
+    """
+    try:
+        server.add_flags(uid, ["\\Seen"])
+    except Exception:
+        try:
+            response = server.fetch(uid, ["FLAGS"])
+            flags = response.get(uid, {}).get(b"FLAGS", ())
+            if any(
+                str(flag, "ascii", "ignore").casefold() == "\\seen"
+                if isinstance(flag, bytes) else str(flag).casefold() == "\\seen"
+                for flag in flags
+            ):
+                print(f"LGL UID {uid}: Seen flag verified after IMAP response error")
+                return
+        except Exception:
+            # Keep the original acknowledgement error, not the verification
+            # error. Unconfirmed acknowledgement must still fail closed.
+            pass
+        raise
+
+
 def handle_message(server, uid, ledger, normalizer, reconcile_only,
                    seen_rows=None):
     """Handle a direct or verified forwarded notification once per LGL gift."""
@@ -201,7 +228,7 @@ def handle_message(server, uid, ledger, normalizer, reconcile_only,
     if seen_rows is not None:
         seen_rows.setdefault(submission_id, normalized)
     # Only acknowledge an email after the normalized row is durable.
-    server.add_flags(uid, ["\\Seen"])
+    acknowledge_persisted(server, uid)
     return category
 
 
@@ -220,7 +247,7 @@ def process_messages(server, uids: list, ledger: SubmissionLedger,
         except Exception as error:
             summary["failed"] += 1
             # Error messages can contain PII; print only type and mailbox UID.
-            print(f"LGL UID {uid} failed ({type(error).__name__}); left unread")
+            print(f"LGL UID {uid} failed ({type(error).__name__}); acknowledgement not confirmed")
     return summary
 
 def update_local_csv():
@@ -267,7 +294,7 @@ def write_processing_summary(uids: list, summary: dict, ledger: SubmissionLedger
         f"| Matching unread notifications at start | {len(uids)} |",
         f"| New donation rows persisted | {summary['new']} |",
         f"| Previously persisted notifications | {summary['already_stored']} |",
-        f"| Failed notifications (left unread) | {summary['failed']} |",
+        f"| Failed notifications (acknowledgement not confirmed) | {summary['failed']} |",
         f"| Read-only pending notifications | {summary['pending']} |",
         f"| Highest matched mailbox UID (not a processed watermark) | {latest_uid} |",
         f"| Identified normalized Sheet rows | {len(ledger.ids)} |",

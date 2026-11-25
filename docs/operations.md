@@ -147,6 +147,15 @@ Scheduled Actions refresh roughly every five minutes; GitHub cron can be delayed
 
 A code rollback does not undo Google Sheet writes or IMAP Seen flags.
 
+**IMAP acknowledgement uncertainty:** An IMAP STORE response can fail after the
+server has already applied the `\\Seen` flag. The importer now queries the
+actual FLAGS before declaring that an already-persisted donation has failed.
+If confirmation also fails, it blocks CSV publication. Inspect the live
+`entries_2026` submission IDs and Gmail unread status before deciding to
+reset any flags or replay mail. A rerun with no unread LGL notifications
+still recalculates the CSV from the full durable 2026 ledger, without
+duplicating any donations.
+
 ### Offline recovery rehearsal
 
 ~~~bash
