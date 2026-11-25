@@ -6,6 +6,16 @@ on:
   repository_dispatch:
     types: [sheet-change, lgl-form-submission]
   workflow_dispatch:
+    inputs:
+      rehearsal:
+        description: "Manual prelaunch E2E drill (ingests mail, updates Sheets, publishes public CSV)"
+        type: boolean
+        required: true
+        default: false
+      confirmation:
+        description: "Type REHEARSE to allow the prelaunch drill; otherwise dates still apply"
+        type: string
+        required: false
   # GitHub cron is UTC. Tick at :02/:07/.../:57 (off the busy hour),
   # with a best-effort last pre-cutoff tick at 00:59 UTC on Dec 8.
   # Year-independent cron is guarded by season.json and the kill switch.
@@ -29,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CWKC_INGESTION_ENABLED: ${{ vars.CWKC_INGESTION_ENABLED }}
+      CWKC_REHEARSAL: ${{ github.event_name == 'workflow_dispatch' && inputs.rehearsal == true && inputs.confirmation == 'REHEARSE' }}
     outputs:
       active: ${{ steps.season.outputs.active }}
     steps:
@@ -46,6 +57,7 @@ jobs:
     needs: check-window
     env:
       CWKC_INGESTION_ENABLED: ${{ vars.CWKC_INGESTION_ENABLED }}
+      CWKC_REHEARSAL: ${{ github.event_name == 'workflow_dispatch' && inputs.rehearsal == true && inputs.confirmation == 'REHEARSE' }}
     if: needs.check-window.outputs.active == 'true'
     runs-on: ubuntu-latest
     permissions:
