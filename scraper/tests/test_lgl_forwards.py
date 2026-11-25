@@ -1,6 +1,7 @@
 """Synthetic forwarded LGL fixtures: never use real donor records in GitHub."""
 from email.message import EmailMessage
 from html import escape
+from imaplib import IMAP4
 from unittest.mock import MagicMock
 
 import pytest
@@ -150,3 +151,82 @@ def test_importer_uses_stable_key_for_both_delivery_methods():
     assert result == {"new": 1, "already_stored": 1, "pending": 0, "failed": 0}
     assert stored == {"lgl:synthetic-shared-id"}
     assert server.add_flags.call_count == 2
+
+
+def test_acknowledgement_error_is_recovered_when_gmail_stored_seen():
+    raw, _ = _notification(source_id="ack-confirmed")
+    server = _server({41: raw})
+    server.add_flags.side_effect = IMAP4.error("synthetic IMAP response failure")
+    base_fetch = server.fetch.side_effect
+
+    def fetch_with_flags(uid, items):
+        if items == ["FLAGS"]:
+            return {uid: {b"FLAGS": (b"\\Seen", b"\\Recent")}}
+        return base_fetch(uid, items)
+
+    server.fetch.side_effect = fetch_with_flags
+    ledger = MagicMock()
+    ledger.known.return_value = False
+    ledger.insert.return_value = True
+
+    result = getLglFormData.process_messages(server, [41], ledger)
+
+    assert result == {"new": 1, "already_stored": 0, "pending": 0, "failed": 0}
+    ledger.insert.assert_called_once()
+    server.add_flags.assert_called_once_with(41, ["\\Seen"])
+    server.fetch.assert_any_call(41, ["FLAGS"])
+
+
+def test_unconfirmed_acknowledgement_fails_closed_but_replay_does_not_duplicate():
+    raw, _ = _notification(source_id="ack-unconfirmed")
+    server = _server({41: raw})
+    server.add_flags.side_effect = IMAP4.error("synthetic failure before STORE")
+    base_fetch = server.fetch.side_effect
+
+    def fetch_without_seen(uid, items):
+        if items == ["FLAGS"]:
+            return {uid: {b"FLAGS": (b"\\Recent",)}}
+        return base_fetch(uid, items)
+
+    server.fetch.side_effect = fetch_without_seen
+    ledger = MagicMock()
+    persisted = set()
+    ledger.known.side_effect = lambda key: key in persisted
+    ledger.insert.side_effect = lambda row, key: (persisted.add(key) or True)
+
+    first = getLglFormData.process_messages(server, [41], ledger)
+
+    assert first == {"new": 0, "already_stored": 0, "pending": 0, "failed": 1}
+    assert persisted == {"lgl:ack-unconfirmed"}
+    assert ledger.insert.call_count == 1
+
+    # On a later run, the same unread notification is acknowledged safely
+    # without writing another row.
+    server.add_flags.side_effect = None
+    second = getLglFormData.process_messages(server, [41], ledger)
+
+    assert second == {"new": 0, "already_stored": 1, "pending": 0, "failed": 0}
+    assert ledger.insert.call_count == 1
+
+
+def test_ack_verification_failure_does_not_mask_unconfirmed_email():
+    raw, _ = _notification(source_id="ack-check-failed")
+    server = _server({41: raw})
+    server.add_flags.side_effect = IMAP4.error("synthetic STORE failure")
+    base_fetch = server.fetch.side_effect
+
+    def fetch_fails_for_flags(uid, items):
+        if items == ["FLAGS"]:
+            raise IMAP4.error("synthetic FETCH failure")
+        return base_fetch(uid, items)
+
+    server.fetch.side_effect = fetch_fails_for_flags
+    ledger = MagicMock()
+    ledger.known.return_value = False
+    ledger.insert.return_value = True
+
+    result = getLglFormData.process_messages(server, [41], ledger)
+
+    assert result["failed"] == 1
+    ledger.insert.assert_called_once()
+    server.fetch.assert_any_call(41, ["FLAGS"])
