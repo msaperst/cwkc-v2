@@ -10,6 +10,47 @@
 4. The calculator produces `public/assets/csv/results.csv`. GitHub Actions stores the published snapshot on `cwkc-results` and deploys the static site through GitHub Pages.
 5. A separate watchdog checks that ingestion continues during the event.
 
+### Current production workflow
+
+The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** fully gated recomputation.
+
+```mermaid
+flowchart TB
+    subgraph sources["Donation and participation sources"]
+        LGL["UVA / VT LGL forms<br/>donations handled by Hillels"] --> MAIL["Dedicated Gmail inbox<br/>direct emails + validated forwards"]
+        FORMS["2026 Hanukkah / gathering Forms"] --> RESP["Private Google response Sheets"]
+    end
+
+    subgraph updates["GitHub Actions: update.yml"]
+        CRON["Scheduled UTC cron<br/>about every 5 minutes"] --> GATE{"Eastern event window<br/>AND ingestion enabled?"}
+        DISPATCH["Optional sheet-change dispatch"] -.-> GATE
+        GATE -->|No| SKIP["Skip ingestion"]
+        GATE -->|Yes| INGEST["Read unread LGL emails<br/>validate + deduplicate"]
+        INGEST --> LEDGER["Private donations Sheet<br/>verified batch write + readback"]
+        LEDGER --> SCORE["Calculate donation scores"]
+        SCORE --> PARTICIPATION["Read Forms Sheets<br/>calculate participation scores"]
+        PARTICIPATION --> CSV["Recomputed results.csv"]
+        CSV --> CHANGED{"Different from published CSV?"}
+        CHANGED -->|No| NOCHANGE["No publication needed"]
+        CHANGED -->|Yes| DATA["Commit CSV to cwkc-results branch"]
+        DATA --> RESULTDEPLOY["Deploy updated results"]
+    end
+
+    MAIL --> INGEST
+    RESP --> PARTICIPATION
+
+    subgraph public["Published website"]
+        MAIN["Reviewed main branch<br/>HTML / JavaScript / CSS"] --> CODEDEPLOY["On main push: deploy.yml<br/>overlay latest results CSV"]
+        CODEDEPLOY --> PAGES["GitHub Pages: cwkc.org"]
+        RESULTDEPLOY --> PAGES
+    end
+    DATA -.->|Current results overlay| CODEDEPLOY
+
+    WATCH["Separate scheduled watchdog.yml<br/>read-only run/branch checks"] -.->|Failure or stale heartbeat| ISSUE["Operator GitHub issue"]
+```
+
+**Important boundaries:** The update workflow skips processing outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A source error blocks score publication; a changed CSV is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Public photo display is not part of this pipeline yet ([photo viewer #50](https://github.com/msaperst/cwkc-v2/issues/50)).
+
 `main` is reviewed code and a **zeroed starter CSV**; `cwkc-results` is the last published scoreboard. The default ingestion is GitHub's **scheduled five-minute update**—no external email poller or always-on machine is required.
 
 **2026 event:** November 30, 00:00 EST – December 7, 20:00 EST. The single season config is `public/assets/config/season.json`, using `America/New_York`. GitHub schedules are expressed in UTC, and the Python gate enforces the actual configured instants.
