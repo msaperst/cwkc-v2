@@ -18,9 +18,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 SEASON_CONFIG = ROOT / "public/assets/config/season.json"
 
-# The 2022 gathering workbook is reused, but its 'Form Responses 1' tab is
-# the current responses tab. Archived year-named tabs must never be counted.
-GATHERING_SHEET_ID = "1EOURh5B5mKy0AjAgTKMObYtdmvZGI8txVC18DCmlA5o"
+# Use the actual 2026 gathering Form's linked response workbook, not the
+# archived 2022 workbook. Its response tab is still 'Form Responses 1'.
+GATHERING_SHEET_ID = "1CygL3GcCUlX1hKqQi8j7eFy_K73_RKYPWycWs8uJlW4"
 HANUKKAH_SHEET_ID = "1WwpnVdW94jdvtyxVhNxNk2zz120Z57xu_2OkjcoVs2M"
 CURRENT_TAB = "Form Responses 1"
 
