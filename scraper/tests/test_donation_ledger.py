@@ -49,7 +49,7 @@ class FakeSheet:
         """Simulate values.update to explicitly addressed, adjacent rows."""
         import re
         assert value_input_option == "RAW"
-        match = re.fullmatch(r"A(\\d+):L(\\d+)", range_name)
+        match = re.fullmatch(r"A(\d+):L(\d+)", range_name)
         assert match is not None, range_name
         first, last = map(int, match.groups())
         assert first == len(self.rows) + 1
