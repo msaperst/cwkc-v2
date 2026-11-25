@@ -216,6 +216,33 @@ jobs:
         with:
           name: results-csv-${{ github.run_id }}
           path: public/assets/csv
+      # This is the REAL public site, not a dummy preview or altered metric
+      # calculator. Inject only into the deployment artifact, never main.
+      - name: Temporarily show full scoreboard before kickoff for rehearsal
+        if: github.event_name == 'workflow_dispatch' && inputs.rehearsal == true && inputs.confirmation == 'REHEARSE'
+        shell: bash
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timedelta, timezone
+          import json
+          from pathlib import Path
+          from scraper.contest_window import START
+
+          now = datetime.now(timezone.utc)
+          if now >= START:
+              raise SystemExit("Prelaunch rehearsal display is no longer allowed")
+          expires = min(now + timedelta(minutes=10), START).isoformat()
+          html = Path("public/index.html")
+          marker = '<script src="assets/js/main.js"></script>'
+          source = html.read_text(encoding="utf-8")
+          if source.count(marker) != 1:
+              raise SystemExit("Unable to install short-lived rehearsal display")
+          injection = (
+              '<script>globalThis.CWKC_REHEARSAL_VIEW_UNTIL = '
+              + json.dumps(expires) + ';</script>\\n'
+          )
+          html.write_text(source.replace(marker, injection + marker), encoding="utf-8")
+          PY
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Upload public website
