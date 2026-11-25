@@ -18,18 +18,12 @@ from .affiliations import (
     ALUMNI, CURRENT_STUDENT_GRANDPARENT_AFFILIATIONS, FAMILY_AFFILIATIONS,
 )
 from .donation_ledger import NORMALIZED_FIELDS, fingerprint
-from .lgl_forwarding import search_unread_lgl
+from .lgl_forwarding import FORM_TITLES, search_unread_lgl
 from .getLglFormData import (
     EMAIL_ACCOUNT, EMAIL_PASSWORD, FROM_FILTER, GRADUATION_YEAR_FIELD,
     IMAP_SERVER, MAILBOX, IMAPClient, parse_lgl_email, validate_submission,
 )
 
-FORM_TITLES = {
-    "uva-front": "14th Annual Commonwealth Kiddush Cup Front End Form",
-    "uva-back": "14th Annual Commonwealth Kiddush Cup Back-end Form",
-    "vt-front": "CWKC 2026 Donation Form",
-    "vt-back": "CWKC 2026 Back End Form (Virginia Tech)",
-}
 MONEY_METRICS = {
     "total_amount", "most_money_families",
     "most_money_grandparents_current_students",
