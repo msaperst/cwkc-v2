@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from scraper import audit_lgl, getLglFormData
+from scraper import getLglFormData
 from scraper.lgl_forwarding import search_unread_lgl, submission_key
 
 
@@ -92,31 +92,34 @@ def test_direct_and_forwarded_have_the_same_durable_key():
     assert submission_key(direct, fields1) == "lgl:synthetic-shared-id"
 
 
-def test_preview_deduplicates_direct_and_forward_without_mutating_mail():
+def test_real_batch_deduplicates_direct_and_forward():
     direct, _ = _notification()
     forwarded = _forward()
     server = _server({11: forwarded, 12: direct})
-    assert search_unread_lgl(server) == [11, 12]
-    report = audit_lgl.audit_unread(server)
-    assert report["unread_matching"] == 2
-    assert report["parsed"] == 1
-    assert report["forwarded_parsed"] == 1
-    assert report["duplicate_submissions_skipped"] == 1
-    assert report["failed"] == 0
-    assert report["provisional_metrics"]["uva"]["total_amount"] == "103.00"
-    assert report["provisional_metrics"]["uva"]["most_money_families"] == "103.00"
-    server.add_flags.assert_not_called()
-    assert all(call.args[1] == ["BODY.PEEK[]"]
+    uids = search_unread_lgl(server)
+    assert uids == [11, 12]
+    ledger = MagicMock()
+    ledger.insert_verified_batch.return_value = {"lgl:synthetic-shared-id"}
+
+    result = getLglFormData.process_messages_verified_batch(server, uids, ledger)
+
+    assert result == {"new": 1, "already_stored": 1, "pending": 0, "failed": 0}
+    (records,) = ledger.insert_verified_batch.call_args.args
+    assert set(records) == {"lgl:synthetic-shared-id"}
+    assert server.add_flags.call_count == 2
+    assert all(call.args[1] == ["BODY.PEEK[]"] or call.args[1] == ["FLAGS"]
                for call in server.fetch.call_args_list)
 
 
-def test_conflicting_source_records_fail_closed():
+def test_real_batch_conflicting_source_records_fail_closed():
     direct, _ = _notification()
     server = _server({11: direct, 12: _forward(amount="$999.00")})
-    report = audit_lgl.audit_unread(server)
-    assert report["parsed"] == 1
-    assert report["failed"] == 1
-    assert report["errors"][0]["error_type"] == "ValueError"
+    ledger = MagicMock()
+
+    result = getLglFormData.process_messages_verified_batch(server, [11, 12], ledger)
+
+    assert result["failed"] == 1
+    ledger.insert_verified_batch.assert_not_called()
     server.add_flags.assert_not_called()
 
 
