@@ -9,6 +9,7 @@ describe('contest lifecycle', () => {
 
     beforeEach(() => {
         originalAjax = $.ajax;
+        delete globalThis.CWKC_REHEARSAL_VIEW_UNTIL;
         jest.useFakeTimers();
         document.body.innerHTML = `
             <div id="countdown"><span id="countdown-text"></span>
@@ -24,6 +25,7 @@ describe('contest lifecycle', () => {
     });
 
     afterEach(() => {
+        delete globalThis.CWKC_REHEARSAL_VIEW_UNTIL;
         $.ajax = originalAjax;
         jest.clearAllTimers();
         jest.useRealTimers();
@@ -46,6 +48,34 @@ describe('contest lifecycle', () => {
         expect(main.getContestPhase(start)).toBe('active');
         expect(main.getContestPhase(new Date(deadline.getTime() - 1))).toBe('active');
         expect(main.getContestPhase(deadline)).toBe('ended');
+    });
+
+    test('approved short-lived rehearsal shows real live scoreboard before kickoff', () => {
+        const now = new Date(start.getTime() - 60000);
+        globalThis.CWKC_REHEARSAL_VIEW_UNTIL =
+            new Date(now.getTime() + 30000).toISOString();
+
+        const main = loadWithFreshReady(now);
+        expect(main.getContestPhase(now)).toBe('active');
+        expect($('#countdown-text').text()).toBe('The Cup Ends In');
+        expect($.ajax).toHaveBeenCalledTimes(1);
+        expect($('.enable-during-contest')[0].style.pointerEvents).toBe('');
+
+        // The same published site automatically reverts to prelaunch phase
+        // when its temporary marker expires; the official dates stay fixed.
+        expect(main.getContestPhase(new Date(now.getTime() + 29999))).toBe('active');
+        expect(main.getContestPhase(new Date(now.getTime() + 30000))).toBe('upcoming');
+        expect(main.getContestPhase(start)).toBe('active');
+    });
+
+    test('unapproved or late rehearsal marker cannot activate site early', () => {
+        const now = new Date(start.getTime() - 60000);
+        globalThis.CWKC_REHEARSAL_VIEW_UNTIL =
+            new Date(start.getTime() + 3600000).toISOString();
+        const main = loadWithFreshReady(now);
+        expect(main.getContestPhase(now)).toBe('upcoming');
+        expect($.ajax).not.toHaveBeenCalled();
+        expect($('.enable-during-contest')[0].style.pointerEvents).toBe('none');
     });
 
     test('pre-start page makes no CSV request and keeps form links disabled', () => {

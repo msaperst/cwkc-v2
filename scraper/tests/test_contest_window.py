@@ -200,3 +200,21 @@ def test_workflow_rehearsal_requires_explicit_manual_input_and_confirmation():
     assert "inputs.confirmation == 'REHEARSE'" in workflow
     assert workflow.count("CWKC_REHEARSAL:") == 2
     assert "github.event_name == 'workflow_dispatch'" in workflow
+
+
+def test_rehearsal_display_is_deployment_only_and_expires_before_kickoff():
+    workflow = (ROOT / ".github/workflows/update.yml").read_text()
+    html = (ROOT / "public/index.html").read_text()
+    script = (ROOT / "public/assets/js/main.js").read_text()
+    importer = (ROOT / "scraper/getLglFormData.py").read_text()
+
+    # The normal main/deploy paths retain the official season configuration.
+    assert "CWKC_REHEARSAL_VIEW_UNTIL" not in html
+    assert "timedelta(minutes=10)" in workflow
+    assert "min(now + timedelta(minutes=10), START)" in workflow
+    assert "globalThis.CWKC_REHEARSAL_VIEW_UNTIL" in workflow
+    assert "getContestPhase" in script
+    assert "window.location.reload()" in script
+    assert "CWKC_REHEARSAL_VIEW_UNTIL" in script
+    assert "if metric_name == \"donor_names\"" not in importer
+    assert "inputs.confirmation == 'REHEARSE'" in workflow

@@ -13,7 +13,17 @@ let countdownUntil; // when we are counting down to
  * Contest phase is based on fixed Eastern-time instants, not the visitor's timezone.
  */
 function getContestPhase(now = new Date()) {
-    if (now < startTime) return 'upcoming';
+    if (now < startTime) {
+        // Only the prelaunch rehearsal's DEPLOYED HTML supplies this timestamp.
+        // Normal deployments have no override; the official dates never change.
+        const previewUntil = Date.parse(globalThis.CWKC_REHEARSAL_VIEW_UNTIL || '');
+        if (Number.isFinite(previewUntil)
+            && previewUntil <= startTime.getTime()
+            && now.getTime() < previewUntil) {
+            return 'active';
+        }
+        return 'upcoming';
+    }
     if (now < deadline) return 'active';
     return 'ended';
 }
@@ -210,6 +220,13 @@ function getTimeRemaining(endTime) {
  * @param endTime the time to tick down to
  */
 function updateClock(endTime) {
+    // When the 10-minute rehearsal expires, reload the normal prelaunch page.
+    // This also clears any names and scores from an already-open browser tab.
+    if (endTime.getTime() === deadline.getTime()
+        && getContestPhase() === 'upcoming') {
+        window.location.reload();
+        return;
+    }
     // A tab left open before the cup must switch to the LIVE countdown at
     // midnight Eastern, not declare a winner when the start timer reaches zero.
     if (endTime.getTime() === startTime.getTime() && getContestPhase() !== 'upcoming') {
