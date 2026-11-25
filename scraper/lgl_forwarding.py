@@ -10,6 +10,12 @@ from email.utils import parseaddr
 from .donation_ledger import fingerprint
 
 LGL_ADDRESS = "lglforms-submissions@littlegreenlight.com"
+FORM_TITLES = {
+    "uva-front": "14th Annual Commonwealth Kiddush Cup Front End Form",
+    "uva-back": "14th Annual Commonwealth Kiddush Cup Back-end Form",
+    "vt-front": "CWKC 2026 Donation Form",
+    "vt-back": "CWKC 2026 Back End Form (Virginia Tech)",
+}
 FORWARDER_DOMAINS = frozenset({"brodyjewishcenter.org", "hillelvt.org"})
 FORWARD_SUBJECT = re.compile(r"^\s*Fwd?:\s*New Submission:", re.IGNORECASE)
 FORWARD_MARKER = re.compile(
