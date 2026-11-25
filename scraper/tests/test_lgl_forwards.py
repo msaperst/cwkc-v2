@@ -48,19 +48,19 @@ def _forward(*, amount="$103.00", source_id="synthetic-shared-id",
     msg = EmailMessage()
     msg["From"] = f"CWKC Volunteer <{from_address}>"
     msg["Subject"] = "Fwd: New Submission: Donor -- " + FORM
-    marker = "---------- Forwarded message ---------\\n" if include_marker else ""
+    marker = "---------- Forwarded message ---------\n" if include_marker else ""
     forwarded_header = (
         marker
-        + f"From: {SCHOOL} <{original_address}>\\n"
-        + "Date: Tue, Nov 24, 2026 at 10:01 AM\\n"
-        + "Subject: New Submission: Donor -- " + FORM + "\\n"
-        + "To: cwkc@example.invalid\\n\\n"
+        + f"From: {SCHOOL} <{original_address}>\n"
+        + "Date: Tue, Nov 24, 2026 at 10:01 AM\n"
+        + "Subject: New Submission: Donor -- " + FORM + "\n"
+        + "To: cwkc@example.invalid\n\n"
     )
-    msg.set_content("Volunteer signature\\n\\n" + forwarded_header + "Synthetic original")
+    msg.set_content("Volunteer signature\n\n" + forwarded_header + "Synthetic original")
     msg.add_alternative(
         "<p>Volunteer signature</p>"
         + "<div class='gmail_attr'>"
-        + escape(forwarded_header).replace("\\n", "<br>")
+        + escape(forwarded_header).replace("\n", "<br>")
         + "</div><div class='gmail_quote'>" + table + "</div>",
         subtype="html", cte="quoted-printable",
     )
