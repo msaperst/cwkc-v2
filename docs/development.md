@@ -1,10 +1,10 @@
-# Developing CWKC
+# Development
 
-See [README](../README.md) for the overview. This guide covers **the current code**, not annual organizer decisions. Use a feature branch and PR; `main` is protected.
+Use a feature branch and pull request; `main` is the reviewed production source. The frontend is **static** (HTML, CSS/Tailwind CDN and JavaScript), so there is no website build step.
 
-## Local setup and tests
+## Run and test locally
 
-Requires Git, **Python 3.12**, Node.js **24** and npm. From the repository root:
+From the repository root, with Python 3.12 and Node.js 24:
 
 ~~~bash
 npm ci
@@ -14,49 +14,45 @@ python -m pip install -r scraper/requirements-test.txt
 python -m http.server 8000 --directory public
 ~~~
 
-Open http://localhost:8000. The site is static—**no build step or private credentials** are needed for a frontend preview. Outside the event window scores may be hidden; test the timer with synthetic clock fixtures, **not by changing production dates**.
+Open http://localhost:8000. Test without production credentials:
 
 ~~~bash
 npm test
 python -m pytest scraper/tests --maxfail=1 -q
 python -m pytest scraper/tests --cov=scraper --cov-report=term-missing
-npx playwright install chromium     # once
+npx playwright install chromium
 npm run test:browser
 ~~~
 
-Jest covers site calculations/timer; pytest covers normalization, ledger, score calculations, season gates and recovery; Playwright uses intercepted synthetic CSV responses on desktop/mobile. CI also runs SonarCloud and GitGuardian. Python CI installs exact-version/hashed wheels from `scraper/requirements-ci.lock` targeting Python 3.12 / Linux x86_64.
+Jest covers the UI, timer and score rendering; pytest covers parsing, durable ledger writes, scoring and date gates; Playwright tests desktop/mobile rendering using synthetic data. CI runs these tests and security/static analysis. Python CI installs hash-pinned dependencies from `scraper/requirements-ci.lock`.
 
-## Component map
+## Code map
 
-| Path | Responsibility |
+| Files | Responsibility |
 | --- | --- |
-| `public/index.html`, `public/assets/js/main.js` | Static site, labels, score comparisons and timer |
-| `public/assets/css/main.css`, `tailwind.js` | Styles and colors |
-| `public/assets/config/season.json` | Canonical season dates/timezone |
-| `scraper/getLglFormData.py`, `EmailParser.py` | LGL MIME parsing, validation, normalization and IMAP acknowledgment |
-| `scraper/donation_ledger.py` | Durable, replay-aware private Google Sheet writes |
-| `scraper/CalculateValues.py` | Donation metrics, affiliation and Class of 2026 eligibility |
-| `scraper/getGoogleFormData.py` | Current participation response Sheets and scores |
-| `public/assets/csv/results.csv` | Derived public scoreboard contract, not the donor source of truth |
-| `.github/workflows/` | CI, gated updates, Pages deployment and watchdog |
+| `public/index.html`, `public/assets/js/main.js` | Static site, countdown, score display |
+| `public/assets/css/main.css`, `public/assets/js/tailwind.js` | Styles and theme |
+| `public/assets/config/season.json`, `scraper/season_config.py` | Single source of truth for event dates and generated JS config |
+| `scraper/getLglFormData.py`, `EmailParser.py`, `lgl_forwarding.py` | Validate and normalize direct/forwarded LGL emails |
+| `scraper/affiliations.py`, `CalculateValues.py` | Canonical categories and donation scoring |
+| `scraper/donation_ledger.py` | Verified, deduplicated private Sheets persistence |
+| `scraper/getGoogleFormData.py` | Hanukkah and gathering scoring |
+| `scraper/scoreboard_snapshot.py`, `public/assets/csv/results.csv` | Published CSV contract |
+| `.github/workflows/{update,deploy,watchdog,test}.yml` | Scheduled updates, Pages, monitoring and CI |
 
-The reference implementation is designed for exactly **two schools** (`uva`, `vt`). For reusing it with other participants, see [Adapting](adapting.md).
+## Change safely
 
-## Changing a season or rule
-
-**Dates:** Edit `public/assets/config/season.json` with offset-aware timestamps, then run:
+**Season:** edit `public/assets/config/season.json` (offset-aware local Eastern timestamps), then run:
 
 ~~~bash
 python -m scraper.season_config --write
 python -m scraper.season_config --check
 ~~~
 
-This also regenerates browser metadata. The GitHub Actions **fixed UTC cron schedules** in `update.yml` and `watchdog.yml` must be checked separately.
+Update the **UTC cron windows** in `.github/workflows/update.yml` and `watchdog.yml` separately. Avoid testing by modifying real event dates.
 
-**Scoring:** Treat the form label/answer contract → `donation_ledger.NORMALIZED_FIELDS` → `CalculateValues` metric keys → CSV headers → HTML scoring selectors and `data-points` → JS/Playwright fixtures as **one change**. Cover one-status, multi-status and invalid/ambiguous-year cases. Never attribute a related student's graduation year to a donor's alumni class.
+**Forms/scoring:** update aliases and fields, normalized column schema, calculator metrics, CSV headers, HTML IDs/`data-points` selectors, and synthetic fixtures together. Multi-affiliation donors may qualify in several scoring categories but must not be double-counted in total dollars or donor counts. Keep alumni donor years distinct from related students' years.
 
-**UI:** Preserve the existing HTML IDs, `.score-area`, `.winner`, `.points`, `data-points`, `.days`, `.hours`, `.minutes`, `.seconds` and `.enable-during-contest` unless updating their consumers/tests together. Logo and social preview metadata both need checking. Verify responsive layout and accessible controls.
+**UI:** preserve `.score-area`, `.winner`, `.points`, timers (`.days`/`.hours`/`.minutes`/`.seconds`), `.enable-during-contest` and JS-targeted IDs unless all consumers/tests are updated. Check responsive behavior and keyboard accessibility.
 
-**Integrations:** [Forms](forms.md) documents LGL/Google schemas and authorized read-only checks. [Operations](operations.md) covers live access, controlled publishing and failure recovery.
-
-Never commit real notifications, backend form links, service-account credentials or identifying donor data. A manual importer run may mutate **live** Sheets and IMAP Seen flags even with GitHub Actions ingestion switched off. Use fabricated fixtures or separately approved isolated resources.
+**Live operations:** read [Operations](operations.md) before touching real mailbox or Sheets. Never put private donor data, LGL staff links or Google credentials in repository files, fixtures, Actions logs or issues. Track feature requests and future work in [GitHub issues](https://github.com/msaperst/cwkc-v2/issues).

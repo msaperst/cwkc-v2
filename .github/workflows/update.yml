@@ -4,7 +4,7 @@ name: Update results from multiple locations
 
 on:
   repository_dispatch:
-    types: [sheet-change, lgl-form-submission]
+    types: [sheet-change]
   workflow_dispatch:
     inputs:
       rehearsal:
