@@ -1,7 +1,7 @@
 # tests/test_pollEmail.py
 import io
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -30,6 +30,7 @@ def test_check_for_unread_lgl_emails_triggers(monkeypatch):
 
     def fake_trigger():
         triggered.append(True)
+        return True
 
     monkeypatch.setattr(pollEmail, "trigger_github_action", fake_trigger)
 
@@ -47,6 +48,7 @@ def test_check_for_unread_lgl_emails_none(monkeypatch):
 
     def fake_trigger():
         triggered.append(True)
+        return True
 
     monkeypatch.setattr(pollEmail, "trigger_github_action", fake_trigger)
 
@@ -140,3 +142,79 @@ def test_main_error_handling(monkeypatch):
     sys.stdout = sys.__stdout__
     output = captured.getvalue()
     assert "Error during polling: Test exception" in output
+
+
+def test_forwarded_only_message_wakes_poller(monkeypatch):
+    mail = MagicMock()
+    # No direct LGL-origin messages; only a forwarded-subject notification.
+    mail.search.side_effect = [
+        ("OK", [b""]),
+        ("OK", [b"41"]),
+    ]
+    dispatched = MagicMock(return_value=True)
+    monkeypatch.setattr(pollEmail, "trigger_github_action", dispatched)
+    assert pollEmail.check_for_unread_lgl_emails(mail) is True
+    assert mail.search.call_args_list == [
+        call(None, pollEmail.SEARCH_CRITERIA[0]),
+        call(None, pollEmail.SEARCH_CRITERIA[1]),
+    ]
+    dispatched.assert_called_once_with()
+
+
+def test_direct_and_forwarded_searches_dedupe_uids_and_dispatch_once(monkeypatch):
+    mail = MagicMock()
+    mail.search.side_effect = [
+        ("OK", [b"10 11"]),
+        ("OK", [b"11 12"]),
+    ]
+    triggered = MagicMock(return_value=True)
+    monkeypatch.setattr(pollEmail, "trigger_github_action", triggered)
+    assert pollEmail.check_for_unread_lgl_emails(mail) is True
+    triggered.assert_called_once_with()
+
+
+def test_second_imap_search_failure_does_not_dispatch(monkeypatch):
+    mail = MagicMock()
+    mail.search.side_effect = [
+        ("OK", [b"10"]),
+        ("NO", []),
+    ]
+    triggered = MagicMock()
+    monkeypatch.setattr(pollEmail, "trigger_github_action", triggered)
+    assert pollEmail.check_for_unread_lgl_emails(mail) is False
+    triggered.assert_not_called()
+
+
+def test_failed_dispatch_returns_false_without_touching_flags(monkeypatch):
+    mail = MagicMock()
+    mail.search.side_effect = [
+        ("OK", [b"10"]),
+        ("OK", [b""]),
+    ]
+    triggered = MagicMock(return_value=False)
+    monkeypatch.setattr(pollEmail, "trigger_github_action", triggered)
+    assert pollEmail.check_for_unread_lgl_emails(mail) is False
+    mail.store.assert_not_called()
+    mail.fetch.assert_not_called()
+
+
+def test_one_shot_poller_closes_mailbox_even_when_trigger_raises(monkeypatch):
+    mail = MagicMock()
+    monkeypatch.setattr(pollEmail, "connect_mailbox", lambda: mail)
+    monkeypatch.setattr(
+        pollEmail, "check_for_unread_lgl_emails",
+        MagicMock(side_effect=RuntimeError("synthetic poll failure")),
+    )
+    with pytest.raises(RuntimeError, match="synthetic"):
+        pollEmail.main(once=True)
+    mail.logout.assert_called_once_with()
+
+
+def test_dispatch_status_204_is_required(monkeypatch):
+    mock_post = MagicMock()
+    monkeypatch.setattr(pollEmail.requests, "post", mock_post)
+    mock_post.return_value.status_code = 204
+    assert pollEmail.trigger_github_action() is True
+    assert mock_post.call_args.kwargs["timeout"] == 15
+    mock_post.return_value.status_code = 403
+    assert pollEmail.trigger_github_action() is False
