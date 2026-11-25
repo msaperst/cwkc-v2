@@ -50,8 +50,9 @@ def trigger_github_action():
     response = requests.post(GITHUB_API_URL, json=payload, headers=headers, timeout=15)
     if response.status_code == 204:
         print("✅ GitHub Action triggered successfully.")
-    else:
-        print(f"❌ Failed to trigger GitHub Action: {response.status_code} - {response.text}")
+        return True
+    print(f"❌ Failed to trigger GitHub Action: HTTP {response.status_code}")
+    return False
 
 
 # Keep these searches aligned with lgl_forwarding.search_unread_lgl.
@@ -79,8 +80,7 @@ def check_for_unread_lgl_emails(mail):
 
     if unread_ids:
         print(f"📧 Found {len(unread_ids)} matching unread notification(s). Triggering GitHub Action...")
-        trigger_github_action()
-        return True
+        return trigger_github_action()
     print("💤 No unread direct or forwarded LGL notifications found.")
     return False
 
