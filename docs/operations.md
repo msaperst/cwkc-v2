@@ -147,6 +147,26 @@ Scheduled Actions refresh roughly every five minutes; GitHub cron can be delayed
 
 A code rollback does not undo Google Sheet writes or IMAP Seen flags.
 
+**Silent Sheets overwrite recovery (Nov 25 rehearsal):** A prior 50-email
+run reported 49 durable `append_row` responses, but the live 2026 ledger and
+published CSV contained only the **last** $18.54 VT gift. The importer now
+collects all valid donations, writes missing records to one **explicit,
+contiguous cell range** (not implicit per-row table append), and reads the
+entire range back before acknowledging any source emails or generating the
+public scoreboard. A partial/incorrect readback blocks publication.
+
+If the old importer already marked everything Seen, run the normal
+**Update results from multiple locations** manual workflow on `main`
+with `rehearsal=true`, `confirmation=REHEARSE`, and
+`replay_all=true`. Only before kickoff, only with the production kill
+switch off, the real importer searches **all** approved LGL messages,
+including Seen ones, deduplicates by LGL Submission ID, writes missing
+rows to `entries_2026`, independently verifies the entire batch, and
+recalculates/deploys the live site. Replay **does not change email flags**.
+Do not delete the single already persisted row, and do not bulk-mark all
+emails unread merely to replay. Do not run this outside the manual,
+prelaunch recovery workflow.
+
 **IMAP acknowledgement uncertainty:** An IMAP STORE response can fail after the
 server has already applied the `\\Seen` flag. The importer now queries the
 actual FLAGS before declaring that an already-persisted donation has failed.

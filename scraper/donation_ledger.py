@@ -146,6 +146,81 @@ class SubmissionLedger:
     def known(self, submission_id: str) -> bool:
         return submission_id in self.ids
 
+
+    def insert_verified_batch(self, submissions: dict[str, dict]) -> set[str]:
+        """Write all missing IDs to an explicit cell range, then verify.
+
+        Never depend on Sheets' implicit append-table detection for each gift.
+        The previous importer reported 49 successful append responses while
+        only the last gift remained in the worksheet. An HTTP 200 alone is
+        not proof of persistence, so only verified IDs may be acknowledged.
+        """
+        if not submissions:
+            return set()
+
+        # Refresh the authoritative state immediately before this write.
+        self.ids, self.legacy_rows = self._read_state()
+        if self.legacy_rows:
+            raise ValueError("Existing unkeyed donations require reconciliation before ingestion")
+        pending = {
+            key: row for key, row in submissions.items() if key not in self.ids
+        }
+        if not pending:
+            return set()
+
+        existing = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
+        # Restrict the explicit update to empty rows immediately after the
+        # final occupied row; never overwrite a donor or header.
+        last_occupied = max(
+            (i for i, values in enumerate(existing, start=1) if any(values)),
+            default=0,
+        )
+        first = last_occupied + 1
+        payloads = [
+            [key if col == SUBMISSION_ID else row.get(col, "")
+             for col in self.headers]
+            for key, row in pending.items()
+        ]
+        last = first + len(payloads) - 1
+        bottom_right = gspread.utils.rowcol_to_a1(last, len(self.headers))
+        cell_range = f"A{first}:{bottom_right}"
+
+        # One values.update call, no per-gift append calls. Even when the API
+        # reports an exception after committing, read the exact range.
+        write_error = None
+        try:
+            self.ws.update(
+                range_name=cell_range,
+                values=payloads,
+                value_input_option="RAW",
+            )
+        except Exception as error:
+            write_error = error
+
+        stored = retry(lambda: self.ws.get_all_values(), sleeper=self.sleeper)
+        observed = stored[first - 1:first - 1 + len(payloads)]
+        def same_row(found, expected):
+            padded = list(found[:len(self.headers)])
+            padded += [""] * (len(self.headers) - len(padded))
+            return padded == [str(value) for value in expected]
+
+        if len(observed) != len(payloads) or not all(
+            same_row(found, expected)
+            for found, expected in zip(observed, payloads, strict=True)
+        ):
+            # Don't acknowledge emails; the next run can inspect/replay the
+            # durable Sheet. Never retry over occupied or ambiguous cells.
+            raise RuntimeError(
+                "Donation batch write did not persist all rows; "
+                "refusing to acknowledge emails or publish scores"
+            ) from write_error
+
+        # Re-scan for duplicate IDs and unkeyed rows before acknowledging.
+        self.ids, self.legacy_rows = self._read_state()
+        if self.legacy_rows or not pending.keys() <= self.ids:
+            raise RuntimeError("Donation batch readback reconciliation failed")
+        return set(pending)
+
     def insert(self, row: dict, submission_id: str) -> bool:
         """Return True if inserted; False if already persisted."""
         if submission_id in self.ids:

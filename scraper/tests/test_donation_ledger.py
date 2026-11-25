@@ -45,6 +45,25 @@ class FakeSheet:
             self.append_error = None
             raise exc
 
+    def update(self, *, range_name, values, value_input_option):
+        """Simulate values.update to explicitly addressed, adjacent rows."""
+        import re
+        assert value_input_option == "RAW"
+        match = re.fullmatch(r"A(\d+):L(\d+)", range_name)
+        assert match is not None, range_name
+        first, last = map(int, match.groups())
+        assert first == len(self.rows) + 1
+        assert last == first + len(values) - 1
+        self.rows.extend(list(row) for row in values)
+        if getattr(self, "lose_all_but_last", False):
+            # Model the production failure: API calls seemed successful, but
+            # only the final donation persisted in the actual worksheet.
+            self.rows = self.rows[:first - 1] + [list(values[-1])]
+        if getattr(self, "update_error", None):
+            error = self.update_error
+            self.update_error = None
+            raise error
+
 
 def build_ledger(sheet, *, read_only=False, sleeper=None):
     sh = MagicMock()
@@ -513,3 +532,113 @@ def test_empty_mailbox_fails_closed_when_sheet_is_inaccessible(monkeypatch):
 
     recalculate.assert_not_called()
     assert sheet.append_attempts == 0
+
+
+def test_verified_batch_writes_each_gift_in_a_single_explicit_range():
+    sheet = FakeSheet()
+    ledger = build_ledger(sheet)
+    gift = dict.fromkeys(NORMALIZED_FIELDS, "synthetic")
+    saved = ledger.insert_verified_batch({
+        "lgl:alpha": {**gift, "total amount": "15.0"},
+        "lgl:beta": {**gift, "total amount": "20.0"},
+        "lgl:gamma": {**gift, "total amount": "30.0"},
+    })
+    assert saved == {"lgl:alpha", "lgl:beta", "lgl:gamma"}
+    assert [row[-1] for row in sheet.rows[1:]] == [
+        "lgl:alpha", "lgl:beta", "lgl:gamma",
+    ]
+    assert sheet.append_attempts == 1  # Header only
+    assert ledger.insert_verified_batch({"lgl:beta": gift}) == set()
+    assert len(sheet.rows) == 4
+
+
+def test_verified_batch_detects_silent_loss_and_refuses_to_acknowledge():
+    sheet = FakeSheet()
+    sheet.lose_all_but_last = True
+    ledger = build_ledger(sheet)
+    server = FakeServer({1: make_email("$11"), 2: make_email("$22")})
+    summary = lgl.process_messages_verified_batch(server, [1, 2], ledger)
+    assert summary["failed"] == 1
+    assert summary["new"] == 0
+    assert server.seen == set()
+    assert len(sheet.rows) == 2  # Only last gift survived in fake API.
+    assert len(ledger.ids) == 0
+
+
+def test_verified_batch_handles_lost_http_response_after_all_rows_persist():
+    sheet = FakeSheet()
+    ledger = build_ledger(sheet)
+    sheet.update_error = requests.exceptions.Timeout("simulated lost response")
+    gift = dict.fromkeys(NORMALIZED_FIELDS, "synthetic")
+    assert ledger.insert_verified_batch({
+        "lgl:alpha": gift, "lgl:beta": gift,
+    }) == {"lgl:alpha", "lgl:beta"}
+    assert len(sheet.rows) == 3
+
+
+def test_verified_batch_recovery_adds_only_missing_ids_to_existing_ledger():
+    gift = dict.fromkeys(NORMALIZED_FIELDS, "synthetic")
+    sheet = FakeSheet([
+        [*NORMALIZED_FIELDS, SUBMISSION_ID],
+        [*[gift[col] for col in NORMALIZED_FIELDS], "lgl:alpha"],
+    ])
+    ledger = build_ledger(sheet)
+    saved = ledger.insert_verified_batch({
+        "lgl:alpha": gift, "lgl:beta": gift, "lgl:gamma": gift,
+    })
+    assert saved == {"lgl:beta", "lgl:gamma"}
+    assert [row[-1] for row in sheet.rows[1:]] == [
+        "lgl:alpha", "lgl:beta", "lgl:gamma",
+    ]
+
+
+def test_replay_all_uses_actual_importer_and_leaves_all_flags_unchanged(
+    monkeypatch, capsys,
+):
+    server = FakeServer({1: make_email("$11"), 2: make_email("$22")})
+    server.login = MagicMock()
+    server.select_folder = MagicMock()
+    server.search = MagicMock()
+    context = MagicMock()
+    context.__enter__.return_value = server
+    monkeypatch.setattr(lgl, "IMAPClient", lambda *args, **kwargs: context)
+    monkeypatch.setenv("CWKC_REPLAY_ALL", "true")
+    monkeypatch.setattr("scraper.contest_window.rehearsal_allowed", lambda: True)
+    all_mail = MagicMock(return_value=[1, 2])
+    unread_mail = MagicMock(side_effect=AssertionError("UNSEEN search forbidden"))
+    monkeypatch.setattr(lgl, "search_all_lgl", all_mail)
+    monkeypatch.setattr(lgl, "search_unread_lgl", unread_mail)
+    sheet = FakeSheet()
+    workbook = MagicMock()
+    workbook.worksheet.return_value = sheet
+    client = MagicMock()
+    client.open_by_key.return_value = workbook
+    monkeypatch.setattr(lgl.gspread, "service_account", lambda **kwargs: client)
+    recalculate = MagicMock()
+    monkeypatch.setattr(lgl, "update_local_csv", recalculate)
+
+    lgl.main([])
+
+    all_mail.assert_called_once()
+    unread_mail.assert_not_called()
+    assert len(sheet.rows) == 3  # header and both donations
+    assert server.seen == set()  # replay does not modify email flags
+    recalculate.assert_called_once()
+    assert "Reconciliation: new=2" in capsys.readouterr().out
+
+
+def test_replay_all_without_manual_confirmed_gate_fails_before_reading_mail(
+    monkeypatch,
+):
+    monkeypatch.setenv("CWKC_REPLAY_ALL", "true")
+    monkeypatch.setattr("scraper.contest_window.rehearsal_allowed", lambda: False)
+    server = FakeServer({})
+    server.login = MagicMock()
+    server.select_folder = MagicMock()
+    server.search = MagicMock()
+    context = MagicMock()
+    context.__enter__.return_value = server
+    monkeypatch.setattr(lgl, "IMAPClient", lambda *args, **kwargs: context)
+    with pytest.raises(RuntimeError, match="confirmed prelaunch manual rehearsal"):
+        lgl.main([])
+    server.search.assert_not_called()
