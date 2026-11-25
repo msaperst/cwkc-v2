@@ -14,7 +14,10 @@ from .CalculateValues import CalculateValues
 from .EmailParser import EmailParser, determine_source
 from .affiliations import ALUMNI, CURRENT_PARENT
 from .donation_ledger import NORMALIZED_FIELDS, SubmissionLedger
-from .lgl_forwarding import FORM_TITLES, FORWARD_SUBJECT, original_sender, search_unread_lgl, submission_key
+from .lgl_forwarding import (
+    FORM_TITLES, FORWARD_SUBJECT, original_sender, search_all_lgl,
+    search_unread_lgl, submission_key,
+)
 
 # ===== CONFIG =====
 load_dotenv()  # assumes .env in same dir
@@ -250,6 +253,71 @@ def process_messages(server, uids: list, ledger: SubmissionLedger,
             print(f"LGL UID {uid} failed ({type(error).__name__}); acknowledgement not confirmed")
     return summary
 
+def process_messages_verified_batch(server, uids: list, ledger: SubmissionLedger,
+                                    *, acknowledge: bool = True) -> dict:
+    """Parse safely, write *all* donations once, verify, then acknowledge.
+
+    Unlike individual append_row calls, this cannot report a successful
+    ingestion while losing all but the last gift in the actual worksheet.
+    """
+    summary = {"new": 0, "already_stored": 0, "pending": 0, "failed": 0}
+    normalizer = EmailParser()
+    normalized_by_id = {}
+    original_by_id = {}
+    messages = []
+
+    for uid in uids:
+        try:
+            fetched = server.fetch(uid, ["BODY.PEEK[]"])
+            raw = fetched[uid][b"BODY[]"]
+            sender, data = parse_lgl_email(raw)
+            key = submission_key(raw, data)
+            if key in original_by_id:
+                if original_by_id[key] != data:
+                    raise ValueError("Conflicting LGL submissions share a source ID")
+            else:
+                normalized = normalizer.normalize(
+                    data, determine_source(sender, data.get("Form title", "")),
+                )
+                validate_submission(data, normalized)
+                if tuple(normalized) != NORMALIZED_FIELDS:
+                    raise ValueError("Normalized donation column contract changed")
+                original_by_id[key] = data
+                normalized_by_id[key] = normalized
+            messages.append((uid, key))
+        except Exception as error:
+            summary["failed"] += 1
+            print(f"LGL UID {uid} failed ({type(error).__name__}); not acknowledged")
+
+    # Don't partially acknowledge or publish a malformed or conflicting batch.
+    if summary["failed"]:
+        return summary
+
+    try:
+        inserted = ledger.insert_verified_batch(normalized_by_id)
+    except Exception as error:
+        summary["failed"] += 1
+        print(f"Donation batch persistence failed ({type(error).__name__}); "
+              "no messages acknowledged")
+        return summary
+
+    counted = set()
+    for uid, key in messages:
+        try:
+            if acknowledge:
+                acknowledge_persisted(server, uid)
+            if key in inserted and key not in counted:
+                summary["new"] += 1
+            else:
+                summary["already_stored"] += 1
+            counted.add(key)
+        except Exception as error:
+            summary["failed"] += 1
+            print(f"LGL UID {uid} failed ({type(error).__name__}); "
+                  "acknowledgement not confirmed")
+    return summary
+
+
 def update_local_csv():
     # Read exactly the same season-specific worksheet used by SubmissionLedger.
     # Otherwise a fresh 2026 import could accidentally publish 2025 totals.
@@ -319,8 +387,16 @@ def main(argv=None):
         server.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         server.select_folder(MAILBOX)
 
-        uids = search_unread_lgl(server, FROM_FILTER)
-        print(f"Unseen LGL notifications: {len(uids)}")
+        # Replay is only available to an explicitly confirmed manual
+        # prelaunch rehearsal, never cron or an ordinary dispatch.
+        replay_all = os.getenv("CWKC_REPLAY_ALL") == "true"
+        if replay_all:
+            from .contest_window import rehearsal_allowed
+            if not rehearsal_allowed():
+                raise RuntimeError("All-mail replay requires a confirmed prelaunch manual rehearsal")
+        uids = (search_all_lgl(server, FROM_FILTER) if replay_all
+                else search_unread_lgl(server, FROM_FILTER))
+        print(f"{'All matching' if replay_all else 'Unseen'} LGL notifications: {len(uids)}")
         # Always inspect the normalized ledger, including when the inbox is
         # empty. Otherwise a read-only preflight could miss prior-season
         # donations, and a normal refresh could publish legacy scores.
@@ -330,9 +406,14 @@ def main(argv=None):
             gc, SPREADSHEET_KEY, SPREADSHEET_SHEET,
             NORMALIZED_FIELDS, read_only=args.reconcile_only or not uids,
         )
-        summary = process_messages(
-            server, uids, ledger, reconcile_only=args.reconcile_only,
-        )
+        if args.reconcile_only:
+            summary = process_messages(
+                server, uids, ledger, reconcile_only=True,
+            )
+        else:
+            summary = process_messages_verified_batch(
+                server, uids, ledger, acknowledge=not replay_all,
+            )
         print("Reconciliation:", ", ".join(
             f"{key}={value}" for key, value in summary.items()))
         print(
