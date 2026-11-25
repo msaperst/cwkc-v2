@@ -30,6 +30,17 @@ def search_unread_lgl(server, from_filter=LGL_ADDRESS):
     return sorted(set(forwards) | set(direct))
 
 
+def search_all_lgl(server, from_filter=LGL_ADDRESS):
+    """Manual recovery only: search all direct/forwarded LGL notifications.
+
+    Individual messages still pass the same sender, form-title, and amount
+    checks used during normal ingestion. This search doesn't change flags.
+    """
+    forwards = server.search(["SUBJECT", "Fwd: New Submission:"])
+    direct = server.search(["FROM", from_filter])
+    return sorted(set(forwards) | set(direct))
+
+
 def original_sender(msg):
     """Return the original LGL From for a direct or authenticated staff forward.
 
