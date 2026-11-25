@@ -13,7 +13,8 @@ from imapclient import IMAPClient
 from .CalculateValues import CalculateValues
 from .EmailParser import EmailParser, determine_source
 from .affiliations import ALUMNI, CURRENT_PARENT
-from .donation_ledger import NORMALIZED_FIELDS, SubmissionLedger, fingerprint
+from .donation_ledger import NORMALIZED_FIELDS, SubmissionLedger
+from .lgl_forwarding import FORM_TITLES, FORWARD_SUBJECT, original_sender, search_unread_lgl, submission_key
 
 # ===== CONFIG =====
 load_dotenv()  # assumes .env in same dir
@@ -91,7 +92,7 @@ def _handle_repeated_field(
 def parse_lgl_email(raw_msg):
     """Parse one LGL table without silently discarding repeated fields."""
     msg = email.message_from_bytes(raw_msg, policy=default)
-    email_from = msg.get("From", "")
+    email_from = original_sender(msg)
 
     html_part = msg.get_body(preferencelist=("html",))
     if html_part is None:
@@ -99,6 +100,19 @@ def parse_lgl_email(raw_msg):
 
     soup = BeautifulSoup(html_part.get_content(), "html.parser")
     table = soup.find("table")
+    if FORWARD_SUBJECT.match(str(msg.get("Subject", ""))):
+        # Gmail signatures can contain unrelated tables; pick the LGL table.
+        candidates = [
+            candidate for candidate in soup.find_all("table")
+            if any(
+                _field_identity(cells[0].get_text(strip=True)) == "form title"
+                for row in candidate.find_all("tr")
+                if (cells := row.find_all(["td", "th"])) and len(cells) >= 2
+            )
+        ]
+        if len(candidates) != 1:
+            raise ValueError("Forwarded LGL message must contain one form table")
+        table = candidates[0]
     if not table:
         raise ValueError("No table found in email")
 
@@ -125,6 +139,8 @@ def parse_lgl_email(raw_msg):
         seen_fields[identity] = " ".join(value.split())
         data[key] = value
 
+    if FORWARD_SUBJECT.match(str(msg.get("Subject", ""))) and not data.get("Submission ID"):
+        raise ValueError("Forwarded LGL notification must include a source Submission ID")
     return email_from, data
 
 
@@ -143,25 +159,32 @@ def validate_submission(data: dict, normalized_row: dict) -> None:
         raise ValueError("Donation amount must be positive and finite")
     if normalized_row["source"].startswith("unknown"):
         raise ValueError("Donation notification has an unknown Hillel sender")
+    if FORM_TITLES.get(normalized_row["source"]) != data.get("Form title"):
+        raise ValueError("Unrecognized 2026 LGL form title")
 
 
-def handle_message(server, uid, ledger, normalizer, reconcile_only):
-    """Handle one notification and return its summary category."""
+def handle_message(server, uid, ledger, normalizer, reconcile_only,
+                   seen_rows=None):
+    """Handle a direct or verified forwarded notification once per LGL gift."""
     fetched = server.fetch(uid, ["BODY.PEEK[]"])
     raw = fetched[uid][b"BODY[]"]
-    submission_id = fingerprint(raw)
+    sender, data = parse_lgl_email(raw)
+    submission_id = submission_key(raw, data)
     if reconcile_only:
         return "already_stored" if ledger.known(submission_id) else "pending"
+
+    normalized = normalizer.normalize(
+        data, determine_source(sender, data.get("Form title", "")))
+    validate_submission(data, normalized)
+    if tuple(normalized) != NORMALIZED_FIELDS:
+        raise ValueError("Normalized donation column contract changed")
+    if seen_rows is not None and submission_id in seen_rows:
+        if seen_rows[submission_id] != normalized:
+            raise ValueError("Conflicting LGL submissions share a source ID")
 
     if ledger.known(submission_id):
         category = "already_stored"
     else:
-        sender, data = parse_lgl_email(raw)
-        normalized = normalizer.normalize(
-            data, determine_source(sender, data.get("Form title", "")))
-        validate_submission(data, normalized)
-        if tuple(normalized) != NORMALIZED_FIELDS:
-            raise ValueError("Normalized donation column contract changed")
         if data.get("__ambiguous_alumni_year__") == "true":
             print(
                 f"LGL UID {uid}: older VT duplicate year fields; "
@@ -175,6 +198,8 @@ def handle_message(server, uid, ledger, normalizer, reconcile_only):
             )
         was_inserted = update_google_sheet(ledger, normalized, submission_id)
         category = "new" if was_inserted else "already_stored"
+    if seen_rows is not None:
+        seen_rows.setdefault(submission_id, normalized)
     # Only acknowledge an email after the normalized row is durable.
     server.add_flags(uid, ["\\Seen"])
     return category
@@ -185,9 +210,12 @@ def process_messages(server, uids: list, ledger: SubmissionLedger,
     """Process unread emails; never hide a failed notification from retries."""
     summary = {"new": 0, "already_stored": 0, "pending": 0, "failed": 0}
     normalizer = EmailParser()
+    seen_rows = {}
     for uid in uids:
         try:
-            category = handle_message(server, uid, ledger, normalizer, reconcile_only)
+            category = handle_message(
+                server, uid, ledger, normalizer, reconcile_only, seen_rows,
+            )
             summary[category] += 1
         except Exception as error:
             summary["failed"] += 1
@@ -264,7 +292,7 @@ def main(argv=None):
         server.login(EMAIL_ACCOUNT, EMAIL_PASSWORD)
         server.select_folder(MAILBOX)
 
-        uids = server.search(["UNSEEN", "FROM", FROM_FILTER])
+        uids = search_unread_lgl(server, FROM_FILTER)
         print(f"Unseen LGL notifications: {len(uids)}")
         # Always inspect the normalized ledger, including when the inbox is
         # empty. Otherwise a read-only preflight could miss prior-season

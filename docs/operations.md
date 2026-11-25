@@ -65,7 +65,7 @@ With `CWKC_INGESTION_ENABLED=false`:
   python -m scraper.getLglFormData --reconcile-only
   ~~~
 
-  Check `legacy=0`, `id_tracking=enabled` and pending-message totals; compare privately with LGL. This reads but **does not parse or financially reconcile** pending messages.
+  Check `legacy=0`, `id_tracking=enabled` and pending-message totals; compare privately with LGL. This reads only enough to identify pending direct/forwarded submissions; it does **not financially reconcile** pending messages.
 - From `scraper/`, run the participation `python getGoogleFormData.py --dry-run` with authorized credentials. Confirm test Form responses are removed.
 - Confirm a clean score CSV, `cwkc-results`, successful synthetic Pages rehearsal and primary/backup operators receiving alerts.
 - At the authorized opening instant, and **only** after sign-off, set `CWKC_INGESTION_ENABLED=true`.
@@ -91,7 +91,7 @@ Scheduled Actions refresh roughly every five minutes; GitHub cron can be delayed
 1. Record the failed run, latest valid `cwkc-results` commit and aggregate unread backlog. **Never log donor names, raw messages or credentials.**
 2. Set `CWKC_INGESTION_ENABLED=false` to block **new** ingestions; this does not cancel a running job. Stop any local poller if in use.
 3. Run authorized read-only checks. Investigate label ambiguity, service-account access, Sheet quota/headers, source-transaction duplication and Pages permissions. Failed emails must stay unread.
-4. Fix via reviewed PR or authorized credential change. A stored MIME fingerprint stops replay of the *same email* but **not two distinct notifications of one payment**. Reconcile with LGL.
+4. Fix via reviewed PR or authorized credential change. A stored LGL Submission ID deduplicates direct/forwarded copies of the *same form submission*, but **not two distinct submissions of one payment**. Reconcile with LGL; investigate old MIME-hash ledger keys before ingestion.
 5. Resume only within the agreed window after verification. Compare the published snapshot and source totals, and resolve the watchdog issue only after recovery.
 6. At cutoff, stop normal imports/publication. **Do not extend the season window** to force missing gifts through. Organizers must explicitly approve final reconciliation and sign-off.
 

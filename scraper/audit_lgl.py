@@ -18,17 +18,12 @@ from .affiliations import (
     ALUMNI, CURRENT_STUDENT_GRANDPARENT_AFFILIATIONS, FAMILY_AFFILIATIONS,
 )
 from .donation_ledger import NORMALIZED_FIELDS, fingerprint
+from .lgl_forwarding import FORM_TITLES, search_unread_lgl
 from .getLglFormData import (
     EMAIL_ACCOUNT, EMAIL_PASSWORD, FROM_FILTER, GRADUATION_YEAR_FIELD,
     IMAP_SERVER, MAILBOX, IMAPClient, parse_lgl_email, validate_submission,
 )
 
-FORM_TITLES = {
-    "uva-front": "14th Annual Commonwealth Kiddush Cup Front End Form",
-    "uva-back": "14th Annual Commonwealth Kiddush Cup Back-end Form",
-    "vt-front": "CWKC 2026 Donation Form",
-    "vt-back": "CWKC 2026 Back End Form (Virginia Tech)",
-}
 MONEY_METRICS = {
     "total_amount", "most_money_families",
     "most_money_grandparents_current_students",
@@ -175,10 +170,13 @@ def _parse_one(raw, uid):
 
 def audit_unread(server, excluded_ids=frozenset()):
     """Audit all matching UNSEEN mail without acknowledging or changing it."""
-    uids = server.search(["UNSEEN", "FROM", FROM_FILTER])
+    uids = search_unread_lgl(server, FROM_FILTER)
     entries, errors = [], []
     seen_fingerprints = set()
     identical_mime_skipped = 0
+    duplicate_submissions_skipped = 0
+    forward_count = 0
+    seen_submissions = {}
     for uid in uids:
         try:
             fetched = server.fetch(uid, ["BODY.PEEK[]"])
@@ -190,6 +188,19 @@ def audit_unread(server, excluded_ids=frozenset()):
                 identical_mime_skipped += 1
                 continue
             entry = _parse_one(raw, uid)
+            source_id = entry["submission_id"]
+            if source_id and source_id.casefold() in seen_submissions:
+                if seen_submissions[source_id.casefold()] != entry["_row"]:
+                    raise ValueError("Conflicting source records share an LGL Submission ID")
+                duplicate_submissions_skipped += 1
+                seen_fingerprints.add(identity)
+                continue
+            if source_id:
+                seen_submissions[source_id.casefold()] = entry["_row"]
+            from email import message_from_bytes
+            from email.policy import default
+            if str(message_from_bytes(raw, policy=default).get("Subject", "")).lower().startswith(("fwd:", "fw:")):
+                forward_count += 1
             seen_fingerprints.add(identity)
             entries.append(entry)
         except Exception as exc:
@@ -219,6 +230,8 @@ def audit_unread(server, excluded_ids=frozenset()):
         "unread_matching": len(uids),
         "parsed": len(entries),
         "identical_mime_skipped": identical_mime_skipped,
+        "duplicate_submissions_skipped": duplicate_submissions_skipped,
+        "forwarded_parsed": forward_count,
         "failed": len(errors),
         "excluded": sum(x["excluded"] for x in inventory),
         "unreconciled_flags": sum(
@@ -365,6 +378,8 @@ def main(argv=None):
         f"unread={report['unread_matching']}",
         f"parsed={report['parsed']}",
         f"duplicate_mime={report['identical_mime_skipped']}",
+        f"duplicate_submissions={report['duplicate_submissions_skipped']}",
+        f"forwarded={report['forwarded_parsed']}",
         f"failed={report['failed']}",
         f"excluded={report['excluded']}",
         f"flagged={report['unreconciled_flags']}",
