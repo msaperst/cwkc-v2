@@ -149,3 +149,54 @@ def test_update_workflow_uses_explicit_2026_donations_sheet_variable():
     workflow = (ROOT / ".github/workflows/update.yml").read_text(encoding="utf-8")
     assert "SPREADSHEET_SHEET: ${{ vars.CWKC_DONATIONS_WORKSHEET || 'entries' }}" in workflow
     assert "python -m scraper.getLglFormData" in workflow
+
+@pytest.mark.parametrize("when,should_allow", [
+    (START - timedelta(seconds=1), True),
+    (START, False),
+    (START + timedelta(seconds=1), False),
+    (END + timedelta(seconds=1), False),
+])
+def test_manual_rehearsal_only_before_kickoff(monkeypatch, when, should_allow):
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("CWKC_REHEARSAL", "true")
+    monkeypatch.setenv("CWKC_INGESTION_ENABLED", "false")
+    assert contest_window.rehearsal_allowed(when) is should_allow
+
+
+@pytest.mark.parametrize("event,override,production_enabled", [
+    ("schedule", "true", "false"),
+    ("repository_dispatch", "true", "false"),
+    ("workflow_dispatch", "false", "false"),
+    ("workflow_dispatch", "", "false"),
+    ("workflow_dispatch", "true", "true"),
+])
+def test_rehearsal_cannot_bypass_other_event_gates(
+    monkeypatch, event, override, production_enabled,
+):
+    monkeypatch.setenv("GITHUB_EVENT_NAME", event)
+    monkeypatch.setenv("CWKC_REHEARSAL", override)
+    monkeypatch.setenv("CWKC_INGESTION_ENABLED", production_enabled)
+    assert not contest_window.rehearsal_allowed(START - timedelta(days=1))
+
+
+def test_confirmed_prelaunch_rehearsal_passes_both_window_checks(
+    monkeypatch, tmp_path,
+):
+    output = tmp_path / "output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("CWKC_REHEARSAL", "true")
+    monkeypatch.setenv("CWKC_INGESTION_ENABLED", "false")
+    monkeypatch.setattr(contest_window, "is_active", lambda: False)
+    monkeypatch.setattr(contest_window, "rehearsal_allowed", lambda: True)
+    monkeypatch.setattr("sys.argv", ["contest_window", "--require-active"])
+    contest_window.main()
+    assert output.read_text() == "active=true\n"
+
+
+def test_workflow_rehearsal_requires_explicit_manual_input_and_confirmation():
+    workflow = (ROOT / ".github/workflows/update.yml").read_text()
+    assert "inputs.rehearsal == true" in workflow
+    assert "inputs.confirmation == 'REHEARSE'" in workflow
+    assert workflow.count("CWKC_REHEARSAL:") == 2
+    assert "github.event_name == 'workflow_dispatch'" in workflow
