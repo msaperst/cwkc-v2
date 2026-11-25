@@ -16,6 +16,11 @@ on:
         description: "Type REHEARSE to allow the prelaunch drill; otherwise dates still apply"
         type: string
         required: false
+      replay_all:
+        description: "Recover all LGL email submissions, including Seen; keep message flags unchanged"
+        type: boolean
+        required: false
+        default: false
   # GitHub cron is UTC. Tick at :02/:07/.../:57 (off the busy hour),
   # with a best-effort last pre-cutoff tick at 00:59 UTC on Dec 8.
   # Year-independent cron is guarded by season.json and the kill switch.
@@ -138,6 +143,8 @@ jobs:
           SPREADSHEET_KEY: ${{ secrets.SPREADSHEET_KEY }}
           # Configure the separate 2026 ledger after final form/rules sign-off.
           SPREADSHEET_SHEET: ${{ vars.CWKC_DONATIONS_WORKSHEET || 'entries' }}
+          # Explicit manual recovery only: preserve mail read/unread flags.
+          CWKC_REPLAY_ALL: ${{ github.event_name == 'workflow_dispatch' && inputs.rehearsal == true && inputs.confirmation == 'REHEARSE' && inputs.replay_all == true }}
         shell: bash
         run: |
           set -o pipefail
