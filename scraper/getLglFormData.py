@@ -247,7 +247,7 @@ def process_messages(server, uids: list, ledger: SubmissionLedger,
         except Exception as error:
             summary["failed"] += 1
             # Error messages can contain PII; print only type and mailbox UID.
-            print(f"LGL UID {uid} failed ({type(error).__name__}); left unread")
+            print(f"LGL UID {uid} failed ({type(error).__name__}); acknowledgement not confirmed")
     return summary
 
 def update_local_csv():
@@ -294,7 +294,7 @@ def write_processing_summary(uids: list, summary: dict, ledger: SubmissionLedger
         f"| Matching unread notifications at start | {len(uids)} |",
         f"| New donation rows persisted | {summary['new']} |",
         f"| Previously persisted notifications | {summary['already_stored']} |",
-        f"| Failed notifications (left unread) | {summary['failed']} |",
+        f"| Failed notifications (acknowledgement not confirmed) | {summary['failed']} |",
         f"| Read-only pending notifications | {summary['pending']} |",
         f"| Highest matched mailbox UID (not a processed watermark) | {latest_uid} |",
         f"| Identified normalized Sheet rows | {len(ledger.ids)} |",
