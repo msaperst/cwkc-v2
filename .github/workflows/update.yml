@@ -239,7 +239,7 @@ jobs:
               raise SystemExit("Unable to install short-lived rehearsal display")
           injection = (
               '<script>globalThis.CWKC_REHEARSAL_VIEW_UNTIL = '
-              + json.dumps(expires) + ';</script>\\n'
+              + json.dumps(expires) + ';</script>\n'
           )
           html.write_text(source.replace(marker, injection + marker), encoding="utf-8")
           PY
