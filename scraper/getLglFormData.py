@@ -14,7 +14,7 @@ from .CalculateValues import CalculateValues
 from .EmailParser import EmailParser, determine_source
 from .affiliations import ALUMNI, CURRENT_PARENT
 from .donation_ledger import NORMALIZED_FIELDS, SubmissionLedger
-from .lgl_forwarding import FORWARD_SUBJECT, original_sender, search_unread_lgl, submission_key
+from .lgl_forwarding import FORM_TITLES, FORWARD_SUBJECT, original_sender, search_unread_lgl, submission_key
 
 # ===== CONFIG =====
 load_dotenv()  # assumes .env in same dir
@@ -159,6 +159,8 @@ def validate_submission(data: dict, normalized_row: dict) -> None:
         raise ValueError("Donation amount must be positive and finite")
     if normalized_row["source"].startswith("unknown"):
         raise ValueError("Donation notification has an unknown Hillel sender")
+    if FORM_TITLES.get(normalized_row["source"]) != data.get("Form title"):
+        raise ValueError("Unrecognized 2026 LGL form title")
 
 
 def handle_message(server, uid, ledger, normalizer, reconcile_only,
