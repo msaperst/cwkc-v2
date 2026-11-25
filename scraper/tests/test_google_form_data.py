@@ -463,3 +463,14 @@ def test_missing_email_fails_closed_without_changing_scoreboard(harness):
     with pytest.raises(ValueError, match="missing email"):
         updater.update_results()
     assert csv.read_bytes() == before
+
+
+def test_2026_gathering_source_and_public_form_link_are_consistent():
+    """Prevent returning to the reused 2022 responses or old signup URL."""
+    assert forms.GATHERING_SHEET_ID == "1CygL3GcCUlX1hKqQi8j7eFy_K73_RKYPWycWs8uJlW4"
+    public_html = (Path(__file__).resolve().parents[2] / "public/index.html").read_text()
+    assert "https://forms.gle/mPGcizkmiCZZRV9d6" in public_html
+    assert "https://forms.gle/V5GyERDyzdHp67D67" not in public_html
+    assert "1EOURh5B5mKy0AjAgTKMObYtdmvZGI8txVC18DCmlA5o" not in (
+        Path(__file__).resolve().parents[1] / "getGoogleFormData.py"
+    ).read_text()

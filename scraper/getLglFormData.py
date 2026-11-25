@@ -232,6 +232,10 @@ def update_local_csv():
 
     for school_code, school_metrics in metrics.items():
         for metric_name, value in school_metrics.items():
+            # Rehearsal publishes a public CSV before kickoff; do not expose
+            # donor names. Numeric score metrics still exercise the real pipeline.
+            if metric_name == "donor_names" and os.getenv("CWKC_REHEARSAL") == "true":
+                value = ""
             # Flatten any list or set into a comma-separated string
             if isinstance(value, (list, set)):
                 value = ", ".join(map(str, value))

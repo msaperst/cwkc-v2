@@ -72,6 +72,44 @@ With `CWKC_INGESTION_ENABLED=false`:
 
 **Caution:** The workflow switch does **not** gate manually invoked Python scripts with live credentials. Such scripts can write Sheets and mark IMAP messages Seen. Do not smoke-test against the production mailbox.
 
+## Controlled November 2026 end-to-end rehearsal
+
+The normal scheduled/repository-dispatched workflow still runs **only inside**
+the configured competition window with `CWKC_INGESTION_ENABLED=true`.
+
+To verify the real ingestion, Sheet append, CSV publication and Pages deploy
+**before kickoff**, operators may run **Actions → Update results from multiple
+locations → Run workflow** on `main` with `rehearsal=true` and confirmation
+`REHEARSE`. This override only works before the November 30 opening, only for
+`workflow_dispatch`, and only while `CWKC_INGESTION_ENABLED` is *not*
+`true`. Both pre- and post-ingestion date guards enforce that rule. Do not
+change `season.json` or enable the production switch to test early.
+
+**This is not a read-only run.** It writes 2026 donation rows to the private
+ledger, marks successfully processed direct/forwarded LGL notifications
+**Seen**, commits the resulting CSV to `cwkc-results`, and deploys the public
+site if the score changes. Prelaunch rehearsal suppresses donor names from
+the public CSV. It still exposes **aggregate** totals to anyone who fetches
+the raw public CSV, even though the countdown hides live scores.
+
+Preflight: ensure the current Donations tab is `entries_2026` with 12
+columns ending in `submission id` (with a space), `SPREADSHEET_KEY` is
+configured, the GCP service account has Editor access to the Donations
+workbook and read access to **both** current 2026 response workbooks, and
+`cwkc-results` exists with a clean zeroed CSV. The new gathering source is
+`CWKC Alum Gathering Photos Form 2026 (Responses)`, **not** the 2022 archive.
+Run the read-only preview first to test the new source permissions.
+
+After the E2E test: compare the normalized ledger and published CSV with the
+read-only reference audit, then restore `cwkc-results` to the zero-score
+snapshot and run a clean Pages deploy. Remove test Google Form responses from
+both the Forms and their response Sheets. Restoring the CSV does **not** undo
+Google Sheet writes or IMAP Seen flags; if required for a later inbox audit,
+re-mark the relevant notifications unread manually. **Keep legitimate early
+donations in the 2026 ledger**; do not delete/replay them just to reset the
+public scoreboard. No permanent date override is left on: a later manual
+rehearsal still requires the explicit inputs and the prelaunch boundary.
+
 ## Manual read-only score preview (before launch)
 
 After merging the preview workflow, use **Actions → Preview CWKC results (read-only) → Run workflow** on `main`. It parses **currently unread** LGL emails without changing Seen flags, computes the donation CSV numbers, and optionally reads the current Google Forms response Sheets (`include_forms=true`) in dry-run mode. It does **not** write a Sheet, update `cwkc-results`, or publish Pages. Exclude only verified non-payment test records using their comma-separated LGL *Submission IDs*; otherwise they will appear in provisional totals. Donor-name columns are redacted.
