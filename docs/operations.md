@@ -88,9 +88,18 @@ change `season.json` or enable the production switch to test early.
 **This is not a read-only run.** It writes 2026 donation rows to the private
 ledger, marks successfully processed direct/forwarded LGL notifications
 **Seen**, commits the resulting CSV to `cwkc-results`, and deploys the public
-site if the score changes. Prelaunch rehearsal suppresses donor names from
-the public CSV. It still exposes **aggregate** totals to anyone who fetches
-the raw public CSV, even though the countdown hides live scores.
+site if the score changes. Rehearsal publishes **the full production CSV,
+including donor names that the normal scoring logic considers public**.
+The Pages deployment also temporarily enables the real live scoreboard and
+donor scroller, using an inline expiration marker valid for up to 10 minutes
+before kickoff. After that time, open browser tabs reload into the ordinary
+prelaunch countdown. The source season dates remain unchanged.
+
+**Public data is not automatically deleted when the preview expires.**
+The CSV remains accessible by direct URL until the score branch is reset and
+a clean Pages deployment completes. The prior public Git commit can remain
+accessible via Git history, caches, or copies even after resetting; a
+10-minute browser view does not guarantee a 10-minute exposure.
 
 Preflight: ensure the current Donations tab is `entries_2026` with 12
 columns ending in `submission id` (with a space), `SPREADSHEET_KEY` is
@@ -102,7 +111,10 @@ Run the read-only preview first to test the new source permissions.
 
 After the E2E test: compare the normalized ledger and published CSV with the
 read-only reference audit, then restore `cwkc-results` to the zero-score
-snapshot and run a clean Pages deploy. Remove test Google Form responses from
+snapshot and run a clean Pages deploy. This restores the normal prelaunch
+display but does not reliably erase donor information from public Git history.
+The 10-minute display marker expires by itself; resetting the data branch
+and redeploying remain manual steps. Remove test Google Form responses from
 both the Forms and their response Sheets. Restoring the CSV does **not** undo
 Google Sheet writes or IMAP Seen flags; if required for a later inbox audit,
 re-mark the relevant notifications unread manually. **Keep legitimate early
