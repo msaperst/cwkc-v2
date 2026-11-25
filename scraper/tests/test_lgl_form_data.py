@@ -213,3 +213,27 @@ def test_lgl_step_summary_is_optional_and_handles_empty_mail(monkeypatch, capsys
     body = capsys.readouterr().out
     assert "| Matching unread notifications at start | 0 |" in body
     assert "| Highest matched mailbox UID (not a processed watermark) | None |" in body
+
+
+def test_manual_rehearsal_publishes_numeric_scores_but_no_donor_names(monkeypatch):
+    """Rehearsal's public CSV must never publish individual donor identities."""
+    monkeypatch.setenv("CWKC_REHEARSAL", "true")
+    monkeypatch.setattr(lgl, "SPREADSHEET_SHEET", "entries_2026")
+    output = pd.DataFrame({
+        "uva_total_amount": [0.0],
+        "uva_donor_names": ["old-placeholder"],
+        "vt_total_amount": [0.0],
+        "vt_donor_names": ["old-placeholder"],
+    })
+    with patch("scraper.getLglFormData.CalculateValues") as calculator, \
+         patch("scraper.getLglFormData.pd.read_csv", return_value=output), \
+         patch("scraper.getLglFormData.pd.DataFrame.to_csv"):
+        calculator.return_value.calculate_all.return_value = {
+            "uva": {"total_amount": 150.0, "donor_names": "Example Person"},
+            "vt": {"total_amount": 80.0, "donor_names": "Another Example"},
+        }
+        lgl.update_local_csv()
+    assert output.at[0, "uva_total_amount"] == 150.0
+    assert output.at[0, "vt_total_amount"] == 80.0
+    assert output.at[0, "uva_donor_names"] == ""
+    assert output.at[0, "vt_donor_names"] == ""
