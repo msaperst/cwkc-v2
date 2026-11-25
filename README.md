@@ -57,6 +57,7 @@ flowchart TB
 
 ## Documentation
 
+- **[Deploy your own CWKC](docs/deploy-your-own.md): complete fork-to-launch guide** for another Hillel pair, including LGL, Gmail, Sheets, Forms, GitHub Actions, Pages, customization and optional form-submit dispatch.
 - [Development](docs/development.md): run locally, test, make code changes.
 - [Forms and scoring](docs/forms.md): LGL schemas, normalization, participation rules and source access.
 - [Operations](docs/operations.md): credentials, scheduled ingestion, deployment, recovery and launch/cutoff.
