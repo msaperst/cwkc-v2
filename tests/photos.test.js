@@ -65,3 +65,89 @@ test('manifest fetch failures never throw or modify the scoreboard', async () =>
     await loadGalleries(jest.fn().mockResolvedValue({ok: true, json: async () => [photo()]}));
     expect(document.querySelectorAll('.photo-gallery')).toHaveLength(1);
 });
+
+test('rotation pauses on hover and focus, resumes only after both clear, and respects the pause button', () => {
+    renderGalleries([photo(), photo('uva', 'hanukkah_photos', 'b')]);
+    const gallery = document.querySelector('.photo-gallery');
+    const count = gallery.querySelector('.photo-count');
+    const next = gallery.querySelector('[aria-label="Next photo"]');
+    const toggle = gallery.querySelector('[aria-label="Pause automatic rotation"]');
+    jest.advanceTimersByTime(6000);
+    expect(count.textContent).toBe('2 / 2');
+    gallery.dispatchEvent(new MouseEvent('mouseenter'));
+    next.dispatchEvent(new FocusEvent('focusin', {bubbles: true}));
+    next.dispatchEvent(new FocusEvent('focusout', {bubbles: true, relatedTarget: toggle}));
+    gallery.dispatchEvent(new MouseEvent('mouseleave'));
+    jest.advanceTimersByTime(12000);
+    expect(count.textContent).toBe('2 / 2');
+    gallery.dispatchEvent(new MouseEvent('mouseenter'));
+    toggle.dispatchEvent(new FocusEvent('focusout', {bubbles: true}));
+    jest.advanceTimersByTime(12000);
+    expect(count.textContent).toBe('2 / 2');
+    gallery.dispatchEvent(new MouseEvent('mouseleave'));
+    jest.advanceTimersByTime(6000);
+    expect(count.textContent).toBe('1 / 2');
+    toggle.click();
+    jest.advanceTimersByTime(6000);
+    expect(count.textContent).toBe('1 / 2');
+    expect(toggle.textContent).toBe('Play');
+    toggle.click();
+    jest.advanceTimersByTime(6000);
+    expect(count.textContent).toBe('2 / 2');
+    next.click();
+    expect(count.textContent).toBe('1 / 2');
+});
+
+test('reduced motion starts paused but allows deliberate playback', () => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = jest.fn().mockReturnValue({matches: true});
+    try {
+        renderGalleries([photo(), photo('uva', 'hanukkah_photos', 'b')]);
+        const gallery = document.querySelector('.photo-gallery');
+        const count = gallery.querySelector('.photo-count');
+        jest.advanceTimersByTime(12000);
+        expect(count.textContent).toBe('1 / 2');
+        gallery.querySelector('[aria-label="Start automatic rotation"]').click();
+        jest.advanceTimersByTime(6000);
+        expect(count.textContent).toBe('2 / 2');
+    } finally {
+        if (previousMatchMedia === undefined) delete window.matchMedia;
+        else window.matchMedia = previousMatchMedia;
+    }
+});
+
+test('enlargement uses the selected local image and removes the dialog on close', () => {
+    const prototype = Object.getPrototypeOf(document.createElement('dialog'));
+    const originalShow = Object.getOwnPropertyDescriptor(prototype, 'showModal');
+    const originalClose = Object.getOwnPropertyDescriptor(prototype, 'close');
+    Object.defineProperty(prototype, 'showModal', {configurable: true, value: function () {
+        this.setAttribute('open', '');
+    }});
+    Object.defineProperty(prototype, 'close', {configurable: true, value: function () {
+        this.removeAttribute('open');
+        this.dispatchEvent(new Event('close'));
+    }});
+    try {
+        renderGalleries([photo()]);
+        document.querySelector('[aria-label="Enlarge photo"]').click();
+        const dialog = document.querySelector('dialog[open]');
+        expect(dialog.querySelector('img').getAttribute('src')).toBe(photo().src);
+        expect(dialog.querySelector('img').alt).toBe(photo().alt);
+        dialog.querySelector('button').click();
+        expect(document.querySelector('dialog')).toBeNull();
+    } finally {
+        if (originalShow) Object.defineProperty(prototype, 'showModal', originalShow);
+        else delete prototype.showModal;
+        if (originalClose) Object.defineProperty(prototype, 'close', originalClose);
+        else delete prototype.close;
+    }
+});
+
+test('single-photo galleries ignore navigation keys and missing score rows', () => {
+    document.getElementById('alumni_gatherings').remove();
+    renderGalleries([photo(), photo('vt', 'alumni_gatherings')]);
+    const gallery = document.querySelector('.photo-gallery');
+    gallery.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true}));
+    expect(gallery.querySelector('.photo-count').textContent).toBe('1 / 1');
+    expect(document.querySelectorAll('.photo-gallery')).toHaveLength(1);
+});
