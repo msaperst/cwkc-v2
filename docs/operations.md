@@ -23,7 +23,9 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 - `main`: reviewed code and a safe, zeroed starter `public/assets/csv/results.csv`.
 - `cwkc-results`: latest published snapshot; website deployments overlay this branch's CSV so code changes cannot reset a live scoreboard.
 - `update.yml`: GitHub schedule ~every 5 minutes during event (cron can be delayed); combines unread LGL ingestion and participation; only publishes changes. `sheet-change` repository dispatch may also wake it. **All events still pass the same date/kill-switch gate.**
-- `deploy.yml`: publishes reviewed static site plus the current `cwkc-results` snapshot.
+- `cwkc-photos`: approved optimized photo assets and manifest only.
+- `photo-sync.yml`: independent approval-aware sync, triggered by `sheet-change`, manual dispatch or scheduled fallback when `CWKC_PHOTOS_ENABLED=true`.
+- `deploy.yml`: publishes reviewed static site plus current scores and validated photos. See [photo moderation](photos.md).
 - `watchdog.yml`: checks ingestion heartbeat twice hourly during event, creates one operator issue for failures/staleness.
 - `test.yml`: Python/Jest/Playwright checks on PRs and `main`.
 
@@ -54,4 +56,4 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 5. Resume only within the official collection window after operator sign-off; verify results and close the watchdog incident after recovery.
 6. At **Dec 7 20:00 EST**, the backend cutoff prevents new ingestion/publication. Obtain final LGL reconciliation and organizer sign-off; do not extend the window to force a late import.
 
-A code rollback or results-branch reset **does not undo private Sheet writes, email Seen flags, publicly exposed CSV history or cached data**. Never assume a short-lived test display erases published identities. Use [issue #41](https://github.com/msaperst/cwkc-v2/issues/41) for launch decisions and [#40](https://github.com/msaperst/cwkc-v2/issues/40) for monitoring owners; the optional photo viewer is [#50](https://github.com/msaperst/cwkc-v2/issues/50).
+A code rollback or results-branch reset **does not undo private Sheet writes, email Seen flags, publicly exposed CSV history or cached data**. Never assume a short-lived test display erases published identities. Use [issue #41](https://github.com/msaperst/cwkc-v2/issues/41) for launch decisions and [#40](https://github.com/msaperst/cwkc-v2/issues/40) for monitoring owners; see [photo moderation](photos.md) for gallery recovery.
