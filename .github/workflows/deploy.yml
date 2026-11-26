@@ -2,6 +2,8 @@
 name: Deploy static content to Pages
 
 on:
+  workflow_call:
+
   # Runs on pushes targeting the default branch
   push:
     branches: [ "main" ]
@@ -52,6 +54,10 @@ jobs:
           else
             python -m scraper.scoreboard_snapshot require-prelaunch
           fi
+      - name: Overlay current approved photos (independent of scoring)
+        env:
+          CWKC_PHOTOS_ENABLED: ${{ vars.CWKC_PHOTOS_ENABLED }}
+        run: python3 -m scraper.photo_snapshot
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Upload artifact
