@@ -4,14 +4,13 @@
 .photo-gallery-uva { grid-column: 1; border-top: 3px solid #E87722; background-color: rgba(35,45,75,.35); }
 .photo-gallery-vt { grid-column: 2; border-top: 3px solid #E5751F; background-color: rgba(99,0,49,.35); }
 .photo-heading { margin: 0 0 .5rem; text-align: center; font-size: .875rem; }
-.photo-frame { display: block; width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: .65rem; background: #10151e; cursor: zoom-in; }
 .photo-image { width: 100%; height: 100%; object-fit: contain; }
 .photo-fallback { padding: 1rem; font-size: .875rem; }
 .photo-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .5rem; margin-top: .5rem; }
 .photo-control { color: inherit; border: 1px solid rgba(255,255,255,.25); border-radius: .5rem; padding: .35rem .65rem; min-height: 2.5rem; }
 .photo-control:hover { background: rgba(255,255,255,.1); }
 .photo-control:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-.photo-frame { padding: 0; }
+.photo-frame { display: block; width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: .65rem; background: #10151e; cursor: zoom-in; padding: 0; }
 .photo-count { font-size: .875rem; font-variant-numeric: tabular-nums; }
 .photo-gallery [hidden] { display: none !important; }
 .photo-dialog { color: #fff; background: #10151e; border: 1px solid #687080; padding: 1rem; border-radius: 1rem; max-width: 95vw; max-height: 95vh; }
