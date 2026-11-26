@@ -54,12 +54,13 @@ def optimize(payload: bytes) -> bytes:
         return output.getvalue()
 
 
-def generate(photos, download, destination: Path) -> int:
+def generate(photos, download, destination: Path, year: int) -> tuple[int, int]:
     """Build in staging; replace the public directory only after validation."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists() and any(destination.iterdir()):
         raise ValueError("Photo generation requires an empty output directory")
     manifest = []
+    failures = 0
     with tempfile.TemporaryDirectory(dir=destination.parent) as temporary:
         staging = Path(temporary) / "photos"
         staging.mkdir()
@@ -68,7 +69,10 @@ def generate(photos, download, destination: Path) -> int:
             try:
                 image = optimize(download(photo.file_id))
             except Exception:
-                raise RuntimeError("Approved photo download or conversion failed") from None
+                # Omit unreadable photos, including previously published ones.
+                # A failed file must not block removal of revoked approvals.
+                failures += 1
+                continue
             filename = hashlib.sha256(image).hexdigest() + ".jpg"
             (staging / filename).write_bytes(image)
             entry = {"school": photo.school, "category": photo.category,
@@ -78,8 +82,10 @@ def generate(photos, download, destination: Path) -> int:
         manifest.sort(key=lambda item: (item["category"], item["school"], item["src"]))
         (staging / "photos.json").write_text(json.dumps(manifest, indent=2) + "\n",
                                             encoding="utf-8")
+        (staging / "season.json").write_text(json.dumps({"year": year}) + "\n",
+                                             encoding="utf-8")
         staging.replace(destination)
-    return len(manifest)
+    return len(manifest), failures
 
 
 def main():
@@ -93,10 +99,13 @@ def main():
         client = gspread.authorize(credentials)
         photos = approved_photos(client, year)
         with build("drive", "v3", credentials=credentials, cache_discovery=False) as drive:
-            count = generate(photos, lambda file_id: download_photo(drive, file_id), args.output)
+            count, failures = generate(photos, lambda file_id: download_photo(drive, file_id),
+                                       args.output, year)
     except Exception:
         raise SystemExit("Photo sync failed; check private approval data and Drive access") from None
     print(f"Prepared {count} approved gallery images")
+    if failures:
+        print(f"::warning::{failures} approved images were inaccessible or unsupported; omitted from gallery")
 
 
 if __name__ == "__main__":
