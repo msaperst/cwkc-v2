@@ -8,11 +8,12 @@
 2. The scheduled Python importer parses unread notifications, deduplicates by LGL Submission ID, and writes verified rows to the **private** season-specific donations Google Sheet.
 3. A second importer counts Hanukkah and alumni-gathering participation from linked Google Forms response Sheets.
 4. The calculator produces `public/assets/csv/results.csv`. GitHub Actions stores the published snapshot on `cwkc-results` and deploys the static site through GitHub Pages.
-5. A separate watchdog checks that ingestion continues during the event.
+5. A separate photo workflow publishes explicitly approved, optimized images; both deployment paths preserve scores and photos.
+6. A separate watchdog checks that ingestion continues during the event.
 
 ### Current production workflow
 
-The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** fully gated recomputation.
+The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** fully gated recomputation. The independent photo workflow also listens to `sheet-change`.
 
 ```mermaid
 flowchart TB
@@ -36,6 +37,14 @@ flowchart TB
         DATA --> RESULTDEPLOY["Deploy updated results"]
     end
 
+    RESP --> APPROVAL["Private photo approvals + consent"]
+    DISPATCH -.-> PHOTOS["photo-sync.yml: approved uploads only"]
+    APPROVAL --> PHOTOS
+    PHOTOS --> GALLERY["cwkc-photos: optimized images + manifest"]
+    GALLERY --> CODEDEPLOY
+    GALLERY --> RESULTDEPLOY
+    PHOTOS -.-> CODEDEPLOY
+
     MAIL --> INGEST
     RESP --> PARTICIPATION
 
@@ -49,7 +58,7 @@ flowchart TB
     WATCH["Separate scheduled watchdog.yml<br/>read-only run/branch checks"] -.->|Failure or stale heartbeat| ISSUE["Operator GitHub issue"]
 ```
 
-**Important boundaries:** The update workflow skips processing outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A source error blocks score publication; a changed CSV is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Public photo display is not part of this pipeline yet ([photo viewer #50](https://github.com/msaperst/cwkc-v2/issues/50)).
+**Important boundaries:** The update workflow skips processing outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A source error blocks score publication; a changed CSV is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Photo publication is separately enabled with `CWKC_PHOTOS_ENABLED` and is not date-gated; see [photo moderation](docs/photos.md).
 
 `main` is reviewed code and a **zeroed starter CSV**; `cwkc-results` is the last published scoreboard. The default ingestion is GitHub's **scheduled five-minute update**—no external email poller or always-on machine is required.
 
@@ -60,6 +69,7 @@ flowchart TB
 - **[Deploy your own CWKC](docs/deploy-your-own.md): complete fork-to-launch guide** for another Hillel pair, including LGL, Gmail, Sheets, Forms, GitHub Actions, Pages, customization and optional form-submit dispatch.
 - [Development](docs/development.md): run locally, test, make code changes.
 - [Forms and scoring](docs/forms.md): LGL schemas, normalization, participation rules and source access.
+- [Photo moderation](docs/photos.md): upload access, approval notifications, publication and takedown.
 - [Operations](docs/operations.md): credentials, scheduled ingestion, deployment, recovery and launch/cutoff.
 - [GitHub issues](https://github.com/msaperst/cwkc-v2/issues): launch tasks, photo viewer, improvements and other future work. [2026 launch tracker #41](https://github.com/msaperst/cwkc-v2/issues/41).
 
