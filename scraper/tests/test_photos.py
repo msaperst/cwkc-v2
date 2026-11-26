@@ -1,0 +1,206 @@
+"""Synthetic tests for the independent photo publication pipeline."""
+import hashlib
+import io
+import json
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import gspread
+import pytest
+from PIL import Image
+
+from scraper import getPhotos, photo_approvals as approvals, photo_snapshot as snapshot
+
+
+ID = "synthetic_file_123"
+OTHER = "synthetic_file_456"
+LINK = "https://drive.google.com/open?id=" + ID
+YEAR = 2026
+
+
+def workbook(rows, approved_rows=None):
+    book = MagicMock()
+    sheets = {approvals.CURRENT_TAB: rows}
+    if approved_rows is not None:
+        sheets[approvals.APPROVAL_TAB] = [approvals.APPROVAL_HEADER] + approved_rows
+
+    def worksheet(name):
+        if name not in sheets:
+            raise gspread.WorksheetNotFound(name)
+        result = MagicMock()
+        result.get_all_values.return_value = sheets[name]
+        return result
+
+    book.worksheet.side_effect = worksheet
+    return book
+
+
+def responses(category, values):
+    fields = approvals.HANUKKAH_FIELDS if category == "hanukkah_photos" else approvals.GATHERING_FIELDS
+    keys = ["timestamp", "school", "photo"]
+    if category == "hanukkah_photos":
+        keys.append("photo_release")
+    return fields, [[fields[key] for key in keys]] + values
+
+
+@pytest.mark.parametrize("url", [
+    LINK,
+    "https://drive.google.com/file/d/" + ID + "/view?usp=sharing",
+    "https://drive.google.com/open?usp=sharing&id=" + ID,
+])
+def test_file_ids(url):
+    assert approvals.file_ids(url) == [ID]
+    assert approvals.file_ids(url + ", " + LINK + "\n") == [ID, ID]
+
+
+@pytest.mark.parametrize("url", [
+    "https://example.invalid/open?id=" + ID,
+    "http://drive.google.com/open?id=" + ID,
+    "https://drive.google.com/open?id=bad",
+    "https://drive.google.com/unknown",
+])
+def test_reject_unknown_links(url):
+    with pytest.raises(ValueError):
+        approvals.file_ids(url)
+
+
+def test_approval_tab_is_explicit_and_bounded():
+    assert approvals.read_approvals(workbook([])) == {}
+    assert approvals.read_approvals(workbook([], [
+        [ID, " YES ", "  Menorah  ", LINK], [OTHER, "No", "Pending", ""]
+    ])) == {ID: "Menorah"}
+    assert approvals.read_approvals(workbook([], [[ID, "Yes", ""], [OTHER, "Yes", "x" * 301]])) == {}
+    with pytest.raises(ValueError):
+        approvals.read_approvals(workbook([], [[ID, "Yes", "a"], [ID, "No", "b"]]))
+    with pytest.raises(ValueError):
+        approvals.read_approvals(workbook([], [["bad", "Yes", "a"]]))
+
+
+def test_hanukkah_requires_release_and_approval():
+    category = "hanukkah_photos"
+    fields, rows = responses(category, [
+        ["11/26/2026", "UVA", LINK, "Yes"],
+        ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "No"],
+    ])
+    book = workbook(rows, [[ID, "Yes", "Candles"], [OTHER, "Yes", "Private"]])
+    assert approvals.read_candidates(book, fields, category, YEAR) == [
+        approvals.ApprovedPhoto(ID, "uva", category, "Candles")
+    ]
+    assert approvals.read_candidates(workbook(rows), fields, category, YEAR) == []
+    rows.append(["11/26/2026", "UVA", LINK, "No"])
+    assert approvals.read_candidates(book, fields, category, YEAR) == []
+
+
+def test_gathering_early_approval_and_season_and_conflicts():
+    category = "alumni_gatherings"
+    fields, rows = responses(category, [
+        ["11/25/2026", "VT", LINK],
+        ["11/25/2025", "UVA", LINK],
+    ])
+    book = workbook(rows, [[ID, "Yes", "Group"]])
+    assert approvals.read_candidates(book, fields, category, YEAR) == [
+        approvals.ApprovedPhoto(ID, "vt", category, "Group")
+    ]
+    rows.append(["11/25/2026", "UVA", LINK])
+    assert approvals.read_candidates(book, fields, category, YEAR) == []
+
+
+def test_cross_source_conflict():
+    client = MagicMock()
+    fields, gatherings = responses("alumni_gatherings", [["11/25/2026", "VT", LINK]])
+    fields, hanukkah = responses("hanukkah_photos", [["11/25/2026", "UVA", LINK, "Yes"]])
+    client.open_by_key.side_effect = [
+        workbook(gatherings, [[ID, "Yes", "Group"]]),
+        workbook(hanukkah, [[ID, "Yes", "Candles"]]),
+    ]
+    assert approvals.approved_photos(client, YEAR) == []
+
+
+def image_bytes():
+    output = io.BytesIO()
+    image = Image.new("RGB", (2000, 1000), "orange")
+    exif = image.getexif()
+    exif[270] = "private description"
+    image.save(output, format="JPEG", exif=exif)
+    return output.getvalue()
+
+
+def test_optimize_strips_metadata_and_resizes():
+    with Image.open(io.BytesIO(getPhotos.optimize(image_bytes()))) as image:
+        assert image.size == (1600, 800)
+        assert not image.getexif()
+        assert image.format == "JPEG"
+    with pytest.raises(ValueError):
+        getPhotos.optimize(b"")
+
+
+def test_drive_download_validates_metadata_and_size():
+    drive = MagicMock()
+    resource = drive.files.return_value
+    metadata = resource.get.return_value.execute
+    media = resource.get_media.return_value.execute
+    metadata.return_value = {"size": "3", "mimeType": "image/jpeg"}
+    media.return_value = b"abc"
+    assert getPhotos.download_photo(drive, ID) == b"abc"
+    media.return_value = b"ab"
+    with pytest.raises(ValueError):
+        getPhotos.download_photo(drive, ID)
+    metadata.return_value = {"size": "3", "mimeType": "text/html"}
+    with pytest.raises(ValueError):
+        getPhotos.download_photo(drive, ID)
+    metadata.return_value = {"size": str(getPhotos.MAX_BYTES + 1), "mimeType": "image/png"}
+    with pytest.raises(ValueError):
+        getPhotos.download_photo(drive, ID)
+
+
+def test_publish_only_approved_assets_and_skip_bad_image(tmp_path):
+    destination = tmp_path / "gallery"
+    photos = [
+        approvals.ApprovedPhoto(ID, "uva", "hanukkah_photos", "Candles"),
+        approvals.ApprovedPhoto(OTHER, "vt", "alumni_gatherings", "Broken"),
+    ]
+    assert getPhotos.generate(photos, lambda value: image_bytes() if value == ID else b"bad",
+                              destination, YEAR) == (1, 1)
+    manifest = json.loads((destination / "photos.json").read_text())
+    assert len(manifest) == 1
+    assert manifest[0]["alt"] == "Candles"
+    assert ID not in json.dumps(manifest)
+    path = destination / Path(manifest[0]["src"]).name
+    assert path.name == hashlib.sha256(path.read_bytes()).hexdigest() + ".jpg"
+    restored = tmp_path / "restored"
+    restored.mkdir()
+    snapshot.validate_snapshot(lambda name: (destination / name).read_bytes(), YEAR, restored)
+    assert (restored / path.name).read_bytes() == path.read_bytes()
+    assert (restored / "photos.json").read_bytes() == (destination / "photos.json").read_bytes()
+    with pytest.raises(ValueError):
+        getPhotos.generate([], lambda _: b"", destination, YEAR)
+    assert getPhotos.generate([], lambda _: b"", tmp_path / "revoked", YEAR) == (0, 0)
+
+
+def test_snapshot_invalid_and_disabled_clear_gallery(tmp_path, monkeypatch):
+    destination = tmp_path / "photos"
+    destination.mkdir()
+    (destination / "stale.jpg").write_bytes(b"stale")
+    monkeypatch.setattr(snapshot, "fetch_snapshot", lambda: True)
+    monkeypatch.setattr(snapshot, "read_snapshot_file", lambda _: b"invalid")
+    snapshot.restore(YEAR, destination, enabled=True)
+    assert sorted(path.name for path in destination.iterdir()) == ["photos.json"]
+    assert json.loads((destination / "photos.json").read_text()) == []
+    monkeypatch.setattr(snapshot, "fetch_snapshot", lambda: pytest.fail("disabled must not fetch"))
+    snapshot.restore(YEAR, destination, enabled=False)
+    assert json.loads((destination / "photos.json").read_text()) == []
+
+
+@pytest.mark.parametrize("manifest", [
+    {},
+    [{"school": "other", "category": "hanukkah_photos", "src": "x", "alt": "A"}],
+    [{"school": "uva", "category": "hanukkah_photos", "src": "../private.jpg", "alt": "A"}],
+    [{"school": "uva", "category": "hanukkah_photos", "src": "assets/photos/" + "a" * 64 + ".jpg", "alt": "A"}],
+])
+def test_snapshot_rejects_unvalidated_data(tmp_path, manifest):
+    files = {"season.json": json.dumps({"year": YEAR}).encode(),
+             "photos.json": json.dumps(manifest).encode()}
+    with pytest.raises(ValueError):
+        snapshot.validate_snapshot(lambda name: files.get(name, b"bad"), YEAR, tmp_path)
+    with pytest.raises(ValueError):
+        snapshot.validate_snapshot(lambda name: files[name], YEAR + 1, tmp_path)
