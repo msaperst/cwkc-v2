@@ -3,13 +3,15 @@ from dataclasses import dataclass
 import re
 from urllib.parse import urlsplit, parse_qs
 
+import gspread
+
 from .getGoogleFormData import (
     GATHERING_FIELDS, GATHERING_SHEET_ID, HANUKKAH_FIELDS, HANUKKAH_SHEET_ID,
     CURRENT_TAB, _normalize, _school, _in_season,
 )
 
 APPROVAL_TAB = "Photo approvals"
-APPROVAL_HEADER = ["Drive file ID", "Approved", "Alt text"]
+APPROVAL_HEADER = ["Drive file ID", "Approved", "Alt text", "Review photo"]
 FILE_ID = re.compile(r"[A-Za-z0-9_-]{10,128}")
 
 
@@ -43,12 +45,11 @@ def file_ids(value: str) -> list[str]:
 
 def read_approvals(workbook) -> dict[str, str]:
     """Missing tab means no permission; duplicate approval rows fail closed."""
-    import gspread
     try:
         rows = workbook.worksheet(APPROVAL_TAB).get_all_values()
     except gspread.WorksheetNotFound:
         return {}
-    if not rows or rows[0] != APPROVAL_HEADER:
+    if not rows or rows[0] not in (APPROVAL_HEADER, APPROVAL_HEADER[:3]):
         raise ValueError("Invalid photo approval header")
     approvals = {}
     seen = set()
@@ -59,7 +60,7 @@ def read_approvals(workbook) -> dict[str, str]:
         if not FILE_ID.fullmatch(file_id) or file_id in seen:
             raise ValueError("Invalid or duplicate photo approval")
         seen.add(file_id)
-        if _normalize(approved) == "yes" and alt.strip():
+        if _normalize(approved) == "yes" and alt.strip() and len(alt.strip()) <= 300:
             approvals[file_id] = alt.strip()
     return approvals
 
