@@ -2,7 +2,7 @@
 (() => {
     'use strict';
 
-    const categories = ['alumni_gatherings', 'hanukkah_photos'];
+    const categories = new Set(['alumni_gatherings', 'hanukkah_photos']);
     const schools = {uva: 'UVA', vt: 'Virginia Tech'};
     const imagePath = /^assets\/photos\/[a-f0-9]{64}\.jpg$/;
 
@@ -10,7 +10,7 @@
         if (!Array.isArray(manifest)) return [];
         const seen = new Set();
         return manifest.filter(photo => {
-            if (!photo || !categories.includes(photo.category)
+            if (!photo || !categories.has(photo.category)
                 || !Object.hasOwn(schools, photo.school)
                 || typeof photo.src !== 'string' || !imagePath.test(photo.src)
                 || typeof photo.alt !== 'string' || !photo.alt.trim()) return false;
