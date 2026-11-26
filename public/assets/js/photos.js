@@ -23,8 +23,8 @@
 
     function element(tag, className, text) {
         const node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text) node.textContent = text;
+        node.className = className;
+        node.textContent = text ?? '';
         return node;
     }
 
@@ -73,9 +73,10 @@
 
         let index = 0;
         let timer;
-        const reducedMotion = typeof window.matchMedia === 'function'
-            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const reducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
         let paused = reducedMotion;
+        let hovered = false;
+        let focused = false;
         function render() {
             const photo = photos[index];
             image.hidden = false;
@@ -95,7 +96,7 @@
         }
         function start() {
             if (!paused && photos.length > 1 && timer === undefined
-                && !gallery.matches(':hover') && !gallery.contains(document.activeElement)) {
+                && !hovered && !focused) {
                 timer = setInterval(() => move(1), 6000);
             }
         }
@@ -123,13 +124,22 @@
             if (paused) stop();
             else start();
         });
-        gallery.addEventListener('mouseenter', stop);
-        gallery.addEventListener('mouseleave', start);
-        gallery.addEventListener('focusin', stop);
+        gallery.addEventListener('mouseenter', () => {
+            hovered = true;
+            stop();
+        });
+        gallery.addEventListener('mouseleave', () => {
+            hovered = false;
+            start();
+        });
+        gallery.addEventListener('focusin', () => {
+            focused = true;
+            stop();
+        });
         gallery.addEventListener('focusout', event => {
-            if (!gallery.contains(event.relatedTarget) && !paused && photos.length > 1 && timer === undefined) {
-                timer = setInterval(() => move(1), 6000);
-            }
+            if (event.relatedTarget instanceof Node && gallery.contains(event.relatedTarget)) return;
+            focused = false;
+            start();
         });
         gallery.addEventListener('keydown', event => {
             if (photos.length < 2) return;
@@ -138,7 +148,10 @@
                 navigate(event.key === 'ArrowLeft' ? -1 : 1);
             }
         });
-        previous.hidden = next.hidden = toggle.hidden = photos.length === 1;
+        const singlePhoto = photos.length === 1;
+        previous.hidden = singlePhoto;
+        next.hidden = singlePhoto;
+        toggle.hidden = singlePhoto;
         updateToggle();
         render();
         start();
@@ -180,6 +193,6 @@
     if (typeof module !== 'undefined') {
         module.exports = {validPhotos, renderGalleries, loadGalleries};
     } else {
-        loadGalleries();
+        void loadGalleries();
     }
 })();
