@@ -250,6 +250,10 @@ jobs:
           )
           html.write_text(source.replace(marker, injection + marker), encoding="utf-8")
           PY
+      - name: Overlay current approved photos (independent of scoring)
+        env:
+          CWKC_PHOTOS_ENABLED: ${{ vars.CWKC_PHOTOS_ENABLED }}
+        run: python3 -m scraper.photo_snapshot
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Upload public website
