@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import tempfile
 
-from .getGoogleFormData import SEASON_CONFIG
+SEASON_CONFIG = Path("public/assets/config/season.json")
 
 PHOTO_DIR = Path("public/assets/photos")
 PHOTO_REF = "refs/remotes/origin/cwkc-photos"
