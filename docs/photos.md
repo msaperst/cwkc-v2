@@ -9,8 +9,8 @@ count toward a score without permission to display it.
    project. Give the service-account client email Viewer access to both private
    Forms upload folders and response spreadsheets. Keep the folders private.
 2. Append two columns to the right of the existing Form Responses 1 tab in
-   **each** response workbook: **Approved** and **Alt Text**. Leave new rows
-   blank by default. Do not change the form questions. Restrict editing access
+   **each** response workbook: **Image Approved** and **Image Alt Text**. Configure a strict Yes/No dropdown on the entire Image Approved column,
+   excluding the header; leave new rows blank by default. Do not change the form questions. Restrict editing access
    to authorized reviewers; protect these columns if other editors need access.
 3. In each spreadsheet's Extensions → Apps Script, update the existing
    triggerGithubAction function using [photo-moderation.gs](../scripts/photo-moderation.gs).
@@ -33,13 +33,13 @@ count toward a score without permission to display it.
 
 Open the uploaded image(s) using the original response row. Confirm public
 display permission for everyone depicted, including appropriate guardian consent
-for minors. Enter brief descriptive Alt Text (1–300 characters, no private
-information) and set Approved to Yes. All images attached to that response share
+for minors. Enter brief descriptive Image Alt Text (1–300 characters, no private
+information) and set Image Approved to Yes. All images attached to that response share
 the approval and description. Hanukkah photos additionally require an affirmative
 Yes in the form's photo-release field. Gathering uploads require organizer
 verification of publication permission. Scoring eligibility is unchanged.
 
-Clear Approved, set it to No, or clear Alt Text to revoke publication. The same
+Clear Image Approved, set it to No, or clear Image Alt Text to revoke publication. The same
 trigger runs the existing update workflow. Do not replace the contents of an
 approved Drive file; revoke and review a new submission instead.
 
@@ -72,7 +72,7 @@ folders public.
 
 Submit a synthetic photo with no private information. Confirm an email with the
 private response-row link and the sheet-change run. Leave approval blank and
-confirm no photo is published. Add alt text and approve the row; verify the
+confirm no photo is published. Enter Image Alt Text and set Image Approved to Yes; verify the
 change trigger, update run, Pages deployment and correct gallery appearing in an
 already-open browser. Revoke approval and verify the photo disappears without a
 reload. The donation inbox, ledger and published scoreboard must remain unchanged.
