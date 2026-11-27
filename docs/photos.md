@@ -61,10 +61,10 @@ or unsupported approved files are omitted with an aggregate warning.
 
 The browser polls photos.json every five seconds, independently of the scoreboard
 timer; unchanged manifests do not reset the galleries. Failed polls retain the
-last successful view. An already-visible gallery is cleared only after three
+last successful view. An already-visible gallery is cleared only after five
 consecutive successful empty manifests, avoiding brief deployment flicker.
-Removing the final image can therefore take two extra polling intervals (about
-10 seconds after the first empty response); partial removals apply immediately.
+Removing the final image can therefore take four extra polling intervals (about
+20 seconds after the first empty response); partial removals apply immediately.
 
 **Public history:** Approved derivatives are public and may remain in Git history,
 caches or third-party copies after revocation. Revocation removes the image from
