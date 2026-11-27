@@ -1,4 +1,4 @@
-const {validPhotos, renderGalleries, loadGalleries} = require('../public/assets/js/photos.js');
+const {validPhotos, renderGalleries, loadGalleries, startPhotoPolling} = require('../public/assets/js/photos.js');
 
 const photo = (school = 'uva', category = 'hanukkah_photos', character = 'a') => ({
     school, category, src: 'assets/photos/' + character.repeat(64) + '.jpg', alt: 'Synthetic photo'
@@ -176,4 +176,34 @@ test('a pending manifest request prevents overlapping polling', async () => {
     complete({ok: true, json: async () => [photo('vt')]});
     await pending;
     expect(document.querySelector('.photo-gallery-vt')).not.toBeNull();
+});
+
+test('polling updates only the changed school gallery', async () => {
+    const items = [photo(), photo('uva', 'hanukkah_photos', 'b'), photo('vt')];
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => items});
+    await loadGalleries(fetcher);
+    const uva = document.querySelector('.photo-gallery-uva');
+    const vt = document.querySelector('.photo-gallery-vt');
+    uva.querySelector('[aria-label="Next photo"]').click();
+    items.push(photo('vt', 'hanukkah_photos', 'c'));
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery-uva')).toBe(uva);
+    expect(uva.querySelector('.photo-count').textContent).toBe('2 / 2');
+    expect(document.querySelector('.photo-gallery-vt')).not.toBe(vt);
+    fetcher.mockResolvedValue({ok: true, json: async () => ({invalid: true})});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery-uva')).toBe(uva);
+});
+
+test('polling starts immediately and refreshes every five seconds', async () => {
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => []});
+    const interval = startPhotoPolling(fetcher);
+    try {
+        await jest.advanceTimersByTimeAsync(4999);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(fetcher).toHaveBeenCalledTimes(2);
+    } finally {
+        clearInterval(interval);
+    }
 });
