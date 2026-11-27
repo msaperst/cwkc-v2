@@ -178,7 +178,7 @@
         categories.forEach(category => {
             const score = document.getElementById(category);
             let row = rows.get(category);
-            if (!row || !row.isConnected) {
+            if (!row?.isConnected) {
                 Object.keys(schools).forEach(school => removeGallery(category + ':' + school));
                 row = element('div', 'photo-gallery-row');
                 rows.set(category, row);
