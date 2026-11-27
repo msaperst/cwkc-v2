@@ -158,30 +158,52 @@
         return {gallery, stop};
     }
 
-    let mounted = [];
+    const mounted = new Map();
+    const rows = new Map();
+
+    function removeGallery(key) {
+        const instance = mounted.get(key);
+        if (!instance) return;
+        instance.stop();
+        instance.gallery.remove();
+        mounted.delete(key);
+    }
+
     function renderGalleries(manifest) {
-        mounted.forEach(({gallery, stop}) => { stop(); gallery.remove(); });
-        mounted = [];
-        lastManifest = undefined;
-        document.querySelectorAll('.photo-gallery-row').forEach(row => row.remove());
         const photos = validPhotos(manifest);
+        const published = new Set(photos.map(photo => photo.src));
+        document.querySelectorAll('.photo-dialog').forEach(dialog => {
+            if (!published.has(dialog.querySelector('img').getAttribute('src'))) dialog.close();
+        });
         categories.forEach(category => {
             const score = document.getElementById(category);
-            if (!score) return;
-            const row = element('div', 'photo-gallery-row');
+            let row = rows.get(category);
+            if (!row || !row.isConnected) {
+                Object.keys(schools).forEach(school => removeGallery(category + ':' + school));
+                row = element('div', 'photo-gallery-row');
+                rows.set(category, row);
+            }
             Object.keys(schools).forEach(school => {
-                const items = photos.filter(photo => photo.category === category && photo.school === school);
+                const key = category + ':' + school;
+                const items = score ? photos.filter(photo => photo.category === category && photo.school === school) : [];
+                const signature = JSON.stringify(items);
+                if (mounted.get(key)?.signature === signature) return;
+                removeGallery(key);
                 if (!items.length) return;
                 const instance = createGallery(items, school, category);
-                mounted.push(instance);
+                mounted.set(key, {...instance, signature});
                 row.append(instance.gallery);
             });
             // Sibling, not child: scoring uses selectors inside data-points rows.
-            if (row.childElementCount) score.after(row);
+            if (score && row.childElementCount) {
+                if (!row.isConnected) score.after(row);
+            } else {
+                row.remove();
+                rows.delete(category);
+            }
         });
     }
 
-    let lastManifest;
     let loading = false;
     async function loadGalleries(fetcher = fetch) {
         if (loading) return;
@@ -189,13 +211,8 @@
         try {
             const response = await fetcher('assets/photos/photos.json', {cache: 'no-store'});
             if (!response.ok) return;
-            const photos = validPhotos(await response.json());
-            const signature = JSON.stringify(photos);
-            if (signature !== lastManifest) {
-                document.querySelectorAll('.photo-dialog').forEach(dialog => dialog.close());
-                renderGalleries(photos);
-                lastManifest = signature;
-            }
+            const manifest = await response.json();
+            if (Array.isArray(manifest)) renderGalleries(manifest);
         } catch {
             // An unavailable gallery must never prevent the scoreboard loading.
         } finally {
@@ -203,10 +220,14 @@
         }
     }
 
+    function startPhotoPolling(fetcher = fetch) {
+        void loadGalleries(fetcher);
+        return setInterval(() => { void loadGalleries(fetcher); }, 5000);
+    }
+
     if (typeof module !== 'undefined') {
-        module.exports = {validPhotos, renderGalleries, loadGalleries};
+        module.exports = {validPhotos, renderGalleries, loadGalleries, startPhotoPolling};
     } else {
-        void loadGalleries();
-        setInterval(() => { void loadGalleries(); }, 5000);
+        startPhotoPolling();
     }
 })();
