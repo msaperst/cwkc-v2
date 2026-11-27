@@ -11,7 +11,7 @@ import tempfile
 SEASON_CONFIG = Path("public/assets/config/season.json")
 
 PHOTO_DIR = Path("public/assets/photos")
-PHOTO_REF = "refs/remotes/origin/cwkc-photos"
+PHOTO_REF = "refs/remotes/origin/cwkc-results"
 CATEGORIES = {"alumni_gatherings", "hanukkah_photos"}
 SCHOOLS = {"uva", "vt"}
 IMAGE_PATH = re.compile(r"assets/photos/([a-f0-9]{64}\.jpg)")
@@ -57,13 +57,13 @@ def validate_snapshot(read, year: int, destination: Path) -> None:
 
 def fetch_snapshot() -> bool:
     result = subprocess.run(
-        ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/cwkc-photos"],
+        ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/cwkc-results"],
         capture_output=True,
     )
     if result.returncode == 2:
         return False
     result.check_returncode()
-    git("fetch", "--no-tags", "origin", f"refs/heads/cwkc-photos:{PHOTO_REF}")
+    git("fetch", "--no-tags", "origin", f"refs/heads/cwkc-results:{PHOTO_REF}")
     return True
 
 
