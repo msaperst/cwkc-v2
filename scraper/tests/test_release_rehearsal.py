@@ -4,11 +4,13 @@ Covers the real sequence of restoring the last CSV, committing only changed
 results, and overlaying the published snapshot during a clean Pages deployment.
 """
 from pathlib import Path
+import hashlib
+import json
 import subprocess
 
 import pytest
 
-from scraper import scoreboard_snapshot
+from scraper import photo_snapshot, scoreboard_snapshot
 
 RESULTS = scoreboard_snapshot.RESULTS_PATH
 ZERO = b"uva_total,vt_total\n0,0\n"
@@ -175,3 +177,61 @@ def test_schema_drift_refuses_deploy_without_altering_snapshot(
         restore_for_update(rehearsal, monkeypatch)
     assert (source / RESULTS).read_bytes() == new_schema
     assert branch_result(rehearsal["remote"]) == FIRST
+
+
+def publish_gallery(rehearsal, approved):
+    """Publish only the gallery on the same data branch used by the scoreboard."""
+    source = rehearsal["source"]
+    git(source, "fetch", "-q", "origin",
+        "refs/heads/cwkc-results:refs/remotes/origin/cwkc-results")
+    worktree = rehearsal["root"] / "photo-worktree"
+    git(source, "worktree", "add", "-q", "--detach", str(worktree), "origin/cwkc-results")
+    try:
+        gallery = worktree / photo_snapshot.PHOTO_DIR
+        gallery.mkdir(parents=True, exist_ok=True)
+        for old in gallery.glob("*.jpg"):
+            old.unlink()
+        manifest = []
+        if approved:
+            # A synthetic JPEG signature and content hash; image conversion is
+            # exercised separately in test_photos.py using actual raster bytes.
+            image = b"\xff\xd8synthetic"
+            name = hashlib.sha256(image).hexdigest() + ".jpg"
+            (gallery / name).write_bytes(image)
+            manifest.append({"school": "uva", "category": "hanukkah_photos",
+                             "src": "assets/photos/" + name, "alt": "Synthetic"})
+        (gallery / "photos.json").write_text(json.dumps(manifest) + "\n")
+        (gallery / "season.json").write_text('{"year": 2026}\n')
+        git(worktree, "config", "user.name", "CWKC Offline Drill")
+        git(worktree, "config", "user.email", "synthetic@example.invalid")
+        git(worktree, "add", "-A", "--", str(photo_snapshot.PHOTO_DIR))
+        git(worktree, "commit", "-qm", "Update approved photos")
+        git(worktree, "push", "-q", "origin", "HEAD:cwkc-results")
+    finally:
+        git(source, "worktree", "remove", "--force", str(worktree))
+
+
+def test_photo_and_score_publication_share_one_snapshot(rehearsal, monkeypatch):
+    assert publish_recomputed_csv(rehearsal, monkeypatch, FIRST)
+    publish_gallery(rehearsal, True)
+    assert branch_result(rehearsal["remote"]) == FIRST
+
+    site = fresh_pages_checkout(rehearsal, monkeypatch, "with-photos")
+    photo_snapshot.restore(2026, enabled=True)
+    gallery = site / photo_snapshot.PHOTO_DIR
+    assert len(list(gallery.glob("*.jpg"))) == 1
+    assert len(json.loads((gallery / "photos.json").read_text())) == 1
+    assert (site / RESULTS).read_bytes() == FIRST
+
+    # A later score-only update must not lose the already published gallery.
+    assert publish_recomputed_csv(rehearsal, monkeypatch, SECOND)
+    later = fresh_pages_checkout(rehearsal, monkeypatch, "later-score")
+    photo_snapshot.restore(2026, enabled=True)
+    assert len(list((later / photo_snapshot.PHOTO_DIR).glob("*.jpg"))) == 1
+
+    publish_gallery(rehearsal, False)
+    final = fresh_pages_checkout(rehearsal, monkeypatch, "revoked-photo")
+    photo_snapshot.restore(2026, enabled=True)
+    assert list((final / photo_snapshot.PHOTO_DIR).glob("*.jpg")) == []
+    assert json.loads((final / photo_snapshot.PHOTO_DIR / "photos.json").read_text()) == []
+    assert (final / RESULTS).read_bytes() == SECOND
