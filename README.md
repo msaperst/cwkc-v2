@@ -13,7 +13,7 @@
 
 ### Current production workflow
 
-The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** fully gated recomputation. The same update also synchronizes photos when enabled, independently of the score gate.
+The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** update workflow with independently gated scoring and photos. The same update also synchronizes photos when enabled, independently of the score gate.
 
 ```mermaid
 flowchart TB
@@ -31,17 +31,20 @@ flowchart TB
         LEDGER --> SCORE["Calculate donation scores"]
         SCORE --> PARTICIPATION["Read Forms Sheets<br/>calculate participation scores"]
         PARTICIPATION --> CSV["Recomputed results.csv"]
-        CSV --> CHANGED{"Different from published CSV?"}
+        CSV --> CHANGED{"Public results or photos changed?"}
         CHANGED -->|No| NOCHANGE["No publication needed"]
         CHANGED -->|Yes| DATA["Commit changed CSV and/or photos to cwkc-results"]
         DATA --> RESULTDEPLOY["Deploy updated results"]
     end
 
     RESP --> APPROVAL["Approved + Alt Text on response row"]
+    RESP -.-> REVIEW["Submit-trigger email to reviewers"]
+    REVIEW -.-> APPROVAL
+    APPROVAL -.-> DISPATCH
     DISPATCH -.-> PHOTOS["Forms importer: approved photos when enabled"]
     CRON --> PHOTOS
     APPROVAL --> PHOTOS
-    PHOTOS --> DATA
+    PHOTOS --> CHANGED
 
     MAIL --> INGEST
     RESP --> PARTICIPATION
@@ -56,7 +59,7 @@ flowchart TB
     WATCH["Separate scheduled watchdog.yml<br/>read-only run/branch checks"] -.->|Failure or stale heartbeat| ISSUE["Operator GitHub issue"]
 ```
 
-**Important boundaries:** The update workflow skips processing outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A source error blocks score publication; a changed CSV is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Photo publication is separately enabled with `CWKC_PHOTOS_ENABLED` and is not date-gated; see [photo moderation](docs/photos.md).
+**Important boundaries:** The update workflow skips scoring outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A scoring source error blocks score publication; changed public data is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Photo publication is separately enabled with `CWKC_PHOTOS_ENABLED` and is not date-gated; see [photo moderation](docs/photos.md).
 
 `main` is reviewed code and a **zeroed starter CSV**; `cwkc-results` holds the last published scoreboard and approved gallery. The default ingestion is GitHub's **scheduled five-minute update**—no external email poller or always-on machine is required.
 
