@@ -39,7 +39,7 @@ def validate_snapshot(read, year: int, destination: Path) -> None:
                 or entry["school"] not in SCHOOLS or entry["category"] not in CATEGORIES
                 or not isinstance(entry["alt"], str) or not 0 < len(entry["alt"].strip()) <= 300):
             raise ValueError("Invalid photo manifest entry")
-        match = IMAGE_PATH.fullmatch(entry["src"])
+        match = IMAGE_PATH.fullmatch(entry["src"]) if isinstance(entry["src"], str) else None
         if not match:
             raise ValueError("Invalid public photo path")
         name = match.group(1)
@@ -56,15 +56,13 @@ def validate_snapshot(read, year: int, destination: Path) -> None:
 
 
 def fetch_snapshot() -> bool:
+    # The deployment already fetched the single published results snapshot.
+    # Do not fetch a newer ref independently of the restored scoreboard.
     result = subprocess.run(
-        ["git", "ls-remote", "--exit-code", "--heads", "origin", "refs/heads/cwkc-results"],
+        ["git", "cat-file", "-e", f"{PHOTO_REF}:{PHOTO_DIR.as_posix()}/season.json"],
         capture_output=True,
     )
-    if result.returncode == 2:
-        return False
-    result.check_returncode()
-    git("fetch", "--no-tags", "origin", f"refs/heads/cwkc-results:{PHOTO_REF}")
-    return True
+    return result.returncode == 0
 
 
 def restore(year: int, destination: Path = PHOTO_DIR, *, enabled: bool) -> None:
