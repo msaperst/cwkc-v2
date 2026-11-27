@@ -9,12 +9,15 @@ import pytest
 from PIL import Image
 
 from scraper import getPhotos, photo_approvals as approvals, photo_snapshot as snapshot
+from scraper.tests.test_google_form_data import GATHERING_HEADER, HANUKKAH_HEADER
 
 
 ID = "synthetic_file_123"
 OTHER = "synthetic_file_456"
 LINK = "https://drive.google.com/open?id=" + ID
 YEAR = 2026
+# Independently captured from the live form, not imported from production code.
+PHOTO_RELEASE_YES = "YES! You can share my photo on the CWKC webpage."
 
 
 def workbook(rows):
@@ -25,10 +28,10 @@ def workbook(rows):
 
 def responses(category, values, moderated=True):
     fields = approvals.HANUKKAH_FIELDS if category == "hanukkah_photos" else approvals.GATHERING_FIELDS
-    keys = ["timestamp", "school", "photo"]
     if category == "hanukkah_photos":
-        keys.append("photo_release")
-    headers = [fields[key] for key in keys]
+        headers = [HANUKKAH_HEADER[i] for i in (0, 3, 6, 7)]
+    else:
+        headers = [GATHERING_HEADER[i] for i in (0, 2, 6)]
     if moderated:
         headers += ["Image Approved", "Image Alt Text"]
     return fields, [headers] + values
@@ -57,11 +60,11 @@ def test_reject_unknown_links(url):
 
 def test_unconfigured_sheet_and_missing_alt_fail_closed():
     category = "hanukkah_photos"
-    fields, rows = responses(category, [["11/26/2026", "UVA", LINK, "Yes"]], moderated=False)
+    fields, rows = responses(category, [["11/26/2026", "UVA", LINK, PHOTO_RELEASE_YES]], moderated=False)
     assert approvals.read_candidates(rows, fields, category, YEAR) == []
     fields, rows = responses(category, [
-        ["11/26/2026", "UVA", LINK, "Yes", "Yes", ""],
-        ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "Yes", "Yes", "x" * 301],
+        ["11/26/2026", "UVA", LINK, PHOTO_RELEASE_YES, "Yes", ""],
+        ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, PHOTO_RELEASE_YES, "Yes", "x" * 301],
     ])
     assert approvals.read_candidates(rows, fields, category, YEAR) == []
     rows[0].append("Image Approved")
@@ -74,9 +77,9 @@ def test_unconfigured_sheet_and_missing_alt_fail_closed():
 def test_hanukkah_requires_release_and_approval():
     category = "hanukkah_photos"
     fields, rows = responses(category, [
-        ["11/26/2026", "UVA", LINK, "Yes", " YES ", "  Candles  "],
+        ["11/26/2026", "UVA", LINK, PHOTO_RELEASE_YES, " YES ", "  Candles  "],
         ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "No", "Yes", "Private"],
-        ["11/26/2026", "UVA", "", "Yes", "Yes", "No upload"],
+        ["11/26/2026", "UVA", "", PHOTO_RELEASE_YES, "Yes", "No upload"],
     ])
     assert approvals.read_candidates(rows, fields, category, YEAR) == [
         approvals.ApprovedPhoto(ID, "uva", category, "Candles")
@@ -116,7 +119,7 @@ def test_multiple_uploads_share_row_approval():
 def test_cross_source_conflict():
     client = MagicMock()
     _, gatherings = responses("alumni_gatherings", [["11/25/2026", "VT", LINK, "Yes", "Group"]])
-    _, hanukkah = responses("hanukkah_photos", [["11/25/2026", "UVA", LINK, "Yes", "Yes", "Candles"]])
+    _, hanukkah = responses("hanukkah_photos", [["11/25/2026", "UVA", LINK, PHOTO_RELEASE_YES, "Yes", "Candles"]])
     client.open_by_key.side_effect = [workbook(gatherings), workbook(hanukkah)]
     assert approvals.approved_photos(client, YEAR) == []
 
@@ -263,18 +266,19 @@ def test_legacy_moderation_headers_do_not_authorize_publication():
 
 
 @pytest.mark.parametrize("release,expected", [
-    ("YES! You can share my photo on the CWKC webpage.", True),
+    (PHOTO_RELEASE_YES, True),
     ("  yes! YOU CAN SHARE MY PHOTO ON THE CWKC WEBPAGE.  ", True),
-    ("Yes", True),
+    ("Yes", False),
     ("No", False),
     ("", False),
     ("Yes, but do not publish my photo.", False),
 ])
 def test_actual_hanukkah_release_answer(release, expected):
     category = "hanukkah_photos"
-    fields, rows = responses(category, [
-        ["11/27/2026 11:53:21", "Virginia Tech Hillel", LINK, release, "Yes", "Synthetic candles"],
-    ])
+    fields = approvals.HANUKKAH_FIELDS
+    rows = [HANUKKAH_HEADER + ["Image Approved", "Image Alt Text"],
+            ["11/27/2026 11:53:21", "Synthetic attendee", "test@example.invalid",
+             "Virginia Tech Hillel", "Yes", "2016", LINK, release, "Yes", "Synthetic candles"]]
     result = approvals.read_candidates(rows, fields, category, YEAR)
     assert result == ([approvals.ApprovedPhoto(ID, "vt", category, "Synthetic candles")]
                       if expected else [])
