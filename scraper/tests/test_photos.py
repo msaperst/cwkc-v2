@@ -260,3 +260,21 @@ def test_legacy_moderation_headers_do_not_authorize_publication():
     ])
     rows[0][-2:] = ["Approved", "Alt Text"]
     assert approvals.read_candidates(rows, fields, category, YEAR) == []
+
+
+@pytest.mark.parametrize("release,expected", [
+    ("YES! You can share my photo on the CWKC webpage.", True),
+    ("  yes! YOU CAN SHARE MY PHOTO ON THE CWKC WEBPAGE.  ", True),
+    ("Yes", True),
+    ("No", False),
+    ("", False),
+    ("Yes, but do not publish my photo.", False),
+])
+def test_actual_hanukkah_release_answer(release, expected):
+    category = "hanukkah_photos"
+    fields, rows = responses(category, [
+        ["11/27/2026 11:53:21", "Virginia Tech Hillel", LINK, release, "Yes", "Synthetic candles"],
+    ])
+    result = approvals.read_candidates(rows, fields, category, YEAR)
+    assert result == ([approvals.ApprovedPhoto(ID, "vt", category, "Synthetic candles")]
+                      if expected else [])
