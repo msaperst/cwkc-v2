@@ -63,10 +63,27 @@ test('prelaunch page renders without requesting previous results', async ({ page
   for (const { points, label } of categories) {
     expect(label).toBe(`(${points} Point${points === 1 ? '' : 's'})`);
   }
-  await expect(page.locator('.enable-during-contest').first()).toHaveCSS('pointer-events', 'none');
+  await expect(page.locator('#alumni_gatherings a')).not.toHaveCSS('pointer-events', 'none');
+  await expect(page.locator('#hanukkah_photos a')).toHaveCSS('pointer-events', 'none');
   await page.waitForTimeout(250);
   expect(requests).toHaveLength(0);
   expect(errors).toEqual([]);
+});
+
+test('gathering link opens at midnight Eastern two days before kickoff', async ({ page }) => {
+  const early = new Date('2026-11-28T00:00:00-05:00');
+  await page.clock.install({ time: new Date(early.getTime() - 1_500) });
+  const requests = await mockCsv(page);
+  await openReady(page);
+  const gathering = page.locator('#alumni_gatherings a');
+  const hanukkah = page.locator('#hanukkah_photos a');
+  await expect(gathering).toHaveCSS('pointer-events', 'none');
+  await expect(hanukkah).toHaveCSS('pointer-events', 'none');
+  await page.clock.runFor(2_000);
+  await expect(gathering).not.toHaveCSS('pointer-events', 'none');
+  await expect(hanukkah).toHaveCSS('pointer-events', 'none');
+  await expect(page.locator('#countdown-text')).toHaveText('The Cup Starts In');
+  expect(requests).toHaveLength(0);
 });
 
 test('active phase displays synthetic scores, winners and donor text', async ({ page }) => {
