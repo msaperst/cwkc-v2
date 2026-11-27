@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "school": "uva",
+    "category": "alumni_gatherings",
+    "src": "assets/photos/cb89579938832f86c003a863b43581effc730cf8ceacb8efc963539a52aab2c5.jpg",
+    "alt": "Looks Good"
+  },
+  {
+    "school": "vt",
+    "category": "alumni_gatherings",
+    "src": "assets/photos/53425dd2390afd2c599ff2d13f2e8d0106b2a453ed6d330546a3a87b26ae31b5.jpg",
+    "alt": "Photo"
+  }
+]
