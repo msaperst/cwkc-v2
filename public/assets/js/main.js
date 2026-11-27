@@ -29,12 +29,15 @@ function getContestPhase(now = new Date()) {
 }
 
 /**
- * Links for participation forms are only enabled during the competition.
+ * Participation links default to the contest window; an explicit, current-season
+ * data-open-from timestamp can open an individual link early.
  * Donation links are intentionally NOT controlled by this function.
  */
-function setContestLinksEnabled(enabled) {
+function setContestLinksEnabled(enabled, now = new Date()) {
     $('.enable-during-contest').each(function() {
-        this.style.pointerEvents = enabled ? '' : 'none';
+        const opening = new Date(this.dataset.openFrom);
+        const early = opening.getUTCFullYear() === year && now >= opening && now < startTime;
+        this.style.pointerEvents = enabled || early ? '' : 'none';
     });
 }
 
@@ -220,6 +223,8 @@ function getTimeRemaining(endTime) {
  * @param endTime the time to tick down to
  */
 function updateClock(endTime) {
+    // A prelaunch tab must also notice an individual form's earlier opening.
+    if (getContestPhase() === 'upcoming') setContestLinksEnabled(false);
     // When the 10-minute rehearsal expires, reload the normal prelaunch page.
     // This also clears any names and scores from an already-open browser tab.
     if (endTime.getTime() === deadline.getTime()

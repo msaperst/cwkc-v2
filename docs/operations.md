@@ -31,6 +31,13 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 
 ## Before kickoff
 
+For 2026, the Alumni Gathering link opens November 28 at 00:00 EST, two days
+before kickoff. Its explicit `data-open-from` timestamp in `public/index.html`
+only changes link availability; the Hanukkah link, scoreboard and ingestion gate
+keep the official competition dates. Early gathering submissions remain in the
+response Sheet and are evaluated at kickoff. Review or remove the early-opening
+attribute for the next season.
+
 1. Reconcile genuine paid early gifts against LGL and exclude/resolve nonpaid staff/backend test submissions **privately**. Do not equate an email with a settled payment.
 2. Confirm `entries_2026` has the 12 expected column headers ending in `submission id` and no stray test rows; the current 2026 Google Forms response sheets contain no synthetic test submissions. Photo approval is a separate publication decision.
 3. Ensure every eligible early LGL notification is **unread**; the normal importer searches unread direct and approved forwarded notifications. Do not mark processed mail unread without reconciliation.

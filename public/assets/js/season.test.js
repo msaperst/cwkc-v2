@@ -89,6 +89,24 @@ describe('contest lifecycle', () => {
         expect($.ajax).not.toHaveBeenCalled();
     });
 
+    test('only the early gathering link opens at its own timestamp without scoring', () => {
+        const early = new Date('2026-11-28T00:00:00-05:00');
+        document.body.insertAdjacentHTML('beforeend',
+            '<a id="gathering" class="enable-during-contest" data-open-from="2026-11-28T00:00:00-05:00">Gathering</a>'
+            + '<a id="stale" class="enable-during-contest" data-open-from="2025-11-28T00:00:00-05:00">Stale</a>');
+        const main = loadWithFreshReady(new Date(early.getTime() - 1000));
+        const gathering = document.getElementById('gathering');
+        expect(gathering.style.pointerEvents).toBe('none');
+        jest.advanceTimersByTime(1000);
+        expect(gathering.style.pointerEvents).toBe('');
+        expect(document.getElementById('stale').style.pointerEvents).toBe('none');
+        expect($('.enable-during-contest')[0].style.pointerEvents).toBe('none');
+        expect($('#countdown-text').text()).toBe('The Cup Starts In');
+        expect($.ajax).not.toHaveBeenCalled();
+        main.setContestLinksEnabled(false, deadline);
+        expect(gathering.style.pointerEvents).toBe('none');
+    });
+
     test('open pre-start tab switches countdown and begins polling at kickoff', () => {
         loadWithFreshReady(new Date(start.getTime() - 1000));
         expect($.ajax).not.toHaveBeenCalled();
