@@ -37,7 +37,7 @@ flowchart TB
         DATA --> RESULTDEPLOY["Deploy updated results"]
     end
 
-    RESP --> APPROVAL["Approved + Alt Text on response row"]
+    RESP --> APPROVAL["Image Approved + Image Alt Text on response row"]
     RESP -.-> REVIEW["Submit-trigger email to reviewers"]
     REVIEW -.-> APPROVAL
     APPROVAL -.-> DISPATCH
