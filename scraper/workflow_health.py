@@ -93,7 +93,7 @@ def read_snapshot(repo: str, token: str) -> tuple[list[dict], datetime | None]:
     )["workflow_runs"]
     # GitHub reports overall workflow success even when check-window succeeded
     # but recompute was SKIPPED (e.g. collection was previously switched off).
-    # Only an actual successful recompute is a healthy ingestion heartbeat.
+    # Photo-only recomputes can also succeed; require the actual scoring step.
     runs = []
     for item in raw_runs:
         if item.get("status") == "completed" and item.get("conclusion") == "success":
@@ -103,6 +103,9 @@ def read_snapshot(repo: str, token: str) -> tuple[list[dict], datetime | None]:
             )
             recomputed = any(
                 job.get("name") == "recompute" and job.get("conclusion") == "success"
+                and any(step.get("name") == "Reject publication after cutoff"
+                        and step.get("conclusion") == "success"
+                        for step in job.get("steps", []))
                 for job in job_data["jobs"]
             )
             if not recomputed:
