@@ -13,7 +13,7 @@
 
 ### Current production workflow
 
-The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** update workflow with independently gated scoring and photos. The same update also synchronizes photos when enabled, independently of the score gate.
+The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** update workflow with independently gated scoring and photos. Form-submit triggers also notify photo reviewers when configured.
 
 ```mermaid
 flowchart TB
@@ -59,7 +59,7 @@ flowchart TB
     WATCH["Separate scheduled watchdog.yml<br/>read-only run/branch checks"] -.->|Failure or stale heartbeat| ISSUE["Operator GitHub issue"]
 ```
 
-**Important boundaries:** The update workflow skips scoring outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A scoring source error blocks score publication; changed public data is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Photo publication is separately enabled with `CWKC_PHOTOS_ENABLED` and is not date-gated; see [photo moderation](docs/photos.md).
+**Important boundaries:** The update workflow skips scoring outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A scoring source error blocks score publication; changed public data is committed to `cwkc-results` rather than to protected `main`. Both Pages deployment paths use attempt-specific artifacts and a bounded readiness check before deploying. The watchdog observes workflow health but does not read private donations. Photo publication is separately enabled with `CWKC_PHOTOS_ENABLED` and is not date-gated; see [photo moderation](docs/photos.md).
 
 `main` is reviewed code and a **zeroed starter CSV**; `cwkc-results` holds the last published scoreboard and approved gallery. The default ingestion is GitHub's **scheduled five-minute update**—no external email poller or always-on machine is required.
 
@@ -72,7 +72,7 @@ flowchart TB
 - [Forms and scoring](docs/forms.md): LGL schemas, normalization, participation rules and source access.
 - [Photo moderation](docs/photos.md): upload access, approval notifications, publication and takedown.
 - [Operations](docs/operations.md): credentials, scheduled ingestion, deployment, recovery and launch/cutoff.
-- [GitHub issues](https://github.com/msaperst/cwkc-v2/issues): launch tasks, photo viewer, improvements and other future work. [2026 launch tracker #41](https://github.com/msaperst/cwkc-v2/issues/41).
+- [GitHub issues](https://github.com/msaperst/cwkc-v2/issues): remaining launch tasks, improvements and future work. [2026 launch tracker #41](https://github.com/msaperst/cwkc-v2/issues/41).
 
 ## Quick start (no live credentials)
 
