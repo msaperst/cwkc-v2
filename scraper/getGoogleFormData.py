@@ -2,7 +2,7 @@
 """Read the current Forms response tabs and update participation score columns.
 
 The public scoreboard only receives aggregate counts. Photo-release consent
-is deliberately NOT a condition for Hanukkah scoring or used for publication.
+is deliberately NOT a condition for Hanukkah scoring. Publication requires approval.
 """
 import argparse
 import json
@@ -235,11 +235,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Import aggregate CWKC participation scores")
     parser.add_argument("--dry-run", action="store_true",
                         help="Read both Sheets and preview counts; do not modify CSV")
+    parser.add_argument("--photos-output", type=Path,
+                        help="Generate approved gallery assets into a fresh directory")
+    parser.add_argument("--photos-only", action="store_true",
+                        help="Do not read or update the scoreboard")
     parser.add_argument("--credentials-file", default="spreadsheet_credentials.json")
     parser.add_argument("--results-csv", default="../public/assets/csv/results.csv")
     args = parser.parse_args()
-    updater = SubmissionUpdater(args.credentials_file, args.results_csv)
-    updater.update_results(dry_run=args.dry_run)
+    if args.photos_only and not args.photos_output:
+        parser.error("--photos-only requires --photos-output")
+    if args.dry_run and args.photos_output:
+        parser.error("--dry-run cannot generate gallery files")
+    if not args.photos_only:
+        updater = SubmissionUpdater(args.credentials_file, args.results_csv)
+        updater.update_results(dry_run=args.dry_run)
+    if args.photos_output:
+        from scraper.getPhotos import sync_photos
+        sync_photos(args.credentials_file, args.photos_output)
 
 
 if __name__ == "__main__":
