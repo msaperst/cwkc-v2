@@ -5,7 +5,7 @@ from urllib.parse import urlsplit, parse_qs
 
 from .getGoogleFormData import (
     GATHERING_FIELDS, GATHERING_SHEET_ID, HANUKKAH_FIELDS, HANUKKAH_SHEET_ID,
-    CURRENT_TAB, _normalize, _school, _in_season,
+    CURRENT_TAB, _normalize, _school, _in_season, parse_response_rows,
 )
 
 FILE_ID = re.compile(r"[A-Za-z0-9_-]{10,128}")
@@ -39,8 +39,7 @@ def file_ids(value: str) -> list[str]:
     return result
 
 
-def read_candidates(workbook, fields, category: str, year: int) -> list[ApprovedPhoto]:
-    rows = workbook.worksheet(CURRENT_TAB).get_all_values()
+def read_candidates(rows, fields, category: str, year: int) -> list[ApprovedPhoto]:
     if not rows:
         raise ValueError("Missing photo response headers")
     headers = [_normalize(header) for header in rows[0]]
@@ -50,27 +49,17 @@ def read_candidates(workbook, fields, category: str, year: int) -> list[Approved
     required.update({"approved": "approved", "alt": "alt text"})
     if category == "hanukkah_photos":
         required["photo_release"] = fields["photo_release"]
-    columns = {}
-    for key, prefix in required.items():
-        matches = [i for i, header in enumerate(headers)
-                   if header == prefix or (key not in {"approved", "alt"} and
-                       (header.startswith(prefix + " ") or
-                        (prefix.endswith(":") and header.startswith(prefix))))]
-        if len(matches) != 1:
-            raise ValueError("Missing or ambiguous photo response column: " + key)
-        columns[key] = matches[0]
     candidates = {}
     denied = set()
-    for row in rows[1:]:
-        row = row + [""] * len(headers)
-        if not row[columns["photo"]] or not _in_season(row[columns["timestamp"]], year):
+    for record in parse_response_rows(rows, required):
+        if not record["photo"] or not _in_season(record["timestamp"], year):
             continue
-        alt = row[columns["alt"]].strip()
-        approved = _normalize(row[columns["approved"]]) == "yes" and 0 < len(alt) <= 300
+        alt = record["alt"].strip()
+        approved = _normalize(record["approved"]) == "yes" and 0 < len(alt) <= 300
         if category == "hanukkah_photos":
-            approved = approved and _normalize(row[columns["photo_release"]]) == "yes"
+            approved = approved and _normalize(record["photo_release"]) == "yes"
         try:
-            ids = set(file_ids(row[columns["photo"]]))
+            ids = set(file_ids(record["photo"]))
         except ValueError:
             if approved:
                 raise
@@ -78,7 +67,7 @@ def read_candidates(workbook, fields, category: str, year: int) -> list[Approved
         if not approved:
             denied.update(ids)
             continue
-        school = _school(row[columns["school"]])
+        school = _school(record["school"])
         for file_id in ids:
             photo = ApprovedPhoto(file_id, school, category, alt)
             if file_id in candidates and candidates[file_id] != photo:
@@ -87,10 +76,15 @@ def read_candidates(workbook, fields, category: str, year: int) -> list[Approved
     return [photo for file_id, photo in sorted(candidates.items()) if file_id not in denied]
 
 
-def approved_photos(client, year: int) -> list[ApprovedPhoto]:
-    photos = read_candidates(client.open_by_key(GATHERING_SHEET_ID), GATHERING_FIELDS,
+def approved_photos(client, year: int, response_rows=None) -> list[ApprovedPhoto]:
+    def read(sheet_id):
+        if response_rows is not None:
+            return response_rows[sheet_id]
+        return client.open_by_key(sheet_id).worksheet(CURRENT_TAB).get_all_values()
+
+    photos = read_candidates(read(GATHERING_SHEET_ID), GATHERING_FIELDS,
                              "alumni_gatherings", year)
-    photos += read_candidates(client.open_by_key(HANUKKAH_SHEET_ID), HANUKKAH_FIELDS,
+    photos += read_candidates(read(HANUKKAH_SHEET_ID), HANUKKAH_FIELDS,
                               "hanukkah_photos", year)
     # A file associated with conflicting sources must not appear in either gallery.
     counts = {}
