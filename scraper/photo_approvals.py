@@ -3,15 +3,11 @@ from dataclasses import dataclass
 import re
 from urllib.parse import urlsplit, parse_qs
 
-import gspread
-
 from .getGoogleFormData import (
     GATHERING_FIELDS, GATHERING_SHEET_ID, HANUKKAH_FIELDS, HANUKKAH_SHEET_ID,
     CURRENT_TAB, _normalize, _school, _in_season,
 )
 
-APPROVAL_TAB = "Photo approvals"
-APPROVAL_HEADER = ["Drive file ID", "Approved", "Alt text", "Review photo"]
 FILE_ID = re.compile(r"[A-Za-z0-9_-]{10,128}")
 
 
@@ -43,45 +39,23 @@ def file_ids(value: str) -> list[str]:
     return result
 
 
-def read_approvals(workbook) -> dict[str, str]:
-    """Missing tab means no permission; duplicate approval rows fail closed."""
-    try:
-        rows = workbook.worksheet(APPROVAL_TAB).get_all_values()
-    except gspread.WorksheetNotFound:
-        return {}
-    if not rows or rows[0] not in (APPROVAL_HEADER, APPROVAL_HEADER[:3]):
-        raise ValueError("Invalid photo approval header")
-    approvals = {}
-    seen = set()
-    for row in rows[1:]:
-        if not any(row):
-            continue
-        file_id, approved, alt = (row + ["", "", ""])[:3]
-        if not FILE_ID.fullmatch(file_id) or file_id in seen:
-            raise ValueError("Invalid or duplicate photo approval")
-        seen.add(file_id)
-        if _normalize(approved) == "yes" and alt.strip() and len(alt.strip()) <= 300:
-            approvals[file_id] = alt.strip()
-    return approvals
-
-
 def read_candidates(workbook, fields, category: str, year: int) -> list[ApprovedPhoto]:
-    approvals = read_approvals(workbook)
-    if not approvals:
-        return []
     rows = workbook.worksheet(CURRENT_TAB).get_all_values()
     if not rows:
         raise ValueError("Missing photo response headers")
     headers = [_normalize(header) for header in rows[0]]
-    required = ["timestamp", "school", "photo"]
+    if "approved" not in headers or "alt text" not in headers:
+        return []
+    required = {key: fields[key] for key in ("timestamp", "school", "photo")}
+    required.update({"approved": "approved", "alt": "alt text"})
     if category == "hanukkah_photos":
-        required.append("photo_release")
+        required["photo_release"] = fields["photo_release"]
     columns = {}
-    for key in required:
-        prefix = fields[key]
+    for key, prefix in required.items():
         matches = [i for i, header in enumerate(headers)
-                   if header == prefix or header.startswith(prefix + " ")
-                   or (prefix.endswith(":") and header.startswith(prefix))]
+                   if header == prefix or (key not in {"approved", "alt"} and
+                       (header.startswith(prefix + " ") or
+                        (prefix.endswith(":") and header.startswith(prefix))))]
         if len(matches) != 1:
             raise ValueError("Missing or ambiguous photo response column: " + key)
         columns[key] = matches[0]
@@ -89,17 +63,24 @@ def read_candidates(workbook, fields, category: str, year: int) -> list[Approved
     denied = set()
     for row in rows[1:]:
         row = row + [""] * len(headers)
-        ids = set(file_ids(row[columns["photo"]])) & approvals.keys()
-        if not ids:
+        if not row[columns["photo"]] or not _in_season(row[columns["timestamp"]], year):
             continue
-        if not _in_season(row[columns["timestamp"]], year):
+        alt = row[columns["alt"]].strip()
+        approved = _normalize(row[columns["approved"]]) == "yes" and 0 < len(alt) <= 300
+        if category == "hanukkah_photos":
+            approved = approved and _normalize(row[columns["photo_release"]]) == "yes"
+        try:
+            ids = set(file_ids(row[columns["photo"]]))
+        except ValueError:
+            if approved:
+                raise
             continue
-        if category == "hanukkah_photos" and _normalize(row[columns["photo_release"]]) != "yes":
+        if not approved:
             denied.update(ids)
             continue
         school = _school(row[columns["school"]])
         for file_id in ids:
-            photo = ApprovedPhoto(file_id, school, category, approvals[file_id])
+            photo = ApprovedPhoto(file_id, school, category, alt)
             if file_id in candidates and candidates[file_id] != photo:
                 denied.add(file_id)
             candidates[file_id] = photo
