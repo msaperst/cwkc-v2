@@ -87,17 +87,20 @@ def generate(photos, download, destination: Path, year: int) -> tuple[int, int]:
     return len(manifest), failures
 
 
-def sync_photos(credentials_file: str, output: Path):
+def sync_photos(credentials_file: str, output: Path, response_rows=None) -> None:
     year = int(json.loads(SEASON_CONFIG.read_text(encoding="utf-8"))["year"])
     try:
         credentials = Credentials.from_service_account_file(credentials_file, scopes=SCOPES)
-        client = gspread.authorize(credentials)
-        photos = approved_photos(client, year)
+        client = gspread.authorize(credentials) if response_rows is None else None
+        photos = approved_photos(client, year, response_rows)
         with build("drive", "v3", credentials=credentials, cache_discovery=False) as drive:
             count, failures = generate(photos, lambda file_id: download_photo(drive, file_id),
                                        output, year)
     except Exception:
-        raise SystemExit("Photo sync failed; check private approval data and Drive access") from None
+        # If approvals cannot be verified, publish no photos rather than block
+        # independently valid scores or retain possibly revoked images.
+        print("::warning::Photo source unavailable or invalid; publishing empty gallery")
+        count, failures = generate([], None, output, year)
     print(f"Prepared {count} approved gallery images")
     if failures:
         print(f"::warning::{failures} approved images were inaccessible or unsupported; omitted from gallery")
