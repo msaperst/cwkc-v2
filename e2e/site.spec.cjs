@@ -227,8 +227,21 @@ test('an already open prelaunch page adds and removes approved photos without to
   await expect.poll(() => gallery.locator('img').evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
   await gallery.getByRole('button', { name: 'Enlarge photo' }).click();
   await expect(page.locator('.photo-dialog[open]')).toBeVisible();
+  const published = manifest;
   manifest = [];
   await page.clock.runFor(5_100);
+  await expect(gallery).toBeVisible();
+  await expect(page.locator('.photo-dialog[open]')).toBeVisible();
+  manifest = published;
+  await page.clock.runFor(5_100);
+  await expect(gallery).toBeVisible();
+  manifest = [];
+  for (let poll = 0; poll < 3; poll++) {
+    const response = page.waitForResponse('**/assets/photos/photos.json');
+    await page.clock.runFor(5_100);
+    await response;
+    if (poll < 2) await expect(gallery).toBeVisible();
+  }
   await expect(page.locator('.photo-gallery')).toHaveCount(0);
   await expect(page.locator('.photo-dialog')).toHaveCount(0);
   await expect(page.locator('#hooTotal')).toHaveText('0');
