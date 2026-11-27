@@ -46,6 +46,19 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 - Successfully persisted LGL messages are marked Seen. Source IDs dedupe direct/forwarded deliveries; a source-ID collision, malformed form, unreliable Sheets readback, or unconfirmed IMAP acknowledgement blocks incomplete publication.
 - Scheduled and `sheet-change` score updates share the same season gate; approved photos have an independent flag. Do not run a separate inbox poller.
 
+## Recover a Pages-only failure
+
+If recompute already committed the correct data to `cwkc-results` but Pages
+failed, run **Deploy static content to Pages** on main. This redeploys the
+current validated scores and photos without re-ingesting mail or Forms.
+A normal sheet-change with unchanged data may skip deployment, so do not
+replay donations or edit approval rows merely to recover Pages.
+
+Both Pages workflows use artifact names scoped to the run and attempt, and
+wait for the uploaded artifact ID to appear in the Actions API before deployment.
+The bounded readiness check handles short artifact-listing delays. A persistent
+GitHub service failure still needs a fresh deployment or failed-job retry.
+
 ## Pause, recover, close
 
 1. Record failing run, latest known-good `cwkc-results` commit, Sheets row count/IDs and unread backlog. Keep donor details out of public logs/issues.
