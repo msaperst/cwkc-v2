@@ -162,6 +162,10 @@ test('polling preserves the current carousel when the manifest is unchanged and 
     expect(document.querySelector('.photo-gallery')).toBe(gallery);
     expect(gallery.querySelector('.photo-count').textContent).toBe('2 / 2');
     fetcher.mockResolvedValue({ok: true, json: async () => []});
+    for (let poll = 0; poll < 4; poll++) {
+        await loadGalleries(fetcher);
+        expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    }
     await loadGalleries(fetcher);
     expect(document.querySelector('.photo-gallery')).toBeNull();
     expect(fetcher).toHaveBeenCalledWith('assets/photos/photos.json', {cache: 'no-store'});
@@ -206,4 +210,58 @@ test('polling starts immediately and refreshes every five seconds', async () => 
     } finally {
         clearInterval(interval);
     }
+});
+
+
+test('temporary empty manifests preserve the carousel and its position', async () => {
+    const photos = [photo(), photo('uva', 'hanukkah_photos', 'b')];
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => photos});
+    await loadGalleries(fetcher);
+    const gallery = document.querySelector('.photo-gallery');
+    gallery.querySelector('[aria-label="Next photo"]').click();
+    fetcher.mockResolvedValue({ok: true, json: async () => []});
+    for (let poll = 0; poll < 4; poll++) {
+        await loadGalleries(fetcher);
+        expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    }
+    fetcher.mockResolvedValue({ok: true, json: async () => photos});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    expect(gallery.querySelector('.photo-count').textContent).toBe('2 / 2');
+    // A subsequent empty response must begin a new confirmation sequence.
+    fetcher.mockResolvedValue({ok: true, json: async () => []});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBe(gallery);
+});
+
+test.each([
+    {ok: false},
+    {ok: true, json: async () => ({invalid: true})},
+    {ok: true, json: async () => { throw new Error('invalid JSON'); }},
+])('an unsuccessful poll interrupts empty-manifest confirmation', async failure => {
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => [photo()]});
+    await loadGalleries(fetcher);
+    const gallery = document.querySelector('.photo-gallery');
+    const empty = {ok: true, json: async () => []};
+    fetcher.mockResolvedValue(empty);
+    for (let poll = 0; poll < 4; poll++) await loadGalleries(fetcher);
+    fetcher.mockResolvedValue(failure);
+    await loadGalleries(fetcher);
+    fetcher.mockResolvedValue(empty);
+    for (let poll = 0; poll < 4; poll++) {
+        await loadGalleries(fetcher);
+        expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    }
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBeNull();
+});
+
+test('removing one gallery while another remains is immediate', async () => {
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => [photo(), photo('vt')]});
+    await loadGalleries(fetcher);
+    const vt = document.querySelector('.photo-gallery-vt');
+    fetcher.mockResolvedValue({ok: true, json: async () => [photo('vt')]});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery-uva')).toBeNull();
+    expect(document.querySelector('.photo-gallery-vt')).toBe(vt);
 });

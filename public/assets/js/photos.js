@@ -204,16 +204,33 @@
         });
     }
 
+    const EMPTY_MANIFEST_CONFIRMATIONS = 5;
+    let emptyPolls = 0;
+
+    function applyManifest(manifest) {
+        if (!Array.isArray(manifest)) {
+            emptyPolls = 0;
+            return;
+        }
+        // Pages can briefly serve an empty snapshot during deployment.
+        // Confirm complete removal before clearing an already visible gallery.
+        if (manifest.length === 0 && mounted.size > 0) {
+            emptyPolls++;
+            if (emptyPolls < EMPTY_MANIFEST_CONFIRMATIONS) return;
+        }
+        emptyPolls = 0;
+        renderGalleries(manifest);
+    }
+
     let loading = false;
     async function loadGalleries(fetcher = fetch) {
         if (loading) return;
         loading = true;
         try {
             const response = await fetcher('assets/photos/photos.json', {cache: 'no-store'});
-            if (!response.ok) return;
-            const manifest = await response.json();
-            if (Array.isArray(manifest)) renderGalleries(manifest);
+            applyManifest(response.ok ? await response.json() : null);
         } catch {
+            emptyPolls = 0;
             // An unavailable gallery must never prevent the scoreboard loading.
         } finally {
             loading = false;
