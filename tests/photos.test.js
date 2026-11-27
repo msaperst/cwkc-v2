@@ -1,4 +1,4 @@
-const {validPhotos, renderGalleries, loadGalleries} = require('../public/assets/js/photos.js');
+const {validPhotos, renderGalleries, loadGalleries, startPhotoPolling} = require('../public/assets/js/photos.js');
 
 const photo = (school = 'uva', category = 'hanukkah_photos', character = 'a') => ({
     school, category, src: 'assets/photos/' + character.repeat(64) + '.jpg', alt: 'Synthetic photo'
@@ -150,4 +150,60 @@ test('single-photo galleries ignore navigation keys and missing score rows', () 
     gallery.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true}));
     expect(gallery.querySelector('.photo-count').textContent).toBe('1 / 1');
     expect(document.querySelectorAll('.photo-gallery')).toHaveLength(1);
+});
+
+test('polling preserves the current carousel when the manifest is unchanged and removes revoked images', async () => {
+    const photos = [photo(), photo('uva', 'hanukkah_photos', 'b')];
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => photos});
+    await loadGalleries(fetcher);
+    const gallery = document.querySelector('.photo-gallery');
+    gallery.querySelector('[aria-label="Next photo"]').click();
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    expect(gallery.querySelector('.photo-count').textContent).toBe('2 / 2');
+    fetcher.mockResolvedValue({ok: true, json: async () => []});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBeNull();
+    expect(fetcher).toHaveBeenCalledWith('assets/photos/photos.json', {cache: 'no-store'});
+});
+
+test('a pending manifest request prevents overlapping polling', async () => {
+    let complete;
+    const fetcher = jest.fn(() => new Promise(resolve => { complete = resolve; }));
+    const pending = loadGalleries(fetcher);
+    await loadGalleries(fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    complete({ok: true, json: async () => [photo('vt')]});
+    await pending;
+    expect(document.querySelector('.photo-gallery-vt')).not.toBeNull();
+});
+
+test('polling updates only the changed school gallery', async () => {
+    const items = [photo(), photo('uva', 'hanukkah_photos', 'b'), photo('vt')];
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => items});
+    await loadGalleries(fetcher);
+    const uva = document.querySelector('.photo-gallery-uva');
+    const vt = document.querySelector('.photo-gallery-vt');
+    uva.querySelector('[aria-label="Next photo"]').click();
+    items.push(photo('vt', 'hanukkah_photos', 'c'));
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery-uva')).toBe(uva);
+    expect(uva.querySelector('.photo-count').textContent).toBe('2 / 2');
+    expect(document.querySelector('.photo-gallery-vt')).not.toBe(vt);
+    fetcher.mockResolvedValue({ok: true, json: async () => ({invalid: true})});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery-uva')).toBe(uva);
+});
+
+test('polling starts immediately and refreshes every five seconds', async () => {
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => []});
+    const interval = startPhotoPolling(fetcher);
+    try {
+        await jest.advanceTimersByTimeAsync(4999);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(fetcher).toHaveBeenCalledTimes(2);
+    } finally {
+        clearInterval(interval);
+    }
 });

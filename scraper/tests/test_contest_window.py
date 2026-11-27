@@ -113,18 +113,24 @@ def test_update_workflow_guards_and_single_publisher():
     assert workflow.count("CWKC_INGESTION_ENABLED:") == 2
     assert workflow.count('python -m scraper.contest_window --require-active') == 2
     assert "if: needs.check-window.outputs.active == 'true'" in workflow
+    assert "|| vars.CWKC_PHOTOS_ENABLED == 'true'" in workflow
+    assert 'args+=(--photos-only)' in workflow
+    assert 'args+=(--photos-output "$RUNNER_TEMP/cwkc-gallery")' in workflow
+    assert workflow.count("if: needs.check-window.outputs.active == 'true'") == 3
+    assert "cwkc-photos" not in workflow
+    assert "python3 -m scraper.photo_snapshot" in workflow
     assert "python -m scraper.contest_window --require-active" in workflow
     assert 'cmp -s .cwkc-previous-results.csv public/assets/csv/results.csv' in workflow
     assert "python -m scraper.scoreboard_snapshot restore --backup" in workflow
     assert 'if: steps.changes.outputs.changed == \'true\'' in workflow
-    assert "if: needs.recompute.result == 'success' && needs.recompute.outputs.changed == 'true'" in workflow
+    assert "if: needs.recompute.result == 'success' && (needs.recompute.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "group: updates" in workflow
     assert "group: pages" in workflow
     assert "python -m scraper.getLglFormData" in workflow
-    assert "python getGoogleFormData.py" in workflow
-    assert workflow.index("python -m scraper.getLglFormData") < workflow.index("python getGoogleFormData.py")
-    assert workflow.index("python getGoogleFormData.py") < workflow.index("cmp -s")
+    assert "python -m scraper.getGoogleFormData" in workflow
+    assert workflow.index("python -m scraper.getLglFormData") < workflow.index("python -m scraper.getGoogleFormData")
+    assert workflow.index("python -m scraper.getGoogleFormData") < workflow.index("cmp -s")
     assert "git push origin HEAD:main" not in workflow
     assert workflow.count("git -C \"$RUNNER_TEMP/cwkc-published\" push origin HEAD:cwkc-results") == 1
     assert "actions/upload-artifact@" in workflow
@@ -133,7 +139,8 @@ def test_update_workflow_guards_and_single_publisher():
     assert workflow.index("Reject publication after cutoff") < workflow.index(
         "Commit reconciled scoreboard to data branch")
     assert "git diff public/assets/csv/results.csv &> /dev/null" not in workflow
-    assert "|| github.event_name == 'workflow_dispatch'" not in workflow
+    gate = workflow.split("  recompute:", 1)[1].split("    steps:", 1)[0]
+    assert "|| github.event_name == 'workflow_dispatch'" not in gate
     assert "2025-11-01" not in workflow
     assert "2025-12-10" not in workflow
 

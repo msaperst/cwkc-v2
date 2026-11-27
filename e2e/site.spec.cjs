@@ -197,3 +197,40 @@ test('2026 scoreboard shows 15 possible points and the Hanukkah submission form'
   // Link is displayed but inactive until the competition starts.
   await expect(photo.locator('a')).toHaveCSS('pointer-events', 'none');
 });
+
+
+test('an already open prelaunch page adds and removes approved photos without touching scores', async ({ page }) => {
+  await page.clock.install({ time: new Date(start.getTime() - 60_000) });
+  const scores = await mockCsv(page);
+  let manifest = [];
+  let requests = 0;
+  await page.route('**/assets/photos/photos.json', async route => {
+    requests++;
+    await route.fulfill({ status: 200, json: manifest });
+  });
+  // Serve a synthetic one-pixel PNG at the content-addressed fixture path.
+  // The frontend never reads the private Google Drive upload URL.
+  await page.route(/\/assets\/photos\/[a-f0-9]{64}\.jpg$/, route => route.fulfill({
+    contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j1ioAAAAASUVORK5CYII=', 'base64'),
+  }));
+  await openReady(page);
+  await expect.poll(() => requests).toBeGreaterThan(0);
+  await expect(page.locator('.photo-gallery')).toHaveCount(0);
+  manifest = [{ school: 'uva', category: 'hanukkah_photos',
+    src: 'assets/photos/' + 'a'.repeat(64) + '.jpg', alt: 'Synthetic candle photo' }];
+  await page.clock.runFor(5_100);
+  const gallery = page.locator('#hanukkah_photos + .photo-gallery-row .photo-gallery-uva');
+  await expect(gallery).toBeVisible();
+  await expect(gallery.locator('img')).toHaveAttribute('alt', 'Synthetic candle photo');
+  await gallery.locator('.photo-frame').scrollIntoViewIfNeeded();
+  await expect.poll(() => gallery.locator('img').evaluate(image => image.naturalWidth)).toBeGreaterThan(0);
+  await gallery.getByRole('button', { name: 'Enlarge photo' }).click();
+  await expect(page.locator('.photo-dialog[open]')).toBeVisible();
+  manifest = [];
+  await page.clock.runFor(5_100);
+  await expect(page.locator('.photo-gallery')).toHaveCount(0);
+  await expect(page.locator('.photo-dialog')).toHaveCount(0);
+  await expect(page.locator('#hooTotal')).toHaveText('0');
+  expect(scores).toHaveLength(0);
+});

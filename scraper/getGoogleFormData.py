@@ -2,7 +2,7 @@
 """Read the current Forms response tabs and update participation score columns.
 
 The public scoreboard only receives aggregate counts. Photo-release consent
-is deliberately NOT a condition for Hanukkah scoring or used for publication.
+is deliberately NOT a condition for Hanukkah scoring. Publication requires approval.
 """
 import argparse
 import json
@@ -134,12 +134,37 @@ def _hanukkah_identity(record: dict[str, str], season_year: int) -> tuple | None
     return school, email
 
 
+def parse_response_rows(rows, fields: dict[str, str]) -> list[dict[str, str]]:
+    """Resolve current response headers once using the shared Forms contract."""
+    if not rows:
+        raise ValueError("Response Sheet has no header row")
+    headers = [_normalize(h) for h in rows[0]]
+    column_indexes = {}
+    for name, prefix in fields.items():
+        matches = [index for index, header in enumerate(headers)
+                   if header == prefix or header.startswith(prefix + " ")]
+        if not matches and prefix.endswith(":"):
+            matches = [index for index, header in enumerate(headers)
+                       if header.startswith(prefix)]
+        if len(matches) != 1:
+            raise ValueError(f"Response Sheet column missing or ambiguous: {name}")
+        column_indexes[name] = matches[0]
+    output = []
+    for row in rows[1:]:
+        if not any(str(cell).strip() for cell in row):
+            continue
+        output.append({name: str(row[index]).strip() if index < len(row) else ""
+                       for name, index in column_indexes.items()})
+    return output
+
+
 class SubmissionUpdater:
     """Read current Forms response tabs, validate and update the result CSV."""
 
     def __init__(self, credentials_path: str, results_csv_path: str,
                  season_year: int | None = None):
         self.gc = gspread.service_account(filename=credentials_path)
+        self.response_rows = {}
         self.results_csv_path = results_csv_path
         self.df = pd.read_csv(results_csv_path)
         if season_year is None:
@@ -148,26 +173,8 @@ class SubmissionUpdater:
 
     def _response_rows(self, sheet_id: str, fields: dict[str, str]) -> list[dict[str, str]]:
         rows = self.gc.open_by_key(sheet_id).worksheet(CURRENT_TAB).get_all_values()
-        if not rows:
-            raise ValueError("Response Sheet has no header row")
-        headers = [_normalize(h) for h in rows[0]]
-        column_indexes = {}
-        for name, prefix in fields.items():
-            matches = [index for index, header in enumerate(headers)
-                       if header == prefix or header.startswith(prefix + " ")]
-            if not matches and prefix.endswith(":"):
-                matches = [index for index, header in enumerate(headers)
-                           if header.startswith(prefix)]
-            if len(matches) != 1:
-                raise ValueError(f"Response Sheet column missing or ambiguous: {name}")
-            column_indexes[name] = matches[0]
-        output = []
-        for row in rows[1:]:
-            if not any(str(cell).strip() for cell in row):
-                continue
-            output.append({name: str(row[index]).strip() if index < len(row) else ""
-                           for name, index in column_indexes.items()})
-        return output
+        self.response_rows[sheet_id] = rows
+        return parse_response_rows(rows, fields)
 
     def get_alumni_gatherings(self) -> SubmittedData:
         """Count distinct qualifying in-person gatherings of >=4 including host."""
@@ -235,11 +242,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Import aggregate CWKC participation scores")
     parser.add_argument("--dry-run", action="store_true",
                         help="Read both Sheets and preview counts; do not modify CSV")
+    parser.add_argument("--photos-output", type=Path,
+                        help="Generate approved gallery assets into a fresh directory")
+    parser.add_argument("--photos-only", action="store_true",
+                        help="Do not read or update the scoreboard")
     parser.add_argument("--credentials-file", default="spreadsheet_credentials.json")
     parser.add_argument("--results-csv", default="../public/assets/csv/results.csv")
     args = parser.parse_args()
-    updater = SubmissionUpdater(args.credentials_file, args.results_csv)
-    updater.update_results(dry_run=args.dry_run)
+    if args.photos_only and not args.photos_output:
+        parser.error("--photos-only requires --photos-output")
+    if args.dry_run and args.photos_output:
+        parser.error("--dry-run cannot generate gallery files")
+    response_rows = None
+    if not args.photos_only:
+        updater = SubmissionUpdater(args.credentials_file, args.results_csv)
+        updater.update_results(dry_run=args.dry_run)
+        response_rows = updater.response_rows
+    if args.photos_output:
+        from scraper.getPhotos import sync_photos
+        sync_photos(args.credentials_file, args.photos_output, response_rows)
 
 
 if __name__ == "__main__":

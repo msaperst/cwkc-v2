@@ -32,7 +32,7 @@ The workflow runs `scraper/getGoogleFormData.py` against **current 2026** linked
 
 - **Hanukkah:** distinct eligible respondents per normalized email and school; explicit eligibility answer controls scoring. Public display consent is **separate** from scoring or upload permission.
 - **Alumni gatherings:** [2026 gathering form](https://forms.gle/mPGcizkmiCZZRV9d6), response workbook `1CygL3GcCUlX1hKqQi8j7eFy_K73_RKYPWycWs8uJlW4`, tab `Form Responses 1`. The source is **not** the archived 2022 workbook. Require in-person gathering, at least **four attendees including the host**, an eligible organizer affiliation and a photo. Only qualifying gatherings score.
-- **Photos:** source uploads are not necessarily publicly readable. Photo display, approval, Drive access, consent (including any minors), secure hosting and takedown are tracked in [#50](https://github.com/msaperst/cwkc-v2/issues/50). Do not expose restricted Drive URLs merely because a Sheet row is accessible.
+- **Photos:** source uploads are not necessarily publicly readable. See [photo moderation](photos.md) for approval, consent (including any minors), Drive access, publication and takedown. Do not expose restricted Drive URLs merely because a Sheet row is accessible.
 
 For an authorized read-only participation check, from `scraper/`:
 

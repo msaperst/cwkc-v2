@@ -166,7 +166,7 @@ CWKC's current calculator expects **both** Forms/response Sheets, even if no par
 
    Header comparison is case/whitespace-normalized and sometimes permits an additional suffix, but missing/duplicated required questions **fail** the update. Verify the **actual response Sheet headers**, not just visible Form prompts.
 4. Adapt `_school` to recognize your two team names. Gathering eligibility currently requires an alumni/current-parent host, an in-person venue, a photo and **at least four distinct attendees including the host**. Hanukkah participation requires eligibility `Yes`, a photo and a unique normalized email per school. Adjust scoring rules and regression tests if your competition differs.
-5. **Photo visibility is a separate system:** a Form upload is not automatically public. Obtain explicit release permission, guardian consent where relevant, organizer approval, and a safe hosting/takedown process before displaying images. The current repository **scores participation but does not ship a public photo viewer**.
+5. **Photo visibility is a separate system:** a Form upload is not automatically public. Obtain explicit release permission, guardian consent where relevant, organizer approval, and a safe hosting/takedown process before displaying images. To enable the optional public photo viewer, follow [photo moderation setup](photos.md).
 6. Put the two new **public** Form URLs in the matching sections of `public/index.html`. Never use CWKC's existing response workbooks or Forms in a new fork.
 
 For a read-only test after access is configured, place the **private** service account JSON at `scraper/spreadsheet_credentials.json` (gitignored) and run from `scraper/`:
@@ -179,7 +179,7 @@ Do not commit credentials. After test submissions, clear synthetic responses fro
 
 ## 9. Configure GitHub Actions secrets and variables
 
-In **your fork**, go to **Settings → Secrets and variables → Actions**. Use repository/organization secrets and variables accessible to the workflows. The names below are exactly what the current `update.yml` reads.
+In **your fork**, go to **Settings → Secrets and variables → Actions**. Use repository/organization secrets and variables accessible to the workflows. The following are the scoring and optional gallery settings.
 
 | Type | Exact name(s) | Value |
 | --- | --- | --- |
@@ -190,6 +190,7 @@ In **your fork**, go to **Settings → Secrets and variables → Actions**. Use 
 | Secrets | `AUTH_URI`, `TOKEN_URI`, `AUTH_PROVIDER_X509_CERT_URL`, `CLIENT_X509_CERT_URL` | Remaining matching properties from the same JSON |
 | Secret (optional) | `UNIVERSE_DOMAIN` | Matching JSON property if present; defaults to Google's standard domain |
 | Variable | `CWKC_DONATIONS_WORKSHEET` | Name of the current private worksheet, e.g. `entries_2027` |
+| Variable | `CWKC_PHOTOS_ENABLED` | Optional: `true` enables approved photo synchronization and display independently of scoring |
 | Variable | `CWKC_INGESTION_ENABLED` | Set literal **`false`** until the approved launch; switch to **`true`** at the authorized instant |
 
 The workflow reconstructs two private credential files from these secrets at runtime. Paste the full `private_key` into the `PRIVATE_KEY` secret; the workflow supports actual line breaks or escaped `\n` sequences. It does **not** accept the entire JSON document as one secret. Do not paste this key into a PR, issue, public screenshot or repository file.
@@ -202,42 +203,7 @@ The workflow reconstructs two private credential files from these secrets at run
 
 **You do not need any push integration to run CWKC.** `update.yml` already schedules a complete refresh about every five minutes within its UTC calendar. Both donation inbox and participation response Sheets are polled/read **by the same workflow**. The old local email poller was removed.
 
-For quicker updates when **Google Form responses** arrive, the workflow accepts GitHub `repository_dispatch` with event type `sheet-change`. **The repository does not currently contain the Google Apps Script that sends this event.** If you want it, create a script bound to **each** linked Form response spreadsheet:
-
-1. Create a **fine-grained GitHub token** limited to your fork, with **Contents: read/write** (the dispatch endpoint requires Contents write), an expiration date and the smallest practical access. Prefer an organizer-owned automation identity, not a personal long-lived token.
-2. In each response spreadsheet, open **Extensions → Apps Script**, then add these **Script properties** under Project Settings: `GITHUB_REPO` = `YOUR-ORG/YOUR-REPO` and `GITHUB_DISPATCH_TOKEN` = your token. Do not put the token in source code or a spreadsheet cell.
-3. Paste this script. It only signals that source data changed; it does not transmit names, emails or photo URLs.
-
-   ~~~javascript
-   function notifyGitHubOfParticipation(e) {
-     if (!e || !e.range) throw new Error('Requires a spreadsheet form-submit trigger');
-
-     const properties = PropertiesService.getScriptProperties();
-     const repo = properties.getProperty('GITHUB_REPO');
-     const token = properties.getProperty('GITHUB_DISPATCH_TOKEN');
-     if (!repo || !token) throw new Error('Missing script properties');
-
-     const response = UrlFetchApp.fetch(
-       'https://api.github.com/repos/' + repo + '/dispatches',
-       {
-         method: 'post',
-         contentType: 'application/json',
-         headers: {
-           Authorization: 'Bearer ' + token,
-           Accept: 'application/vnd.github+json'
-         },
-         payload: JSON.stringify({event_type: 'sheet-change'}),
-         muteHttpExceptions: true
-       }
-     );
-     if (response.getResponseCode() !== 204) {
-       throw new Error('GitHub dispatch HTTP ' + response.getResponseCode());
-     }
-   }
-   ~~~
-
-4. In Apps Script's **Triggers** panel, add an **installable** trigger for `notifyGitHubOfParticipation`: **From spreadsheet → On form submit**. Authorize it using the designated owner account. Do this on each relevant response spreadsheet. A **simple** trigger is not sufficient for authenticated outgoing API calls.
-5. Submit a **synthetic** response. Look for a GitHub Actions run titled `sheet-change`. Before the authorized event window or while ingestion is disabled, `check-window` should pass but `recompute` must be **skipped**. That proves dispatch and the safety gate, **not** end-to-end ingestion. Do not enable production just to test a webhook.
+For quicker updates when **Google Form responses** arrive, the workflow accepts GitHub `repository_dispatch` with event type `sheet-change`. Use the repository's [bound Apps Script](../scripts/photo-moderation.gs), following [photo moderation setup](photos.md) for the token, existing form-submit and change triggers, optional reviewer emails and prelaunch test. For a fork, adapt the response tab and photo question prefixes to the new forms; retain the two moderation column names. Before kickoff, confirm scoring remains skipped even when photo synchronization is enabled.
 
 Use a token stored only in restricted Script Properties; people with edit rights to the Apps Script project may be able to access or exfiltrate it, so strictly control script editors and rotate the token if access changes. A dispatch arriving before the response sheet is fully updated may see stale data; **the periodic schedule is the correctness fallback**.
 
