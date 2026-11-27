@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import gspread
 import pytest
 from PIL import Image
 
@@ -18,29 +17,21 @@ LINK = "https://drive.google.com/open?id=" + ID
 YEAR = 2026
 
 
-def workbook(rows, approved_rows=None):
+def workbook(rows):
     book = MagicMock()
-    sheets = {approvals.CURRENT_TAB: rows}
-    if approved_rows is not None:
-        sheets[approvals.APPROVAL_TAB] = [approvals.APPROVAL_HEADER] + approved_rows
-
-    def worksheet(name):
-        if name not in sheets:
-            raise gspread.WorksheetNotFound(name)
-        result = MagicMock()
-        result.get_all_values.return_value = sheets[name]
-        return result
-
-    book.worksheet.side_effect = worksheet
+    book.worksheet.return_value.get_all_values.return_value = rows
     return book
 
 
-def responses(category, values):
+def responses(category, values, moderated=True):
     fields = approvals.HANUKKAH_FIELDS if category == "hanukkah_photos" else approvals.GATHERING_FIELDS
     keys = ["timestamp", "school", "photo"]
     if category == "hanukkah_photos":
         keys.append("photo_release")
-    return fields, [[fields[key] for key in keys]] + values
+    headers = [fields[key] for key in keys]
+    if moderated:
+        headers += ["Approved", "Alt Text"]
+    return fields, [headers] + values
 
 
 @pytest.mark.parametrize("url", [
@@ -64,55 +55,71 @@ def test_reject_unknown_links(url):
         approvals.file_ids(url)
 
 
-def test_approval_tab_is_explicit_and_bounded():
-    assert approvals.read_approvals(workbook([])) == {}
-    assert approvals.read_approvals(workbook([], [
-        [ID, " YES ", "  Menorah  ", LINK], [OTHER, "No", "Pending", ""]
-    ])) == {ID: "Menorah"}
-    assert approvals.read_approvals(workbook([], [[ID, "Yes", ""], [OTHER, "Yes", "x" * 301]])) == {}
-    with pytest.raises(ValueError):
-        approvals.read_approvals(workbook([], [[ID, "Yes", "a"], [ID, "No", "b"]]))
-    with pytest.raises(ValueError):
-        approvals.read_approvals(workbook([], [["bad", "Yes", "a"]]))
+def test_unconfigured_sheet_and_missing_alt_fail_closed():
+    category = "hanukkah_photos"
+    fields, rows = responses(category, [["11/26/2026", "UVA", LINK, "Yes"]], moderated=False)
+    assert approvals.read_candidates(workbook(rows), fields, category, YEAR) == []
+    fields, rows = responses(category, [
+        ["11/26/2026", "UVA", LINK, "Yes", "Yes", ""],
+        ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "Yes", "Yes", "x" * 301],
+    ])
+    assert approvals.read_candidates(workbook(rows), fields, category, YEAR) == []
+    rows[0].append("Approved")
+    with pytest.raises(ValueError, match="ambiguous"):
+        approvals.read_candidates(workbook(rows), fields, category, YEAR)
+    with pytest.raises(ValueError, match="headers"):
+        approvals.read_candidates(workbook([]), fields, category, YEAR)
 
 
 def test_hanukkah_requires_release_and_approval():
     category = "hanukkah_photos"
     fields, rows = responses(category, [
-        ["11/26/2026", "UVA", LINK, "Yes"],
-        ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "No"],
+        ["11/26/2026", "UVA", LINK, "Yes", " YES ", "  Candles  "],
+        ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "No", "Yes", "Private"],
+        ["11/26/2026", "UVA", "", "Yes", "Yes", "No upload"],
     ])
-    book = workbook(rows, [[ID, "Yes", "Candles"], [OTHER, "Yes", "Private"]])
+    book = workbook(rows)
     assert approvals.read_candidates(book, fields, category, YEAR) == [
         approvals.ApprovedPhoto(ID, "uva", category, "Candles")
     ]
-    assert approvals.read_candidates(workbook(rows), fields, category, YEAR) == []
-    rows.append(["11/26/2026", "UVA", LINK, "No"])
+    rows[1][-2] = "No"
+    assert approvals.read_candidates(book, fields, category, YEAR) == []
+    rows[1][-2] = "Yes"
+    rows.append(["11/26/2026", "UVA", LINK, "No", "Yes", "Candles"])
     assert approvals.read_candidates(book, fields, category, YEAR) == []
 
 
 def test_gathering_early_approval_and_season_and_conflicts():
     category = "alumni_gatherings"
     fields, rows = responses(category, [
-        ["11/25/2026", "VT", LINK],
-        ["11/25/2025", "UVA", LINK],
+        ["11/25/2026", "VT", LINK, "Yes", "Group"],
+        ["11/25/2025", "UVA", LINK, "Yes", "Group"],
+        ["11/25/2026", "VT", "not a URL", "No", ""],
     ])
-    book = workbook(rows, [[ID, "Yes", "Group"]])
+    book = workbook(rows)
     assert approvals.read_candidates(book, fields, category, YEAR) == [
         approvals.ApprovedPhoto(ID, "vt", category, "Group")
     ]
-    rows.append(["11/25/2026", "UVA", LINK])
+    rows.append(["11/25/2026", "UVA", LINK, "Yes", "Group"])
     assert approvals.read_candidates(book, fields, category, YEAR) == []
+    rows[3][-2:] = ["Yes", "Group"]
+    with pytest.raises(ValueError, match="upload link"):
+        approvals.read_candidates(book, fields, category, YEAR)
+
+
+def test_multiple_uploads_share_row_approval():
+    category = "alumni_gatherings"
+    fields, rows = responses(category, [
+        ["11/25/2026", "VT", LINK + ", https://drive.google.com/open?id=" + OTHER, "Yes", "Group"],
+    ])
+    assert {p.file_id for p in approvals.read_candidates(workbook(rows), fields, category, YEAR)} == {ID, OTHER}
 
 
 def test_cross_source_conflict():
     client = MagicMock()
-    fields, gatherings = responses("alumni_gatherings", [["11/25/2026", "VT", LINK]])
-    fields, hanukkah = responses("hanukkah_photos", [["11/25/2026", "UVA", LINK, "Yes"]])
-    client.open_by_key.side_effect = [
-        workbook(gatherings, [[ID, "Yes", "Group"]]),
-        workbook(hanukkah, [[ID, "Yes", "Candles"]]),
-    ]
+    _, gatherings = responses("alumni_gatherings", [["11/25/2026", "VT", LINK, "Yes", "Group"]])
+    _, hanukkah = responses("hanukkah_photos", [["11/25/2026", "UVA", LINK, "Yes", "Yes", "Candles"]])
+    client.open_by_key.side_effect = [workbook(gatherings), workbook(hanukkah)]
     assert approvals.approved_photos(client, YEAR) == []
 
 
