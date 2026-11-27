@@ -162,6 +162,7 @@
     function renderGalleries(manifest) {
         mounted.forEach(({gallery, stop}) => { stop(); gallery.remove(); });
         mounted = [];
+        lastManifest = undefined;
         document.querySelectorAll('.photo-gallery-row').forEach(row => row.remove());
         const photos = validPhotos(manifest);
         categories.forEach(category => {
@@ -180,13 +181,25 @@
         });
     }
 
+    let lastManifest;
+    let loading = false;
     async function loadGalleries(fetcher = fetch) {
+        if (loading) return;
+        loading = true;
         try {
             const response = await fetcher('assets/photos/photos.json', {cache: 'no-store'});
             if (!response.ok) return;
-            renderGalleries(await response.json());
+            const photos = validPhotos(await response.json());
+            const signature = JSON.stringify(photos);
+            if (signature !== lastManifest) {
+                document.querySelectorAll('.photo-dialog').forEach(dialog => dialog.close());
+                renderGalleries(photos);
+                lastManifest = signature;
+            }
         } catch {
             // An unavailable gallery must never prevent the scoreboard loading.
+        } finally {
+            loading = false;
         }
     }
 
@@ -194,5 +207,6 @@
         module.exports = {validPhotos, renderGalleries, loadGalleries};
     } else {
         void loadGalleries();
+        setInterval(() => { void loadGalleries(); }, 5000);
     }
 })();
