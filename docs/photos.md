@@ -35,8 +35,9 @@ Open the uploaded image(s) using the original response row. Confirm public
 display permission for everyone depicted, including appropriate guardian consent
 for minors. Enter brief descriptive Image Alt Text (1–300 characters, no private
 information) and set Image Approved to Yes. All images attached to that response share
-the approval and description. Hanukkah photos additionally require an affirmative
-Yes in the form's photo-release field. Gathering uploads require organizer
+the approval and description. Hanukkah photos additionally require the exact affirmative
+answer in the form's photo-release field: “YES! You can share my photo on the CWKC webpage.”
+Case and surrounding whitespace are normalized; a bare “Yes” is not accepted. Gathering uploads require organizer
 verification of publication permission. Scoring eligibility is unchanged.
 
 Clear Image Approved, set it to No, or clear Image Alt Text to revoke publication. The same

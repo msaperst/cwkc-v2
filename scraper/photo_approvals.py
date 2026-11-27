@@ -9,6 +9,7 @@ from .getGoogleFormData import (
 )
 
 FILE_ID = re.compile(r"[A-Za-z0-9_-]{10,128}")
+HANUKKAH_PHOTO_RELEASE = "yes! you can share my photo on the cwkc webpage."
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ def _moderated_upload(record: dict[str, str], category: str) -> tuple[bool, set[
     """Resolve approval and uploaded file IDs; reject malformed approved links."""
     approved = _normalize(record["approved"]) == "yes" and 0 < len(record["alt"]) <= 300
     if category == "hanukkah_photos":
-        approved = approved and _normalize(record["photo_release"]) == "yes"
+        approved = approved and _normalize(record["photo_release"]) == HANUKKAH_PHOTO_RELEASE
     try:
         return approved, set(file_ids(record["photo"]))
     except ValueError:

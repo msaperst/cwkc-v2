@@ -28,6 +28,7 @@ HANUKKAH_HEADER = [
     "PHOTO RELEASE: The CWKC website this year is featuring the photos submitted through this form to celebrate our communities! Please let us know if you are comfortable with having your photo shared. ",
 ]
 DATE = "11/06/2026 10:25:00"
+PHOTO_RELEASE_YES = "YES! You can share my photo on the CWKC webpage."
 
 
 def gathering(school="Brody", host="Alice Example", people="Bob, Carol, Dave",
@@ -101,7 +102,7 @@ def test_dry_run_reads_both_sources_but_does_not_write_csv(harness, capsys):
     assert "one@example.invalid" not in output
 
 
-@pytest.mark.parametrize("consent", ["Yes", "No", "", "I do not consent"])
+@pytest.mark.parametrize("consent", [PHOTO_RELEASE_YES, "No", "", "I do not consent"])
 def test_photo_consent_does_not_affect_eligible_scoring(harness, consent):
     updater, _, photos, _, _ = harness
     photos.get_all_values.return_value += [hanukkah(consent=consent)]
@@ -115,10 +116,10 @@ def test_hanukkah_deduplicates_email_but_never_name(harness):
     photos.get_all_values.return_value += [
         hanukkah(name="Alumnus", email="one@example.invalid", consent="No"),
         # The same name with a different email is a distinct person.
-        hanukkah(name="  ALUMNUS  ", email="other@example.invalid", consent="Yes"),
+        hanukkah(name="  ALUMNUS  ", email="other@example.invalid", consent=PHOTO_RELEASE_YES),
         # A different name with the same email does not add another participant.
-        hanukkah(name="Another Person", email=" ONE@EXAMPLE.INVALID ", consent="Yes"),
-        hanukkah(name="Person Two", email="two@example.invalid", consent="Yes"),
+        hanukkah(name="Another Person", email=" ONE@EXAMPLE.INVALID ", consent=PHOTO_RELEASE_YES),
+        hanukkah(name="Person Two", email="two@example.invalid", consent=PHOTO_RELEASE_YES),
         hanukkah(school="Brody", name="UVA Person", email="uva@example.invalid"),
     ]
     scores = updater.get_hanukkah_photos()
