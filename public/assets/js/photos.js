@@ -204,7 +204,7 @@
         });
     }
 
-    const EMPTY_MANIFEST_CONFIRMATIONS = 3;
+    const EMPTY_MANIFEST_CONFIRMATIONS = 5;
     let emptyPolls = 0;
 
     function applyManifest(manifest) {
