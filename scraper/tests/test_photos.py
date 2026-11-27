@@ -9,15 +9,13 @@ import pytest
 from PIL import Image
 
 from scraper import getPhotos, photo_approvals as approvals, photo_snapshot as snapshot
-from scraper.tests.test_google_form_data import GATHERING_HEADER, HANUKKAH_HEADER
+from scraper.tests.test_google_form_data import GATHERING_HEADER, HANUKKAH_HEADER, PHOTO_RELEASE_YES
 
 
 ID = "synthetic_file_123"
 OTHER = "synthetic_file_456"
 LINK = "https://drive.google.com/open?id=" + ID
 YEAR = 2026
-# Independently captured from the live form, not imported from production code.
-PHOTO_RELEASE_YES = "YES! You can share my photo on the CWKC webpage."
 
 
 def workbook(rows):
