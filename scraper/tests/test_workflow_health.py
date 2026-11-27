@@ -110,7 +110,9 @@ def test_read_snapshot_uses_only_actions_and_branch_metadata(monkeypatch):
         if path.endswith("/branches/cwkc-results"):
             return {"commit": {"commit": {"committer": {"date": PUBLISHED.isoformat()}}}}
         if path.endswith("/jobs?per_page=100"):
-            return {"jobs": [{"name": "recompute", "conclusion": "success"}]}
+            return {"jobs": [{"name": "recompute", "conclusion": "success",
+                              "steps": [{"name": "Reject publication after cutoff",
+                                         "conclusion": "success"}]}]}
         return {"workflow_runs": [run(START)]}
     monkeypatch.setattr(monitor, "_get_json", fake_get)
 
@@ -306,3 +308,17 @@ def test_watchdog_schedule_contained_by_backend_season_gate():
     assert "17,47 * 30 11 *" in workflow
     assert "17,47 * 1-8 12 *" in workflow
     assert END > START
+
+
+def test_photo_only_update_is_not_a_scoring_heartbeat(monkeypatch):
+    def fake_get(path, _token, **_kwargs):
+        if path.endswith("/branches/cwkc-results"):
+            return {"commit": {"commit": {"committer": {"date": PUBLISHED.isoformat()}}}}
+        if path.endswith("/jobs?per_page=100"):
+            return {"jobs": [{"name": "recompute", "conclusion": "success",
+                              "steps": [{"name": "Reject publication after cutoff",
+                                         "conclusion": "skipped"}]}]}
+        return {"workflow_runs": [run(START)]}
+    monkeypatch.setattr(monitor, "_get_json", fake_get)
+    runs, _ = monitor.read_snapshot("example/cwkc", "synthetic-token")
+    assert runs[0]["conclusion"] == "skipped"
