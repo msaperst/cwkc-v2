@@ -1,83 +1,84 @@
 # Moderated photo gallery
 
-Photo publication is separate from donation and participation scoring. No photo
-is published merely because someone submitted it, or because a score counts it.
+Photo publication is independent of participation scoring: a submitted photo can
+count toward a score without permission to display it.
 
-## One-time configuration
+## One-time setup
 
 1. Enable the Google Drive API in the existing service account's Google Cloud
-   project. Grant the actual service-account client email Viewer access to both
-   response spreadsheets and both Forms upload folders. Keep the folders private.
-2. In each response spreadsheet, open Extensions → Apps Script. Replace the
-   existing CWKC dispatch script with [photo-moderation.gs](../scripts/photo-moderation.gs).
-   Preserve the existing Script Properties GITHUB_REPO and GITHUB_DISPATCH_TOKEN.
-   Optionally set PHOTO_REVIEW_EMAILS to a comma-separated list of authorized
-   moderators. The script sends a short notification with a private Sheet link,
-   not an attachment or public photo URL. Alternatively use Google Forms' native
-   new-response email notifications.
-3. Run setupPhotoApprovals once in each bound script, authorizing access as
-   prompted. This creates the private Photo approvals tab.
-4. Retain exactly one installable **From spreadsheet → On form submit** trigger
-   for notifyGitHubOfParticipation. Add an installable **From spreadsheet →
-   On edit** trigger for notifyGitHubOfPhotoEdit. Authorize both under the
-   organizer's account. Simple triggers cannot make authenticated API calls.
-5. Once reviewed and ready, set the repository Actions variable
-   CWKC_PHOTOS_ENABLED to true. It controls photo synchronization and display,
-   not the competition's existing date or ingestion gate.
+   project. Give the service-account client email Viewer access to both private
+   Forms upload folders and response spreadsheets. Keep the folders private.
+2. Append two columns to the right of the existing Form Responses 1 tab in
+   **each** response workbook: **Approved** and **Alt Text**. Leave new rows
+   blank by default. Do not change the form questions. Restrict editing access
+   to authorized reviewers; protect these columns if other editors need access.
+3. In each spreadsheet's Extensions → Apps Script, update the existing
+   triggerGithubAction function using [photo-moderation.gs](../scripts/photo-moderation.gs).
+   Set or preserve Script Properties GITHUB_REPO (owner/repo),
+   GITHUB_DISPATCH_TOKEN (existing restricted dispatch token), and optionally
+   PHOTO_REVIEW_EMAILS (comma-separated authorized reviewer addresses).
+   Do not paste tokens into source or cells. Authorize the new MailApp scope
+   using the trigger owner account.
+4. Retain the existing installable **From spreadsheet → On form submit** and
+   **From spreadsheet → On change** triggers, both pointing to
+   triggerGithubAction. Verify that a manual cell edit fires the change trigger;
+   if not, add an installable On edit trigger for the same handler. A form-submit
+   event sends a review email with the private response-row link and dispatches
+   sheet-change; a change event dispatches without emailing. Script/API writes
+   do not reliably fire these triggers.
+5. Set the repository Actions variable CWKC_PHOTOS_ENABLED=true after review.
+   Keep CWKC_INGESTION_ENABLED=false until the authorized competition opening.
 
-## Review
+## Approve or remove a photo
 
-Each new upload with applicable release permission is queued with Approved=No.
-For each photo, open Review photo privately, confirm the organizer has permission
-to publish it (including permission from any identifiable people and appropriate
-guardian consent for minors), write short descriptive alt text without names or
-private information, and set Approved to Yes. Hanukkah uploads also require the
-form's affirmative Yes release answer. Gathering photos require organizer review
-of publication permission even if the submission counts toward scoring.
+Open the uploaded image(s) using the original response row. Confirm public
+display permission for everyone depicted, including appropriate guardian consent
+for minors. Enter brief descriptive Alt Text (1–300 characters, no private
+information) and set Approved to Yes. All images attached to that response share
+the approval and description. Hanukkah photos additionally require an affirmative
+Yes in the form's photo-release field. Gathering uploads require organizer
+verification of publication permission. Scoring eligibility is unchanged.
 
-Previously submitted photos can be added manually to the approval tab, one Drive
-file ID per row; the importer checks each ID against the current season's
-response sheet. Never approve an arbitrary Drive file. Do not replace the
-contents of an approved Drive file; revoke approval and review a new upload.
-
-Manual edits to the approval tab or response tab dispatch sheet-change. Setting
-Approved to No or clearing approval removes the photo on the next successful
-sync and deployment. If rows were deleted or modified by another script/API,
-manually run **Sync approved photos**; installable edit triggers do not cover
-all structural or programmatic changes.
+Clear Approved, set it to No, or clear Alt Text to revoke publication. The same
+trigger runs the existing update workflow. Do not replace the contents of an
+approved Drive file; revoke and review a new submission instead.
 
 ## Publication and recovery
 
-The separate photo-sync.yml workflow runs on sheet-change, manual dispatch and a
-periodic fallback (15 minutes during the event calendar and daily otherwise).
-It reads the private approval and response sheets using read-only credentials,
-downloads approved JPEG/PNG/WebP files (up to 25 MiB, 40 megapixels), rotates and
-resizes them to at most 1600 pixels, re-encodes as JPEG without original
-metadata, and builds a new content-addressed gallery manifest. Missing approval,
-revoked consent and prior-year submissions are excluded. An inaccessible or
-unsupported approved image is omitted and logged as an aggregate warning.
+The existing update.yml handles both scoring and photo updates. It uses the same
+getGoogleFormData.py entry point for both, including --photos-only before kickoff
+or after closing when photos are enabled but scoring is gated off. During the
+competition, scheduled recomputation also refreshes photos; a daily fallback
+handles missed changes outside the event window.
 
-Only approved, optimized derivatives and the public manifest are written to
-cwkc-photos; original uploads, Drive IDs, response rows and credentials are
-never committed. All Pages deployments overlay the validated gallery snapshot
-and the appropriate published scoreboard. Missing or invalid photo snapshots
-display an empty gallery without interrupting scoreboard deployment.
+Approved JPEG/PNG/WebP uploads (up to 25 MiB and 40 megapixels) are resized to at
+most 1600 pixels and re-encoded as JPEG without original metadata. Only optimized
+images and their public manifest are committed alongside the scoreboard on
+cwkc-results. Every Pages deployment overlays the validated, current-season
+snapshot. Unapproved, revoked or prior-year submissions are omitted. Inaccessible
+or unsupported approved files are omitted with an aggregate warning.
 
-**Public history:** Approved derivatives are public and may remain in Git
-history, browser/CDN caches or third-party copies after takedown. Moderators
-must understand this before approval. Revocation removes the image from the
-current deployed site, not all historical copies. In an urgent takedown,
-disable CWKC_PHOTOS_ENABLED and manually run the normal Pages deploy; investigate
-any historical copies separately. Reconcile approvals and sync before restoring
-public display. Do not enable public sharing on the raw upload folders.
+The browser polls photos.json every five seconds, independently of the scoreboard
+timer; unchanged manifests do not reset the galleries.
 
-## Prelaunch test
+**Public history:** Approved derivatives are public and may remain in Git history,
+caches or third-party copies after revocation. Revocation removes the image from
+the next deployed website, not from every historical copy. For urgent takedown,
+disable CWKC_PHOTOS_ENABLED and manually deploy the site. Reconcile approval rows
+and run an update before re-enabling display. Never make the original upload
+folders public.
 
-Submit a synthetic photo with no private information; verify the review queue
-and notification. The existing scoring workflow must remain gated off, while
-the photo workflow runs with no approved images. Approve the photo and confirm
-the edit triggers a successful photo sync and Pages deployment. Confirm the
-school and category, then revoke approval and confirm the image and manifest
-entry disappear. Verify the donation ledger and public results CSV were not
-changed. If deployment failed after the photo branch was updated, manually run
-Sync approved photos again (manual runs deploy even if the snapshot is unchanged).
+## End-to-end test before kickoff
+
+Submit a synthetic photo with no private information. Confirm an email with the
+private response-row link and the sheet-change run. Leave approval blank and
+confirm no photo is published. Add alt text and approve the row; verify the
+change trigger, update run, Pages deployment and correct gallery appearing in an
+already-open browser. Revoke approval and verify the photo disappears without a
+reload. The donation inbox, ledger and published scoreboard must remain unchanged.
+Remove the synthetic submission from Forms and the linked response sheet.
+
+If a dispatch is missed or a deployment failed after a commit, manually run
+Update results from multiple locations with the normal inputs (no rehearsal);
+when the photo flag is enabled, it can sync and redeploy even outside the event
+window. Verify the photo flag and the actual score gate before testing.
