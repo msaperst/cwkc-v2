@@ -151,3 +151,29 @@ test('single-photo galleries ignore navigation keys and missing score rows', () 
     expect(gallery.querySelector('.photo-count').textContent).toBe('1 / 1');
     expect(document.querySelectorAll('.photo-gallery')).toHaveLength(1);
 });
+
+test('polling preserves the current carousel when the manifest is unchanged and removes revoked images', async () => {
+    const photos = [photo(), photo('uva', 'hanukkah_photos', 'b')];
+    const fetcher = jest.fn().mockResolvedValue({ok: true, json: async () => photos});
+    await loadGalleries(fetcher);
+    const gallery = document.querySelector('.photo-gallery');
+    gallery.querySelector('[aria-label="Next photo"]').click();
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    expect(gallery.querySelector('.photo-count').textContent).toBe('2 / 2');
+    fetcher.mockResolvedValue({ok: true, json: async () => []});
+    await loadGalleries(fetcher);
+    expect(document.querySelector('.photo-gallery')).toBeNull();
+    expect(fetcher).toHaveBeenCalledWith('assets/photos/photos.json', {cache: 'no-store'});
+});
+
+test('a pending manifest request prevents overlapping polling', async () => {
+    let complete;
+    const fetcher = jest.fn(() => new Promise(resolve => { complete = resolve; }));
+    const pending = loadGalleries(fetcher);
+    await loadGalleries(fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    complete({ok: true, json: async () => [photo('vt')]});
+    await pending;
+    expect(document.querySelector('.photo-gallery-vt')).not.toBeNull();
+});
