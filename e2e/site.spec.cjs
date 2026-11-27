@@ -236,11 +236,11 @@ test('an already open prelaunch page adds and removes approved photos without to
   await page.clock.runFor(5_100);
   await expect(gallery).toBeVisible();
   manifest = [];
-  for (let poll = 0; poll < 3; poll++) {
+  for (let poll = 0; poll < 5; poll++) {
     const response = page.waitForResponse('**/assets/photos/photos.json');
     await page.clock.runFor(5_100);
     await response;
-    if (poll < 2) await expect(gallery).toBeVisible();
+    if (poll < 4) await expect(gallery).toBeVisible();
   }
   await expect(page.locator('.photo-gallery')).toHaveCount(0);
   await expect(page.locator('.photo-dialog')).toHaveCount(0);
