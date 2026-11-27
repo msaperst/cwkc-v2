@@ -1,5 +1,4 @@
 """Generate a public gallery from explicitly approved private Drive uploads."""
-import argparse
 import hashlib
 import io
 import json
@@ -88,25 +87,18 @@ def generate(photos, download, destination: Path, year: int) -> tuple[int, int]:
     return len(manifest), failures
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--credentials-file", required=True)
-    parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
+def sync_photos(credentials_file: str, output: Path):
     year = int(json.loads(SEASON_CONFIG.read_text(encoding="utf-8"))["year"])
     try:
-        credentials = Credentials.from_service_account_file(args.credentials_file, scopes=SCOPES)
+        credentials = Credentials.from_service_account_file(credentials_file, scopes=SCOPES)
         client = gspread.authorize(credentials)
         photos = approved_photos(client, year)
         with build("drive", "v3", credentials=credentials, cache_discovery=False) as drive:
             count, failures = generate(photos, lambda file_id: download_photo(drive, file_id),
-                                       args.output, year)
+                                       output, year)
     except Exception:
         raise SystemExit("Photo sync failed; check private approval data and Drive access") from None
     print(f"Prepared {count} approved gallery images")
     if failures:
         print(f"::warning::{failures} approved images were inaccessible or unsupported; omitted from gallery")
 
-
-if __name__ == "__main__":
-    main()
