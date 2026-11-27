@@ -37,8 +37,7 @@ for minors. Enter brief descriptive Image Alt Text (1–300 characters, no priva
 information) and set Image Approved to Yes. All images attached to that response share
 the approval and description. Hanukkah photos additionally require the exact affirmative
 answer in the form's photo-release field: “YES! You can share my photo on the CWKC webpage.”
-Case and surrounding whitespace are normalized; a bare “Yes” is not accepted. Gathering uploads require organizer
-verification of publication permission. Scoring eligibility is unchanged.
+Case and surrounding whitespace are normalized; a bare “Yes” is not accepted. The current Alumni Gathering form does not collect a photo-release answer, so reviewers must obtain and confirm permission before approving. Scoring eligibility is unchanged: an approved image from an ineligible current-student gathering can be displayed, and a qualifying gathering with a rejected image can still score.
 
 Clear Image Approved, set it to No, or clear Image Alt Text to revoke publication. The same
 trigger runs the existing update workflow. Do not replace the contents of an
@@ -83,7 +82,10 @@ already-open browser. Revoke approval and verify the photo disappears without a
 reload. The donation inbox, ledger and published scoreboard must remain unchanged.
 Remove the synthetic submission from Forms and the linked response sheet.
 
-If a dispatch is missed or a deployment failed after a commit, manually run
-Update results from multiple locations with the normal inputs (no rehearsal);
-when the photo flag is enabled, it can sync and redeploy even outside the event
-window. Verify the photo flag and the actual score gate before testing.
+If a dispatch is missed and the snapshot needs recomputing, manually run
+**Update results from multiple locations** with normal inputs (no rehearsal).
+When the photo flag is enabled, it can sync even outside the event window.
+Verify the photo flag and actual score gate before testing. If the snapshot is
+already correct and only Pages failed, run **Deploy static content to Pages** on
+main instead; this restores the current snapshot without reading Forms or mail.
+See [Operations](operations.md#recover-a-pages-only-failure).
