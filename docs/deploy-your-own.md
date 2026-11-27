@@ -179,7 +179,7 @@ Do not commit credentials. After test submissions, clear synthetic responses fro
 
 ## 9. Configure GitHub Actions secrets and variables
 
-In **your fork**, go to **Settings → Secrets and variables → Actions**. Use repository/organization secrets and variables accessible to the workflows. The following are the scoring and optional photo workflow settings.
+In **your fork**, go to **Settings → Secrets and variables → Actions**. Use repository/organization secrets and variables accessible to the workflows. The following are the scoring and optional gallery settings.
 
 | Type | Exact name(s) | Value |
 | --- | --- | --- |
@@ -203,7 +203,7 @@ The workflow reconstructs two private credential files from these secrets at run
 
 **You do not need any push integration to run CWKC.** `update.yml` already schedules a complete refresh about every five minutes within its UTC calendar. Both donation inbox and participation response Sheets are polled/read **by the same workflow**. The old local email poller was removed.
 
-For quicker updates when **Google Form responses** arrive, the workflow accepts GitHub `repository_dispatch` with event type `sheet-change`. Use the repository's [bound Apps Script](../scripts/photo-moderation.gs), following [photo moderation setup](photos.md) for the token, form-submit and approval-edit triggers, optional reviewer emails and prelaunch test. For a fork, adapt the response tab and photo question prefixes to the new forms. Before kickoff, confirm scoring remains skipped even when photo synchronization is enabled.
+For quicker updates when **Google Form responses** arrive, the workflow accepts GitHub `repository_dispatch` with event type `sheet-change`. Use the repository's [bound Apps Script](../scripts/photo-moderation.gs), following [photo moderation setup](photos.md) for the token, existing form-submit and change triggers, optional reviewer emails and prelaunch test. For a fork, adapt the response tab and photo question prefixes to the new forms; retain the two moderation column names. Before kickoff, confirm scoring remains skipped even when photo synchronization is enabled.
 
 Use a token stored only in restricted Script Properties; people with edit rights to the Apps Script project may be able to access or exfiltrate it, so strictly control script editors and rotate the token if access changes. A dispatch arriving before the response sheet is fully updated may see stale data; **the periodic schedule is the correctness fallback**.
 
