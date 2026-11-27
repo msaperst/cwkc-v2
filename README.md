@@ -8,12 +8,12 @@
 2. The scheduled Python importer parses unread notifications, deduplicates by LGL Submission ID, and writes verified rows to the **private** season-specific donations Google Sheet.
 3. A second importer counts Hanukkah and alumni-gathering participation from linked Google Forms response Sheets.
 4. The calculator produces `public/assets/csv/results.csv`. GitHub Actions stores the published snapshot on `cwkc-results` and deploys the static site through GitHub Pages.
-5. A separate photo workflow publishes explicitly approved, optimized images; both deployment paths preserve scores and photos.
+5. The same Forms importer prepares explicitly approved, optimized images. The updater publishes scores and photos to the same data branch.
 6. A separate watchdog checks that ingestion continues during the event.
 
 ### Current production workflow
 
-The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** fully gated recomputation. The independent photo workflow also listens to `sheet-change`.
+The email inbox and Forms response Sheets are **data sources, not triggers**. GitHub's schedule drives normal updates; an optional Forms `sheet-change` dispatch can request an earlier run. Both paths execute the **same** fully gated recomputation. The same update also synchronizes photos when enabled, independently of the score gate.
 
 ```mermaid
 flowchart TB
@@ -33,34 +33,32 @@ flowchart TB
         PARTICIPATION --> CSV["Recomputed results.csv"]
         CSV --> CHANGED{"Different from published CSV?"}
         CHANGED -->|No| NOCHANGE["No publication needed"]
-        CHANGED -->|Yes| DATA["Commit CSV to cwkc-results branch"]
+        CHANGED -->|Yes| DATA["Commit changed CSV and/or photos to cwkc-results"]
         DATA --> RESULTDEPLOY["Deploy updated results"]
     end
 
-    RESP --> APPROVAL["Private photo approvals + consent"]
-    DISPATCH -.-> PHOTOS["photo-sync.yml: approved uploads only"]
+    RESP --> APPROVAL["Approved + Alt Text on response row"]
+    DISPATCH -.-> PHOTOS["Forms importer: approved photos when enabled"]
+    CRON --> PHOTOS
     APPROVAL --> PHOTOS
-    PHOTOS --> GALLERY["cwkc-photos: optimized images + manifest"]
-    GALLERY --> CODEDEPLOY
-    GALLERY --> RESULTDEPLOY
-    PHOTOS -.-> CODEDEPLOY
+    PHOTOS --> DATA
 
     MAIL --> INGEST
     RESP --> PARTICIPATION
 
     subgraph public["Published website"]
-        MAIN["Reviewed main branch<br/>HTML / JavaScript / CSS"] --> CODEDEPLOY["On main push: deploy.yml<br/>overlay latest results CSV"]
+        MAIN["Reviewed main branch<br/>HTML / JavaScript / CSS"] --> CODEDEPLOY["On main push: deploy.yml<br/>overlay latest scores + photos"]
         CODEDEPLOY --> PAGES["GitHub Pages: cwkc.org"]
         RESULTDEPLOY --> PAGES
     end
-    DATA -.->|Current results overlay| CODEDEPLOY
+    DATA -.->|Current scores + photos overlay| CODEDEPLOY
 
     WATCH["Separate scheduled watchdog.yml<br/>read-only run/branch checks"] -.->|Failure or stale heartbeat| ISSUE["Operator GitHub issue"]
 ```
 
 **Important boundaries:** The update workflow skips processing outside the configured Eastern-time competition window or while `CWKC_INGESTION_ENABLED` is not `true`. Unread notifications are only acknowledged after the private ledger write is verified. A source error blocks score publication; a changed CSV is committed to `cwkc-results` rather than to protected `main`. The watchdog observes workflow health but does not read private donations. Photo publication is separately enabled with `CWKC_PHOTOS_ENABLED` and is not date-gated; see [photo moderation](docs/photos.md).
 
-`main` is reviewed code and a **zeroed starter CSV**; `cwkc-results` is the last published scoreboard. The default ingestion is GitHub's **scheduled five-minute update**—no external email poller or always-on machine is required.
+`main` is reviewed code and a **zeroed starter CSV**; `cwkc-results` holds the last published scoreboard and approved gallery. The default ingestion is GitHub's **scheduled five-minute update**—no external email poller or always-on machine is required.
 
 **2026 event:** November 30, 00:00 EST – December 7, 20:00 EST. The single season config is `public/assets/config/season.json`, using `America/New_York`. GitHub schedules are expressed in UTC, and the Python gate enforces the actual configured instants.
 
