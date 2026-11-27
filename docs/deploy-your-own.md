@@ -53,6 +53,7 @@ For a **two-team** fork, the least disruptive approach is to retain internal `uv
 | `scraper/affiliations.py` | Allowed donor-affiliation text and canonical scoring groups |
 | `scraper/CalculateValues.py` | Per-school metrics, Class-of-2026 year, monetary and donor-count rules |
 | `scraper/getGoogleFormData.py` | Participation Sheet IDs, response tab, exact column headers, team-name parsing and eligibility |
+| `scraper/photo_approvals.py`, `public/assets/js/photos.js`, `public/assets/css/photos.css` | Exact affirmative photo-release answer, gallery labels, team branding and photo moderation tests |
 | `public/assets/csv/results.csv` + `public/index.html` + JS/tests | The single-row public CSV schema must agree with every rendered score selector |
 | `public/assets/config/season.json` and two workflow cron schedules | Competition dates/timezone and actual UTC scheduled ticks |
 | `sonar-project.properties` / `package.json` | Your repository's analysis project, metadata, links and branding |
@@ -166,7 +167,7 @@ CWKC's current calculator expects **both** Forms/response Sheets, even if no par
 
    Header comparison is case/whitespace-normalized and sometimes permits an additional suffix, but missing/duplicated required questions **fail** the update. Verify the **actual response Sheet headers**, not just visible Form prompts.
 4. Adapt `_school` to recognize your two team names. Gathering eligibility currently requires an alumni/current-parent host, an in-person venue, a photo and **at least four distinct attendees including the host**. Hanukkah participation requires eligibility `Yes`, a photo and a unique normalized email per school. Adjust scoring rules and regression tests if your competition differs.
-5. **Photo visibility is a separate system:** a Form upload is not automatically public. Obtain explicit release permission, guardian consent where relevant, organizer approval, and a safe hosting/takedown process before displaying images. To enable the optional public photo viewer, follow [photo moderation setup](photos.md).
+5. **Photo visibility is a separate system:** a Form upload is not automatically public. Obtain explicit release permission, guardian consent where relevant, organizer approval, and a safe hosting/takedown process before displaying images. The current gathering form has no explicit release question, so the reviewer must obtain permission before approving. If you change the Hanukkah release wording, update the exact accepted answer in `scraper/photo_approvals.py` and its tests. To enable the optional public photo viewer, follow [photo moderation setup](photos.md).
 6. Put the two new **public** Form URLs in the matching sections of `public/index.html`. Never use CWKC's existing response workbooks or Forms in a new fork.
 
 For a read-only test after access is configured, place the **private** service account JSON at `scraper/spreadsheet_credentials.json` (gitignored) and run from `scraper/`:
@@ -265,6 +266,6 @@ During the event, the scheduled watchdog checks ingestion heartbeat and can open
 
 **You supply and maintain:** LGL payment/form accounts and field mappings, organizational mailbox and IMAP credentials, Google project/service account/Sheets/Forms, optional Apps Script dispatch tokens, domain, authorized branding, source-of-truth financial reconciliation, donor/privacy consent and event operators.
 
-**Not included as turnkey features:** arbitrary team counts, drag-and-drop scoring or form mapping, automatic migration to other schools, a live photo gallery, Gmail push notifications, keyless Google auth or guaranteed GitHub cron precision. If you implement changes to generalize these features, track them in your fork's GitHub issues and submit reviewed PRs.
+**Not included as turnkey features:** arbitrary team counts, drag-and-drop scoring or form mapping, automatic migration to other schools, Gmail push notifications, keyless Google auth or guaranteed GitHub cron precision. If you implement changes to generalize these features, track them in your fork's GitHub issues and submit reviewed PRs.
 
 For the current code structure see [Development](development.md); for the established parser/scoring contract see [Forms](forms.md); for live operations see [Operations](operations.md).
