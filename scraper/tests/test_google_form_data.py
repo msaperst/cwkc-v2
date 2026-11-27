@@ -474,3 +474,43 @@ def test_2026_gathering_source_and_public_form_link_are_consistent():
     assert "1EOURh5B5mKy0AjAgTKMObYtdmvZGI8txVC18DCmlA5o" not in (
         Path(__file__).resolve().parents[1] / "getGoogleFormData.py"
     ).read_text()
+
+
+def test_photo_only_mode_never_reads_or_changes_score_csv(monkeypatch, tmp_path):
+    from scraper import getPhotos
+    mocked_sync = MagicMock()
+    monkeypatch.setattr(getPhotos, "sync_photos", mocked_sync)
+    monkeypatch.setattr(forms, "SubmissionUpdater", lambda *_: pytest.fail("must not touch scores"))
+    output = tmp_path / "photos"
+    monkeypatch.setattr(sys, "argv", [
+        "getGoogleFormData.py", "--photos-only", "--photos-output", str(output),
+        "--credentials-file", "fake.json", "--results-csv", "absent.csv",
+    ])
+    forms.main()
+    mocked_sync.assert_called_once_with("fake.json", output, None)
+
+
+def test_combined_mode_reuses_existing_sheet_reads(harness, monkeypatch, tmp_path):
+    from scraper import getPhotos
+    _, gatherings, photos, csv, client = harness
+    mocked_sync = MagicMock()
+    monkeypatch.setattr(getPhotos, "sync_photos", mocked_sync)
+    output = tmp_path / "photos"
+    monkeypatch.setattr(sys, "argv", [
+        "getGoogleFormData.py", "--photos-output", str(output),
+        "--credentials-file", "fake.json", "--results-csv", str(csv),
+    ])
+    forms.main()
+    mocked_sync.assert_called_once_with("fake.json", output, {
+        forms.GATHERING_SHEET_ID: gatherings.get_all_values.return_value,
+        forms.HANUKKAH_SHEET_ID: photos.get_all_values.return_value,
+    })
+    assert client.open_by_key.call_count == 2
+
+
+@pytest.mark.parametrize("args", [["--photos-only"], ["--dry-run", "--photos-output", "photos"]])
+def test_invalid_photo_cli_options_are_rejected(monkeypatch, args):
+    monkeypatch.setattr(sys, "argv", ["getGoogleFormData.py", *args])
+    with pytest.raises(SystemExit) as error:
+        forms.main()
+    assert error.value.code == 2
