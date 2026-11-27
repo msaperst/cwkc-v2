@@ -11,6 +11,7 @@ import tempfile
 SEASON_CONFIG = Path("public/assets/config/season.json")
 
 PHOTO_DIR = Path("public/assets/photos")
+MANIFEST_FILENAME = "photos.json"
 PHOTO_REF = "refs/remotes/origin/cwkc-results"
 CATEGORIES = {"alumni_gatherings", "hanukkah_photos"}
 SCHOOLS = {"uva", "vt"}
@@ -30,7 +31,7 @@ def validate_snapshot(read, year: int, destination: Path) -> None:
     """Copy exactly the manifest and referenced content-addressed JPEGs."""
     if json.loads(read("season.json")) != {"year": year}:
         raise ValueError("Photo snapshot belongs to a different season")
-    manifest = json.loads(read("photos.json"))
+    manifest = json.loads(read(MANIFEST_FILENAME))
     if not isinstance(manifest, list):
         raise ValueError("Invalid photo manifest")
     copied = set()
@@ -51,7 +52,7 @@ def validate_snapshot(read, year: int, destination: Path) -> None:
             raise ValueError("Invalid public photo content")
         (destination / name).write_bytes(payload)
         copied.add(name)
-    (destination / "photos.json").write_text(json.dumps(manifest, indent=2) + "\n",
+    (destination / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2) + "\n",
                                               encoding="utf-8")
 
 
@@ -75,12 +76,12 @@ def restore(year: int, destination: Path = PHOTO_DIR, *, enabled: bool) -> None:
             if enabled and fetch_snapshot():
                 validate_snapshot(read_snapshot_file, year, staging)
             else:
-                (staging / "photos.json").write_text("[]\n", encoding="utf-8")
+                (staging / MANIFEST_FILENAME).write_text("[]\n", encoding="utf-8")
         except Exception:
             # Do not expose Git error payloads or any unvalidated snapshot.
             shutil.rmtree(staging)
             staging.mkdir()
-            (staging / "photos.json").write_text("[]\n", encoding="utf-8")
+            (staging / MANIFEST_FILENAME).write_text("[]\n", encoding="utf-8")
             print("::warning::Photo snapshot unavailable or invalid; publishing empty gallery")
         if destination.exists():
             shutil.rmtree(destination)
