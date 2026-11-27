@@ -1,5 +1,17 @@
 [
   {
+    "school": "uva",
+    "category": "hanukkah_photos",
+    "src": "assets/photos/a48f9c0a68b5dc96fbbd8e8a00ac55e192246d416aed20cf97444d225c29b685.jpg",
+    "alt": "Hillel Photo"
+  },
+  {
+    "school": "vt",
+    "category": "hanukkah_photos",
+    "src": "assets/photos/5873a28944ea95345afe4fdf1307d4abe0b63b5904275f71eaf404321d35e5fb.jpg",
+    "alt": "Hillel Photo"
+  },
+  {
     "school": "vt",
     "category": "hanukkah_photos",
     "src": "assets/photos/fff005f09cdb7f04c7e7a84d17ff05baa89f67a3b3dcd0fe2167754dfc4a110c.jpg",
