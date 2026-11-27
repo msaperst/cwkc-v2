@@ -22,9 +22,8 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 
 - `main`: reviewed code and a safe, zeroed starter `public/assets/csv/results.csv`.
 - `cwkc-results`: latest published snapshot; website deployments overlay this branch's CSV so code changes cannot reset a live scoreboard.
-- `update.yml`: GitHub schedule ~every 5 minutes during event (cron can be delayed); combines unread LGL ingestion and participation; only publishes changes. `sheet-change` repository dispatch may also wake it. **All events still pass the same date/kill-switch gate.**
-- `cwkc-photos`: approved optimized photo assets and manifest only.
-- `photo-sync.yml`: independent approval-aware sync, triggered by `sheet-change`, manual dispatch or scheduled fallback when `CWKC_PHOTOS_ENABLED=true`.
+- `update.yml`: GitHub schedule ~every 5 minutes during event (cron can be delayed); combines unread LGL ingestion and participation; only publishes changes. `sheet-change` repository dispatch may also wake it. **All score updates still pass the same date/kill-switch gate.**
+- `update.yml` also synchronizes approved images when `CWKC_PHOTOS_ENABLED=true`, including outside the scoring window. Both snapshots are stored on `cwkc-results`.
 - `deploy.yml`: publishes reviewed static site plus current scores and validated photos. See [photo moderation](photos.md).
 - `watchdog.yml`: checks ingestion heartbeat twice hourly during event, creates one operator issue for failures/staleness.
 - `test.yml`: Python/Jest/Playwright checks on PRs and `main`.
@@ -45,7 +44,7 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 - Inspect the **actual `schedule` event** and `recompute`/`deploy-results` jobs, not merely a green `check-window` gate. Confirm private Sheet IDs/counts, published CSV and live page match LGL's authoritative totals.
 - A CSV unchanged from the last run can be correct; GitHub cron can be delayed. The watchdog checks a successful ingestion heartbeat, not merely a new data commit.
 - Successfully persisted LGL messages are marked Seen. Source IDs dedupe direct/forwarded deliveries; a source-ID collision, malformed form, unreliable Sheets readback, or unconfirmed IMAP acknowledgement blocks incomplete publication.
-- Scheduled updates and optional Forms `sheet-change` events share the same season gate. Do not run a separate inbox poller.
+- Scheduled and `sheet-change` score updates share the same season gate; approved photos have an independent flag. Do not run a separate inbox poller.
 
 ## Pause, recover, close
 
