@@ -41,6 +41,7 @@ test('submission emails the private response row and dispatches the existing eve
     expect(mail).toHaveBeenCalledTimes(1);
     expect(mail.mock.calls[0][0]).toBe('reviewer@example.invalid');
     expect(mail.mock.calls[0][2]).toContain('#gid=123&range=A5');
+    expect(mail.mock.calls[0][2]).toContain('enter Image Alt Text, and set Image Approved to Yes.');
     expect(mail.mock.calls[0][2]).not.toContain('Synthetic attendee');
     expect(dispatch).toHaveBeenCalledWith('https://api.github.com/repos/example/cwkc/dispatches',
         expect.objectContaining({payload: JSON.stringify({event_type: 'sheet-change'})}));
