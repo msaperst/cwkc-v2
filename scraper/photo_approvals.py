@@ -39,7 +39,8 @@ def file_ids(value: str) -> list[str]:
     return result
 
 
-def read_candidates(rows, fields, category: str, year: int) -> list[ApprovedPhoto]:
+def _photo_records(rows, fields, category: str) -> list[dict[str, str]]:
+    """Resolve moderation columns using the same parser as scoring."""
     if not rows:
         raise ValueError("Missing photo response headers")
     headers = [_normalize(header) for header in rows[0]]
@@ -49,27 +50,35 @@ def read_candidates(rows, fields, category: str, year: int) -> list[ApprovedPhot
     required.update({"approved": "approved", "alt": "alt text"})
     if category == "hanukkah_photos":
         required["photo_release"] = fields["photo_release"]
+    return parse_response_rows(rows, required)
+
+
+def _moderated_upload(record: dict[str, str], category: str) -> tuple[bool, set[str]]:
+    """Resolve approval and uploaded file IDs; reject malformed approved links."""
+    approved = _normalize(record["approved"]) == "yes" and 0 < len(record["alt"]) <= 300
+    if category == "hanukkah_photos":
+        approved = approved and _normalize(record["photo_release"]) == "yes"
+    try:
+        return approved, set(file_ids(record["photo"]))
+    except ValueError:
+        if approved:
+            raise
+        return False, set()
+
+
+def read_candidates(rows, fields, category: str, year: int) -> list[ApprovedPhoto]:
     candidates = {}
     denied = set()
-    for record in parse_response_rows(rows, required):
+    for record in _photo_records(rows, fields, category):
         if not record["photo"] or not _in_season(record["timestamp"], year):
             continue
-        alt = record["alt"].strip()
-        approved = _normalize(record["approved"]) == "yes" and 0 < len(alt) <= 300
-        if category == "hanukkah_photos":
-            approved = approved and _normalize(record["photo_release"]) == "yes"
-        try:
-            ids = set(file_ids(record["photo"]))
-        except ValueError:
-            if approved:
-                raise
-            continue
+        approved, ids = _moderated_upload(record, category)
         if not approved:
             denied.update(ids)
             continue
         school = _school(record["school"])
         for file_id in ids:
-            photo = ApprovedPhoto(file_id, school, category, alt)
+            photo = ApprovedPhoto(file_id, school, category, record["alt"])
             if file_id in candidates and candidates[file_id] != photo:
                 denied.add(file_id)
             candidates[file_id] = photo
