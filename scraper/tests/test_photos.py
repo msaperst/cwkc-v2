@@ -30,7 +30,7 @@ def responses(category, values, moderated=True):
         keys.append("photo_release")
     headers = [fields[key] for key in keys]
     if moderated:
-        headers += ["Approved", "Alt Text"]
+        headers += ["Image Approved", "Image Alt Text"]
     return fields, [headers] + values
 
 
@@ -64,7 +64,7 @@ def test_unconfigured_sheet_and_missing_alt_fail_closed():
         ["11/26/2026", "VT", "https://drive.google.com/open?id=" + OTHER, "Yes", "Yes", "x" * 301],
     ])
     assert approvals.read_candidates(rows, fields, category, YEAR) == []
-    rows[0].append("Approved")
+    rows[0].append("Image Approved")
     with pytest.raises(ValueError, match="ambiguous"):
         approvals.read_candidates(rows, fields, category, YEAR)
     with pytest.raises(ValueError, match="headers"):
@@ -251,3 +251,12 @@ def test_sync_fails_closed_to_empty_gallery_if_source_unavailable(monkeypatch, t
     logs = capsys.readouterr().out
     assert "publishing empty gallery" in logs
     assert "private details" not in logs
+
+
+def test_legacy_moderation_headers_do_not_authorize_publication():
+    category = "alumni_gatherings"
+    fields, rows = responses(category, [
+        ["11/25/2026", "VT", LINK, "Yes", "Group"],
+    ])
+    rows[0][-2:] = ["Approved", "Alt Text"]
+    assert approvals.read_candidates(rows, fields, category, YEAR) == []

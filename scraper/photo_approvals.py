@@ -44,10 +44,10 @@ def _photo_records(rows, fields, category: str) -> list[dict[str, str]]:
     if not rows:
         raise ValueError("Missing photo response headers")
     headers = [_normalize(header) for header in rows[0]]
-    if "approved" not in headers or "alt text" not in headers:
+    if "image approved" not in headers or "image alt text" not in headers:
         return []
     required = {key: fields[key] for key in ("timestamp", "school", "photo")}
-    required.update({"approved": "approved", "alt": "alt text"})
+    required.update({"approved": "image approved", "alt": "image alt text"})
     if category == "hanukkah_photos":
         required["photo_release"] = fields["photo_release"]
     return parse_response_rows(rows, required)

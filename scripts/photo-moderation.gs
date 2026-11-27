@@ -15,7 +15,7 @@ function triggerGithubAction(e) {
         + '&range=A' + e.range.getRow();
       MailApp.sendEmail(recipients, 'CWKC photo submission to review',
         'Review the submitted photo privately:\n' + url
-        + '\n\nConfirm publication permission, enter Alt Text, and set Approved to Yes.');
+        + '\n\nConfirm publication permission, enter Image Alt Text, and set Image Approved to Yes.');
     }
   } finally {
     const response = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + '/dispatches', {
