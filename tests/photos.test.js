@@ -162,10 +162,10 @@ test('polling preserves the current carousel when the manifest is unchanged and 
     expect(document.querySelector('.photo-gallery')).toBe(gallery);
     expect(gallery.querySelector('.photo-count').textContent).toBe('2 / 2');
     fetcher.mockResolvedValue({ok: true, json: async () => []});
-    await loadGalleries(fetcher);
-    expect(document.querySelector('.photo-gallery')).toBe(gallery);
-    await loadGalleries(fetcher);
-    expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    for (let poll = 0; poll < 4; poll++) {
+        await loadGalleries(fetcher);
+        expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    }
     await loadGalleries(fetcher);
     expect(document.querySelector('.photo-gallery')).toBeNull();
     expect(fetcher).toHaveBeenCalledWith('assets/photos/photos.json', {cache: 'no-store'});
@@ -220,8 +220,10 @@ test('temporary empty manifests preserve the carousel and its position', async (
     const gallery = document.querySelector('.photo-gallery');
     gallery.querySelector('[aria-label="Next photo"]').click();
     fetcher.mockResolvedValue({ok: true, json: async () => []});
-    await loadGalleries(fetcher);
-    await loadGalleries(fetcher);
+    for (let poll = 0; poll < 4; poll++) {
+        await loadGalleries(fetcher);
+        expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    }
     fetcher.mockResolvedValue({ok: true, json: async () => photos});
     await loadGalleries(fetcher);
     expect(document.querySelector('.photo-gallery')).toBe(gallery);
@@ -242,14 +244,14 @@ test.each([
     const gallery = document.querySelector('.photo-gallery');
     const empty = {ok: true, json: async () => []};
     fetcher.mockResolvedValue(empty);
-    await loadGalleries(fetcher);
-    await loadGalleries(fetcher);
+    for (let poll = 0; poll < 4; poll++) await loadGalleries(fetcher);
     fetcher.mockResolvedValue(failure);
     await loadGalleries(fetcher);
     fetcher.mockResolvedValue(empty);
-    await loadGalleries(fetcher);
-    await loadGalleries(fetcher);
-    expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    for (let poll = 0; poll < 4; poll++) {
+        await loadGalleries(fetcher);
+        expect(document.querySelector('.photo-gallery')).toBe(gallery);
+    }
     await loadGalleries(fetcher);
     expect(document.querySelector('.photo-gallery')).toBeNull();
 });
