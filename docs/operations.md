@@ -13,8 +13,9 @@ Configure **Settings → Secrets and variables → Actions**. Do not store crede
 | GCP service-account JSON fields (secrets) | Reconstruct private `spreadsheet_credentials.json` for the import jobs |
 | `CWKC_DONATIONS_WORKSHEET=entries_2026` (variable) | Exact current-season worksheet, shared by importer/scorer |
 | `CWKC_INGESTION_ENABLED` (variable) | Literal `true` allows normal ingestion **only within the configured event window** |
+| `CWKC_PHOTOS_ENABLED` (variable) | Literal `true` enables moderated photo synchronization and display independently of scoring |
 
-The service account needs **Editor** access to the private Donations worksheet and read access to the 2026 participation response Sheets. Do not assume the connected human Google account's permissions also apply to the service account. The workflow's GitHub token publishes `cwkc-results` and Pages with scoped job permissions.
+The service account needs **Editor** access to the private Donations worksheet and read access to the 2026 participation response Sheets. For photos, enable the Drive API and separately grant Viewer access to both private upload folders. Do not assume the connected human Google account's permissions also apply to the service account. The workflow's GitHub token publishes `cwkc-results` and Pages with scoped job permissions.
 
 ## Season timing and publishing
 
@@ -31,7 +32,7 @@ Canonical dates/timezone are in `public/assets/config/season.json`. For 2026: **
 ## Before kickoff
 
 1. Reconcile genuine paid early gifts against LGL and exclude/resolve nonpaid staff/backend test submissions **privately**. Do not equate an email with a settled payment.
-2. Confirm `entries_2026` has the 12 expected column headers ending in `submission id` and no stray test rows; the current 2026 Google Forms response sheets contain only approved submissions.
+2. Confirm `entries_2026` has the 12 expected column headers ending in `submission id` and no stray test rows; the current 2026 Google Forms response sheets contain no synthetic test submissions. Photo approval is a separate publication decision.
 3. Ensure every eligible early LGL notification is **unread**; the normal importer searches unread direct and approved forwarded notifications. Do not mark processed mail unread without reconciliation.
 4. Run authorized read-only checks: `python -m scraper.getLglFormData --reconcile-only` from root; `python getGoogleFormData.py --dry-run` from `scraper/`. Verify the service account and target worksheet.
 5. Confirm `cwkc-results` has the intended prelaunch snapshot, the public site shows **“The Cup Starts In”**, and monitor/backup operators receive alerts.
@@ -66,6 +67,6 @@ GitHub service failure still needs a fresh deployment or failed-job retry.
 3. Investigate actual LGL payment/duplicate IDs, malformed source labels, service-account access, quota, batch verification, and Pages artifact/deployment errors. **Never** assume a successful HTTP append means rows persisted—our importer writes a contiguous explicit range and reads it back.
 4. Fix with a PR or authorized credential adjustment. Missing or already-Seen messages require a deliberate reconciliation/replay plan; **never** indiscriminately clear a ledger or change flags in production.
 5. Resume only within the official collection window after operator sign-off; verify results and close the watchdog incident after recovery.
-6. At **Dec 7 20:00 EST**, the backend cutoff prevents new ingestion/publication. Obtain final LGL reconciliation and organizer sign-off; do not extend the window to force a late import.
+6. At **Dec 7 20:00 EST**, the backend cutoff prevents new score ingestion/publication. Moderated photo updates can continue independently. Obtain final LGL reconciliation and organizer sign-off; do not extend the window to force a late import.
 
 A code rollback or results-branch reset **does not undo private Sheet writes, email Seen flags, publicly exposed CSV history or cached data**. Never assume a short-lived test display erases published identities. Use [issue #41](https://github.com/msaperst/cwkc-v2/issues/41) for launch decisions and [#40](https://github.com/msaperst/cwkc-v2/issues/40) for monitoring owners; see [photo moderation](photos.md) for gallery recovery.
